@@ -22,7 +22,7 @@ for device in data.get("result", {}).get("devices", []):
     if (
         hw.get("platform") == "iOS"
         and conn.get("pairingState", "paired") == "paired"
-        and device.get("state") == "available"
+        and hw.get("reality") == "physical"
     ):
         print(hw.get("udid", ""))
         break
