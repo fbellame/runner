@@ -27,6 +27,8 @@ targets:
       path: Runner/Info.plist
       properties:
         CFBundleDisplayName: Runner
+        CFBundleLocalizations: [en, fr]
+        CFBundleDevelopmentRegion: en
         UILaunchScreen:
           UIColorName: LaunchBackground
         UISupportedInterfaceOrientations: [UIInterfaceOrientationPortrait]
