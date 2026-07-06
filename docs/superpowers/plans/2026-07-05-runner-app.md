@@ -300,11 +300,11 @@ Note: `Runner.xcodeproj` is generated — add it to `.gitignore` in this step (`
 - Consumes: nothing.
 - Produces (used by every Feature task):
   - `extension Color { init(hex: UInt32) }` and static tokens `Color.rBackground`, `.rSurface`, `.rBorder`, `.rLime`, `.rTeal`, `.rPurple`, `.rOrange`, `.rTextSecondary`
-  - `ActivityType` (`enum ActivityType: String, Codable, CaseIterable, Sendable { case run, walk, bike }`) with `var emoji: String`, `var accent: Color`, `var labelKey: String` — **defined here** so both DesignSystem and Core can use it
+  - `ActivityType` (`enum ActivityType: String, Codable, CaseIterable, Sendable { case run, walk, bike }`) with `var emoji: String`, `var accent: Color`, `var localizedName: String` — **defined here** so both DesignSystem and Core can use it
   - `struct GlowNumber: View` (`init(value: Int, unitLabel: String)`) — the big glowing points number
   - `struct GoalBar: View` (`init(points: Int, goal: Int)`) — gradient progress bar
   - `struct SurfaceCard<Content: View>: View` (`init(@ViewBuilder content: () -> Content)`) — dark card with border
-  - `func glowShadow(_ color: Color) -> some ViewModifier` usage: `.modifier(GlowShadow(color: .rLime))`
+  - `struct GlowShadow: ViewModifier` (`init(color: Color)`), applied as `.modifier(GlowShadow(color: .rLime))`
 
 - [ ] **Step 1: Write failing test**
 
