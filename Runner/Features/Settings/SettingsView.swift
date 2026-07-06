@@ -1,0 +1,93 @@
+import SwiftUI
+import UIKit
+
+struct SettingsView: View {
+    @Environment(AppModel.self) private var model
+    @Environment(\.dismiss) private var dismiss
+    @State private var pendingCount = 0
+
+    var body: some View {
+        @Bindable var model = model
+        NavigationStack {
+            List {
+                Section(String(localized: "Daily goal")) {
+                    Stepper(value: $model.dailyGoal, in: 50...500, step: 10) {
+                        HStack {
+                            Text(String(localized: "Goal"))
+                            Spacer()
+                            Text("\(model.dailyGoal) pts")
+                                .foregroundStyle(Color.rLime)
+                                .bold()
+                        }
+                    }
+                }
+
+                Section(String(localized: "Permissions")) {
+                    permissionRow(title: String(localized: "Apple Health"),
+                                  ok: model.health.isAvailable && !model.health.writeDenied,
+                                  detail: model.health.writeDenied
+                                    ? String(localized: "Write access denied — points may be incomplete")
+                                    : String(localized: "Connected"))
+                    permissionRow(title: String(localized: "Location"),
+                                  ok: !model.recorder.authorizationDenied,
+                                  detail: model.recorder.authorizationDenied
+                                    ? String(localized: "Denied — recording won't work")
+                                    : String(localized: "Ready"))
+                    if pendingCount > 0 {
+                        Label(String(localized: "\(pendingCount) workout(s) waiting to sync to Health"),
+                              systemImage: "exclamationmark.arrow.circlepath")
+                            .foregroundStyle(Color.rOrange)
+                    }
+                    Button(String(localized: "Open iOS Settings")) {
+                        if let url = URL(string: UIApplication.openSettingsURLString) {
+                            UIApplication.shared.open(url)
+                        }
+                    }
+                }
+
+                Section(String(localized: "How points work")) {
+                    ruleRow("👟", String(localized: "1 pt per 100 steps (max 200/day)"))
+                    ruleRow("🏃", String(localized: "Run: 15 pts per km"))
+                    ruleRow("🚶", String(localized: "Walk: 10 pts per km"))
+                    ruleRow("🚴", String(localized: "Bike: 6 pts per km"))
+                    ruleRow("🔥", String(localized: "Streak: +5% per gold day, max ×1.5"))
+                }
+
+                Section {
+                    LabeledContent(String(localized: "Version"), value: "1.0")
+                }
+            }
+            .scrollContentBackground(.hidden)
+            .background(Color.rBackground)
+            .navigationTitle(String(localized: "Settings"))
+            .toolbar {
+                ToolbarItem(placement: .confirmationAction) {
+                    Button(String(localized: "Done")) { dismiss() }
+                }
+            }
+            .task { pendingCount = (try? model.store.pendingSync().count) ?? 0 }
+        }
+        .preferredColorScheme(.dark)
+    }
+
+    private func permissionRow(title: String, ok: Bool, detail: String) -> some View {
+        HStack {
+            VStack(alignment: .leading, spacing: 2) {
+                Text(title)
+                Text(detail)
+                    .font(.caption)
+                    .foregroundStyle(Color.rTextSecondary)
+            }
+            Spacer()
+            Image(systemName: ok ? "checkmark.circle.fill" : "xmark.circle.fill")
+                .foregroundStyle(ok ? Color.rTeal : Color.rOrange)
+        }
+    }
+
+    private func ruleRow(_ emoji: String, _ text: String) -> some View {
+        HStack(spacing: 10) {
+            Text(emoji)
+            Text(text).font(.subheadline)
+        }
+    }
+}
