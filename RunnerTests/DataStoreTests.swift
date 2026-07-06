@@ -63,6 +63,23 @@ struct DataStoreTests {
         #expect(try store.workouts(onDay: .now).count == 1)
     }
 
+    @Test func upsertNormalizesDateToStartOfDay() throws {
+        let store = try makeStore()
+        let cal = Calendar.current
+        let noon = cal.date(bySettingHour: 12, minute: 30, second: 0, of: .now)!
+        let day = LedgerDay(date: noon, steps: 6_000,
+                            breakdown: PointsBreakdown(stepPoints: 60, workoutPoints: 0,
+                                                       multiplier: 1.0, total: 60),
+                            goal: 100, isGold: false, streakAfter: 0)
+        try store.upsert([day])
+        #expect(try store.ledger(on: .now)?.totalPoints == 60)   // found via startOfDay key
+        try store.upsert([ledgerDay(0, total: 90)])              // same calendar day, midnight date
+        let all = try store.ledgers(from: cal.date(byAdding: .day, value: -1, to: .now)!,
+                                    through: .now)
+        #expect(all.count == 1)                                  // updated, not duplicated
+        #expect(all[0].totalPoints == 90)
+    }
+
     @Test func latestLedgerBefore() throws {
         let store = try makeStore()
         try store.upsert([ledgerDay(-3, total: 110), ledgerDay(-2, total: 120)])

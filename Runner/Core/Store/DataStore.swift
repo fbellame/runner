@@ -18,7 +18,10 @@ final class DataStore {
             if let existing = try ledger(on: day.date) {
                 existing.apply(day)
             } else {
-                context.insert(DayLedger(date: day.date, steps: day.steps,
+                // Normalize at write time so the unique key is always startOfDay,
+                // regardless of caller discipline.
+                context.insert(DayLedger(date: Calendar.current.startOfDay(for: day.date),
+                                         steps: day.steps,
                                          stepPoints: day.breakdown.stepPoints,
                                          workoutPoints: day.breakdown.workoutPoints,
                                          multiplier: day.breakdown.multiplier,
