@@ -2570,7 +2570,7 @@ Sync algorithm (the contract):
 1. Retry every `store.pendingSync()` workout against `health.saveWorkout`; on success re-upsert with `hkSynced: true` (same local id — external reads exclude our app's workouts by bundle id, so ids never need reconciling).
 2. Read `dailySteps(daysBack: 90)` and `workouts(daysBack: 90)` from HealthKit.
 3. Upsert every HK workout **not from this app** into the cache with `source: "external"`, `routeData: nil`, points = `PointsEngine.workoutPoints`.
-4. Build day inputs for each of the 90 days ascending: steps from the map (0 if absent), workouts = HK workouts grouped by day **plus** still-pending local workouts (they're not in HK yet).
+4. Build day inputs for each of the 90 days ascending: steps from the map (0 if absent), workouts = HK workouts grouped by day **plus** still-pending local workouts. "Still-pending" is determined AFTER step 1's retries (re-query `pendingSync()`): a successfully-retried workout is already in the step-2 HK read and must not be added again — counting it from both sources would double its points for that day.
 5. `LedgerBuilder.build` with `initialStreak = store.latestLedger(before: windowStart)?.streakAfter ?? 0` and `goalProvider = store.goalProvider(currentGoal: currentGoal())`, then `store.upsert`.
 6. Set `lastSyncAt`; on any thrown error set `lastError` (localized description) and keep whatever succeeded.
 
@@ -2600,7 +2600,15 @@ final class FakeHealthStore: HealthStoring {
     func saveWorkout(_ workout: RecordedWorkout, points: Int) async throws -> UUID {
         if let saveError { throw saveError }
         savedWorkouts.append((workout, points))
-        return UUID()
+        // Mirror real HealthKit visibility: a successful save is immediately
+        // returned by subsequent workouts() reads, flagged as ours. Without this,
+        // the fake cannot pin the retry-then-recount double-count bug.
+        let id = UUID()
+        cannedWorkouts.append(ExternalWorkout(id: id, type: workout.type,
+                                              start: workout.start,
+                                              distanceMeters: workout.distanceMeters,
+                                              isFromThisApp: true))
+        return id
     }
 
     func startObservingSteps(_ onChange: @escaping @Sendable () -> Void) {
