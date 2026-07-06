@@ -143,8 +143,9 @@ targets:
       - target: Runner
     settings:
       base:
-        BUNDLE_LOADER: "$(TEST_HOST)"
         GENERATE_INFOPLIST_FILE: true
+        # XcodeGen sets TEST_HOST/BUNDLE_LOADER automatically for unit-test
+        # targets that depend on an app target — do not set them by hand.
 schemes:
   Runner:
     build:
@@ -254,11 +255,14 @@ struct RootTabView: View {
 
 ```swift
 import Testing
+import Foundation
 @testable import Runner
 
 struct SmokeTests {
-    @Test func appModuleLoads() {
-        #expect(Bool(true))
+    @Test func testsRunAgainstTheAppHost() {
+        // Bundle.main is Runner.app only when TEST_HOST wiring is correct —
+        // this catches broken test-target configuration, not app logic.
+        #expect(Bundle.main.bundleIdentifier == "com.farid.runner")
     }
 }
 ```
@@ -3286,6 +3290,9 @@ enum Format {
 struct RouteMapView: View {
     init(points: [RoutePoint], interactive: Bool = false)
     // Dark MapKit map, lime glow polyline, dashed gap segments, start ring / end dot.
+    static func fittingRegion(for points: [RoutePoint],
+                              paddingFactor: Double = 1.4,
+                              minSpan: Double = 0.004) -> MKCoordinateRegion
 }
 ```
 
@@ -3384,7 +3391,10 @@ struct RouteMapView: View {
         return out
     }
 
-    private var region: MKCoordinateRegion {
+    /// Region fitting `points` with padding — shared by every map screen (Routes reuses it).
+    static func fittingRegion(for points: [RoutePoint],
+                              paddingFactor: Double = 1.4,
+                              minSpan: Double = 0.004) -> MKCoordinateRegion {
         guard let first = points.first else {
             return MKCoordinateRegion(center: CLLocationCoordinate2D(latitude: 45.5, longitude: -73.6),
                                       span: MKCoordinateSpan(latitudeDelta: 0.02, longitudeDelta: 0.02))
@@ -3397,9 +3407,11 @@ struct RouteMapView: View {
         return MKCoordinateRegion(
             center: CLLocationCoordinate2D(latitude: (minLat + maxLat) / 2,
                                            longitude: (minLon + maxLon) / 2),
-            span: MKCoordinateSpan(latitudeDelta: max((maxLat - minLat) * 1.4, 0.004),
-                                   longitudeDelta: max((maxLon - minLon) * 1.4, 0.004)))
+            span: MKCoordinateSpan(latitudeDelta: max((maxLat - minLat) * paddingFactor, minSpan),
+                                   longitudeDelta: max((maxLon - minLon) * paddingFactor, minSpan)))
     }
+
+    private var region: MKCoordinateRegion { Self.fittingRegion(for: points) }
 
     var body: some View {
         Map(initialPosition: .region(region), interactionModes: interactive ? .all : []) {
@@ -4592,20 +4604,8 @@ struct RoutesView: View {
     }
 
     private var region: MKCoordinateRegion {
-        let all = routed.flatMap(\.points)
-        guard let first = all.first else {
-            return MKCoordinateRegion(center: .init(latitude: 45.5, longitude: -73.6),
-                                      span: .init(latitudeDelta: 0.05, longitudeDelta: 0.05))
-        }
-        var minLat = first.lat, maxLat = first.lat, minLon = first.lon, maxLon = first.lon
-        for p in all {
-            minLat = min(minLat, p.lat); maxLat = max(maxLat, p.lat)
-            minLon = min(minLon, p.lon); maxLon = max(maxLon, p.lon)
-        }
-        return MKCoordinateRegion(center: .init(latitude: (minLat + maxLat) / 2,
-                                                longitude: (minLon + maxLon) / 2),
-                                  span: .init(latitudeDelta: max((maxLat - minLat) * 1.3, 0.01),
-                                              longitudeDelta: max((maxLon - minLon) * 1.3, 0.01)))
+        RouteMapView.fittingRegion(for: routed.flatMap(\.points),
+                                   paddingFactor: 1.3, minSpan: 0.01)
     }
 
     var body: some View {
