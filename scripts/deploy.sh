@@ -34,12 +34,24 @@ if [ -z "${UDID}" ]; then
 fi
 echo "Deploying to device ${UDID}"
 
+if [ -z "${TEAM_ID:-}" ]; then
+  TEAM_ID=$(defaults read com.apple.dt.Xcode IDEProvisioningTeamByIdentifier 2>/dev/null \
+    | awk -F'= ' '/teamID/{gsub(/[; ]/, "", $2); print $2; exit}')
+fi
+
 BUILD_ARGS=(-project Runner.xcodeproj -scheme Runner -destination "id=${UDID}" -allowProvisioningUpdates)
-[ -n "${TEAM_ID:-}" ] && BUILD_ARGS+=("DEVELOPMENT_TEAM=${TEAM_ID}")
+if [ -n "${TEAM_ID:-}" ]; then
+  echo "Using development team ${TEAM_ID}"
+  BUILD_ARGS+=("DEVELOPMENT_TEAM=${TEAM_ID}")
+fi
 xcodebuild "${BUILD_ARGS[@]}" build
 
 PRODUCTS_DIR=$(xcodebuild "${BUILD_ARGS[@]}" -showBuildSettings 2>/dev/null \
   | awk -F' = ' '/ BUILT_PRODUCTS_DIR/{print $2; exit}')
 xcrun devicectl device install app --device "${UDID}" "${PRODUCTS_DIR}/Runner.app"
-xcrun devicectl device process launch --device "${UDID}" com.farid.runner || true
+if ! xcrun devicectl device process launch --device "${UDID}" com.farid.runner; then
+  echo "Runner installed, but iOS refused to launch it." >&2
+  echo "On the iPhone, trust the developer profile in Settings -> General -> VPN & Device Management, then rerun this script." >&2
+  exit 2
+fi
 echo "Runner deployed. Free-account signature lasts ~7 days; rerun this script weekly."
