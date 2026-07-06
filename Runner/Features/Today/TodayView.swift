@@ -180,8 +180,3 @@ struct CelebrationBurst: View {
             }
     }
 }
-
-enum Haptics {
-    static func goalReached() {}
-    static func kmSplit() {}
-}

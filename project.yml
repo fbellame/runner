@@ -21,6 +21,7 @@ targets:
         CODE_SIGN_STYLE: Automatic
         CODE_SIGN_ENTITLEMENTS: Runner/Runner.entitlements
         TARGETED_DEVICE_FAMILY: "1"
+        ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
         INFOPLIST_KEY_UIUserInterfaceStyle: Dark
         SWIFT_STRICT_CONCURRENCY: complete
     info:
