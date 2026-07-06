@@ -19,7 +19,15 @@ final class FakeHealthStore: HealthStoring {
     func saveWorkout(_ workout: RecordedWorkout, points: Int) async throws -> UUID {
         if let saveError { throw saveError }
         savedWorkouts.append((workout, points))
-        return UUID()
+        // Mirror real HealthKit visibility: a successful save is immediately
+        // returned by subsequent workouts() reads, flagged as ours. Without this,
+        // the fake cannot pin the retry-then-recount double-count bug.
+        let id = UUID()
+        cannedWorkouts.append(ExternalWorkout(id: id, type: workout.type,
+                                              start: workout.start,
+                                              distanceMeters: workout.distanceMeters,
+                                              isFromThisApp: true))
+        return id
     }
 
     func startObservingSteps(_ onChange: @escaping @Sendable () -> Void) {

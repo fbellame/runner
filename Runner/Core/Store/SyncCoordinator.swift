@@ -24,11 +24,7 @@ final class SyncCoordinator {
         lastError = nil
         defer { isSyncing = false }
 
-        // Snapshot once, before retrying: even a save that succeeds in this same
-        // pass isn't guaranteed to be reflected by the HealthKit read below, so
-        // these still count as "not in HK yet" for today's day-input build.
-        let pendingBeforeRetry = (try? store.pendingSync()) ?? []
-        await retryPendingSaves(pendingBeforeRetry)
+        await retryPendingSaves()
 
         do {
             let cal = Calendar.current
@@ -46,10 +42,9 @@ final class SyncCoordinator {
                                         source: "external", hkSynced: true)
             }
 
-            // Day inputs: HK workouts + local workouts that weren't (or might not yet
-            // be reflected as) in HK when we read it above.
+            // Day inputs: HK workouts + local workouts that never reached HK.
             var workoutsByDay = HealthMappers.groupByDay(hkWorkouts, calendar: cal)
-            for rec in pendingBeforeRetry {
+            for rec in try store.pendingSync() {
                 let day = cal.startOfDay(for: rec.start)
                 workoutsByDay[day, default: []]
                     .append(WorkoutSummary(type: rec.type, distanceMeters: rec.distanceMeters))
@@ -77,7 +72,8 @@ final class SyncCoordinator {
         }
     }
 
-    private func retryPendingSaves(_ pending: [WorkoutRec]) async {
+    private func retryPendingSaves() async {
+        guard let pending = try? store.pendingSync(), !pending.isEmpty else { return }
         for rec in pending {
             let workout = RecordedWorkout(type: rec.type, start: rec.start, end: rec.end,
                                           movingSeconds: rec.movingSeconds,
