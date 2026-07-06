@@ -1,0 +1,60 @@
+name: Runner
+options:
+  bundleIdPrefix: com.farid
+  deploymentTarget:
+    iOS: "18.0"
+  createIntermediateGroups: true
+settings:
+  base:
+    SWIFT_VERSION: "6.0"
+    IPHONEOS_DEPLOYMENT_TARGET: "18.0"
+targets:
+  Runner:
+    type: application
+    platform: iOS
+    sources:
+      - Runner
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.farid.runner
+        PRODUCT_NAME: Runner
+        CODE_SIGN_STYLE: Automatic
+        CODE_SIGN_ENTITLEMENTS: Runner/Runner.entitlements
+        TARGETED_DEVICE_FAMILY: "1"
+        INFOPLIST_KEY_UIUserInterfaceStyle: Dark
+        SWIFT_STRICT_CONCURRENCY: complete
+    info:
+      path: Runner/Info.plist
+      properties:
+        CFBundleDisplayName: Runner
+        UILaunchScreen:
+          UIColorName: LaunchBackground
+        UISupportedInterfaceOrientations: [UIInterfaceOrientationPortrait]
+        NSHealthShareUsageDescription: "Runner reads your daily steps and workouts to compute your daily points."
+        NSHealthUpdateUsageDescription: "Runner saves your recorded runs, walks and rides to Apple Health so your data is permanently yours."
+        NSLocationWhenInUseUsageDescription: "Runner uses your location to record your route while you run, walk or ride."
+        UIBackgroundModes: [location]
+        ITSAppUsesNonExemptEncryption: false
+  RunnerTests:
+    type: bundle.unit-test
+    platform: iOS
+    sources:
+      - RunnerTests
+    dependencies:
+      - target: Runner
+    settings:
+      base:
+        GENERATE_INFOPLIST_FILE: true
+        # XcodeGen sets TEST_HOST/BUNDLE_LOADER automatically for unit-test
+        # targets that depend on an app target — do not set them by hand.
+schemes:
+  Runner:
+    build:
+      targets:
+        Runner: all
+    test:
+      gatherCoverageData: false
+      targets:
+        - RunnerTests
+    run:
+      config: Debug
