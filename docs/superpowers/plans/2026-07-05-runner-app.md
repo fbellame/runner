@@ -143,8 +143,9 @@ targets:
       - target: Runner
     settings:
       base:
-        BUNDLE_LOADER: "$(TEST_HOST)"
         GENERATE_INFOPLIST_FILE: true
+        # XcodeGen sets TEST_HOST/BUNDLE_LOADER automatically for unit-test
+        # targets that depend on an app target — do not set them by hand.
 schemes:
   Runner:
     build:
@@ -254,11 +255,14 @@ struct RootTabView: View {
 
 ```swift
 import Testing
+import Foundation
 @testable import Runner
 
 struct SmokeTests {
-    @Test func appModuleLoads() {
-        #expect(Bool(true))
+    @Test func testsRunAgainstTheAppHost() {
+        // Bundle.main is Runner.app only when TEST_HOST wiring is correct —
+        // this catches broken test-target configuration, not app logic.
+        #expect(Bundle.main.bundleIdentifier == "com.farid.runner")
     }
 }
 ```
@@ -296,11 +300,11 @@ Note: `Runner.xcodeproj` is generated — add it to `.gitignore` in this step (`
 - Consumes: nothing.
 - Produces (used by every Feature task):
   - `extension Color { init(hex: UInt32) }` and static tokens `Color.rBackground`, `.rSurface`, `.rBorder`, `.rLime`, `.rTeal`, `.rPurple`, `.rOrange`, `.rTextSecondary`
-  - `ActivityType` (`enum ActivityType: String, Codable, CaseIterable, Sendable { case run, walk, bike }`) with `var emoji: String`, `var accent: Color`, `var labelKey: String` — **defined here** so both DesignSystem and Core can use it
+  - `ActivityType` (`enum ActivityType: String, Codable, CaseIterable, Sendable { case run, walk, bike }`) with `var emoji: String`, `var accent: Color`, `var localizedName: String` — **defined here** so both DesignSystem and Core can use it
   - `struct GlowNumber: View` (`init(value: Int, unitLabel: String)`) — the big glowing points number
   - `struct GoalBar: View` (`init(points: Int, goal: Int)`) — gradient progress bar
   - `struct SurfaceCard<Content: View>: View` (`init(@ViewBuilder content: () -> Content)`) — dark card with border
-  - `func glowShadow(_ color: Color) -> some ViewModifier` usage: `.modifier(GlowShadow(color: .rLime))`
+  - `struct GlowShadow: ViewModifier` (`init(color: Color)`), applied as `.modifier(GlowShadow(color: .rLime))`
 
 - [ ] **Step 1: Write failing test**
 
@@ -966,6 +970,23 @@ struct DataStoreTests {
         #expect(try store.workouts(onDay: .now).count == 1)
     }
 
+    @Test func upsertNormalizesDateToStartOfDay() throws {
+        let store = try makeStore()
+        let cal = Calendar.current
+        let noon = cal.date(bySettingHour: 12, minute: 30, second: 0, of: .now)!
+        let day = LedgerDay(date: noon, steps: 6_000,
+                            breakdown: PointsBreakdown(stepPoints: 60, workoutPoints: 0,
+                                                       multiplier: 1.0, total: 60),
+                            goal: 100, isGold: false, streakAfter: 0)
+        try store.upsert([day])
+        #expect(try store.ledger(on: .now)?.totalPoints == 60)   // found via startOfDay key
+        try store.upsert([ledgerDay(0, total: 90)])              // same calendar day, midnight date
+        let all = try store.ledgers(from: cal.date(byAdding: .day, value: -1, to: .now)!,
+                                    through: .now)
+        #expect(all.count == 1)                                  // updated, not duplicated
+        #expect(all[0].totalPoints == 90)
+    }
+
     @Test func latestLedgerBefore() throws {
         let store = try makeStore()
         try store.upsert([ledgerDay(-3, total: 110), ledgerDay(-2, total: 120)])
@@ -1085,7 +1106,10 @@ final class DataStore {
             if let existing = try ledger(on: day.date) {
                 existing.apply(day)
             } else {
-                context.insert(DayLedger(date: day.date, steps: day.steps,
+                // Normalize at write time so the unique key is always startOfDay,
+                // regardless of caller discipline.
+                context.insert(DayLedger(date: Calendar.current.startOfDay(for: day.date),
+                                         steps: day.steps,
                                          stepPoints: day.breakdown.stepPoints,
                                          workoutPoints: day.breakdown.workoutPoints,
                                          multiplier: day.breakdown.multiplier,
@@ -2546,7 +2570,7 @@ Sync algorithm (the contract):
 1. Retry every `store.pendingSync()` workout against `health.saveWorkout`; on success re-upsert with `hkSynced: true` (same local id — external reads exclude our app's workouts by bundle id, so ids never need reconciling).
 2. Read `dailySteps(daysBack: 90)` and `workouts(daysBack: 90)` from HealthKit.
 3. Upsert every HK workout **not from this app** into the cache with `source: "external"`, `routeData: nil`, points = `PointsEngine.workoutPoints`.
-4. Build day inputs for each of the 90 days ascending: steps from the map (0 if absent), workouts = HK workouts grouped by day **plus** still-pending local workouts (they're not in HK yet).
+4. Build day inputs for each of the 90 days ascending: steps from the map (0 if absent), workouts = HK workouts grouped by day **plus** still-pending local workouts. "Still-pending" is determined AFTER step 1's retries (re-query `pendingSync()`): a successfully-retried workout is already in the step-2 HK read and must not be added again — counting it from both sources would double its points for that day.
 5. `LedgerBuilder.build` with `initialStreak = store.latestLedger(before: windowStart)?.streakAfter ?? 0` and `goalProvider = store.goalProvider(currentGoal: currentGoal())`, then `store.upsert`.
 6. Set `lastSyncAt`; on any thrown error set `lastError` (localized description) and keep whatever succeeded.
 
@@ -2576,7 +2600,15 @@ final class FakeHealthStore: HealthStoring {
     func saveWorkout(_ workout: RecordedWorkout, points: Int) async throws -> UUID {
         if let saveError { throw saveError }
         savedWorkouts.append((workout, points))
-        return UUID()
+        // Mirror real HealthKit visibility: a successful save is immediately
+        // returned by subsequent workouts() reads, flagged as ours. Without this,
+        // the fake cannot pin the retry-then-recount double-count bug.
+        let id = UUID()
+        cannedWorkouts.append(ExternalWorkout(id: id, type: workout.type,
+                                              start: workout.start,
+                                              distanceMeters: workout.distanceMeters,
+                                              isFromThisApp: true))
+        return id
     }
 
     func startObservingSteps(_ onChange: @escaping @Sendable () -> Void) {
@@ -3286,6 +3318,9 @@ enum Format {
 struct RouteMapView: View {
     init(points: [RoutePoint], interactive: Bool = false)
     // Dark MapKit map, lime glow polyline, dashed gap segments, start ring / end dot.
+    static func fittingRegion(for points: [RoutePoint],
+                              paddingFactor: Double = 1.4,
+                              minSpan: Double = 0.004) -> MKCoordinateRegion
 }
 ```
 
@@ -3384,7 +3419,10 @@ struct RouteMapView: View {
         return out
     }
 
-    private var region: MKCoordinateRegion {
+    /// Region fitting `points` with padding — shared by every map screen (Routes reuses it).
+    static func fittingRegion(for points: [RoutePoint],
+                              paddingFactor: Double = 1.4,
+                              minSpan: Double = 0.004) -> MKCoordinateRegion {
         guard let first = points.first else {
             return MKCoordinateRegion(center: CLLocationCoordinate2D(latitude: 45.5, longitude: -73.6),
                                       span: MKCoordinateSpan(latitudeDelta: 0.02, longitudeDelta: 0.02))
@@ -3397,9 +3435,11 @@ struct RouteMapView: View {
         return MKCoordinateRegion(
             center: CLLocationCoordinate2D(latitude: (minLat + maxLat) / 2,
                                            longitude: (minLon + maxLon) / 2),
-            span: MKCoordinateSpan(latitudeDelta: max((maxLat - minLat) * 1.4, 0.004),
-                                   longitudeDelta: max((maxLon - minLon) * 1.4, 0.004)))
+            span: MKCoordinateSpan(latitudeDelta: max((maxLat - minLat) * paddingFactor, minSpan),
+                                   longitudeDelta: max((maxLon - minLon) * paddingFactor, minSpan)))
     }
+
+    private var region: MKCoordinateRegion { Self.fittingRegion(for: points) }
 
     var body: some View {
         Map(initialPosition: .region(region), interactionModes: interactive ? .all : []) {
@@ -4592,20 +4632,8 @@ struct RoutesView: View {
     }
 
     private var region: MKCoordinateRegion {
-        let all = routed.flatMap(\.points)
-        guard let first = all.first else {
-            return MKCoordinateRegion(center: .init(latitude: 45.5, longitude: -73.6),
-                                      span: .init(latitudeDelta: 0.05, longitudeDelta: 0.05))
-        }
-        var minLat = first.lat, maxLat = first.lat, minLon = first.lon, maxLon = first.lon
-        for p in all {
-            minLat = min(minLat, p.lat); maxLat = max(maxLat, p.lat)
-            minLon = min(minLon, p.lon); maxLon = max(maxLon, p.lon)
-        }
-        return MKCoordinateRegion(center: .init(latitude: (minLat + maxLat) / 2,
-                                                longitude: (minLon + maxLon) / 2),
-                                  span: .init(latitudeDelta: max((maxLat - minLat) * 1.3, 0.01),
-                                              longitudeDelta: max((maxLon - minLon) * 1.3, 0.01)))
+        RouteMapView.fittingRegion(for: routed.flatMap(\.points),
+                                   paddingFactor: 1.3, minSpan: 0.01)
     }
 
     var body: some View {
