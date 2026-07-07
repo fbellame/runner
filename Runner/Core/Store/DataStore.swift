@@ -1,6 +1,12 @@
 import Foundation
 import SwiftData
 
+struct DayDerived: Sendable {
+    let activeCalories: Double
+    let distanceMeters: Double
+    let activeSeconds: Double
+}
+
 @MainActor
 final class DataStore {
     let container: ModelContainer
@@ -8,12 +14,31 @@ final class DataStore {
 
     init(inMemory: Bool = false) throws {
         let config = ModelConfiguration(isStoredInMemoryOnly: inMemory)
-        container = try ModelContainer(for: DayLedger.self, WorkoutRec.self, configurations: config)
+        container = try ModelContainer(for: DayLedger.self, WorkoutRec.self, UserProfile.self,
+                                       configurations: config)
+    }
+
+    // MARK: Profile
+
+    func save() throws { try context.save() }
+
+    func profileCount() throws -> Int {
+        try context.fetchCount(FetchDescriptor<UserProfile>())
+    }
+
+    func profile() throws -> UserProfile {
+        if let existing = try context.fetch(FetchDescriptor<UserProfile>()).first {
+            return existing
+        }
+        let created = UserProfile()
+        context.insert(created)
+        try context.save()
+        return created
     }
 
     // MARK: Ledger
 
-    func upsert(_ days: [LedgerDay]) throws {
+    func upsert(_ days: [LedgerDay], derived: [Date: DayDerived] = [:]) throws {
         guard !days.isEmpty else { return }
         let cal = Calendar.current
         // One ranged fetch for the whole batch instead of a predicate fetch per day.
@@ -22,8 +47,10 @@ final class DataStore {
             try ledgers(from: keys.min()!, through: keys.max()!).map { ($0.date, $0) })
         for day in days {
             let key = cal.startOfDay(for: day.date)
+            let row: DayLedger
             if let existing = byDay[key] {
                 existing.apply(day)
+                row = existing
             } else {
                 // Normalize at write time so the unique key is always startOfDay,
                 // regardless of caller discipline.
@@ -38,6 +65,12 @@ final class DataStore {
                                          streakAfter: day.streakAfter)
                 context.insert(inserted)
                 byDay[key] = inserted // dedupe repeated keys within the same batch
+                row = inserted
+            }
+            if let d = derived[key] {
+                row.activeCalories = d.activeCalories
+                row.distanceMeters = d.distanceMeters
+                row.activeSeconds = d.activeSeconds
             }
         }
         try context.save()
@@ -76,7 +109,7 @@ final class DataStore {
     func upsertWorkout(id: UUID, type: ActivityType, start: Date, end: Date,
                        movingSeconds: Double, distanceMeters: Double, points: Int,
                        routeData: Data?, splitSeconds: [Double],
-                       source: String, hkSynced: Bool) throws -> WorkoutRec {
+                       source: String, hkSynced: Bool, calories: Double = 0) throws -> WorkoutRec {
         var descriptor = FetchDescriptor<WorkoutRec>(predicate: #Predicate { $0.id == id })
         descriptor.fetchLimit = 1
         let rec: WorkoutRec
@@ -91,12 +124,13 @@ final class DataStore {
             existing.splitSeconds = splitSeconds
             existing.source = source
             existing.hkSynced = hkSynced
+            existing.calories = calories
             rec = existing
         } else {
             rec = WorkoutRec(id: id, typeRaw: type.rawValue, start: start, end: end,
                              movingSeconds: movingSeconds, distanceMeters: distanceMeters,
                              points: points, routeData: routeData, splitSeconds: splitSeconds,
-                             source: source, hkSynced: hkSynced)
+                             source: source, hkSynced: hkSynced, calories: calories)
             context.insert(rec)
         }
         try context.save()

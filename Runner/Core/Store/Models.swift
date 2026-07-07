@@ -12,9 +12,14 @@ final class DayLedger {
     var goalAtThatTime: Int
     var isGold: Bool
     var streakAfter: Int
+    // Derived, recomputed by the ledger-rebuild path (SyncCoordinator). Cache-safe.
+    var activeCalories: Double
+    var distanceMeters: Double
+    var activeSeconds: Double
 
     init(date: Date, steps: Int, stepPoints: Int, workoutPoints: Int, multiplier: Double,
-         totalPoints: Int, goalAtThatTime: Int, isGold: Bool, streakAfter: Int) {
+         totalPoints: Int, goalAtThatTime: Int, isGold: Bool, streakAfter: Int,
+         activeCalories: Double = 0, distanceMeters: Double = 0, activeSeconds: Double = 0) {
         self.date = date
         self.steps = steps
         self.stepPoints = stepPoints
@@ -24,6 +29,9 @@ final class DayLedger {
         self.goalAtThatTime = goalAtThatTime
         self.isGold = isGold
         self.streakAfter = streakAfter
+        self.activeCalories = activeCalories
+        self.distanceMeters = distanceMeters
+        self.activeSeconds = activeSeconds
     }
 
     func apply(_ day: LedgerDay) {
@@ -51,12 +59,15 @@ final class WorkoutRec {
     var splitSeconds: [Double]
     var source: String        // "runner" | "external"
     var hkSynced: Bool
+    // Persisted at save time from the body metrics in effect then, so a workout
+    // keeps the calories it was burned at even if weight later changes.
+    var calories: Double
 
     var type: ActivityType { ActivityType(rawValue: typeRaw) ?? .run }
 
     init(id: UUID, typeRaw: String, start: Date, end: Date, movingSeconds: Double,
          distanceMeters: Double, points: Int, routeData: Data?, splitSeconds: [Double],
-         source: String, hkSynced: Bool) {
+         source: String, hkSynced: Bool, calories: Double = 0) {
         self.id = id
         self.typeRaw = typeRaw
         self.start = start
@@ -68,5 +79,46 @@ final class WorkoutRec {
         self.splitSeconds = splitSeconds
         self.source = source
         self.hkSynced = hkSynced
+        self.calories = calories
+    }
+}
+
+@Model
+final class UserProfile {
+    var heightCm: Double?
+    var isHeightManual: Bool
+    var weightKg: Double?
+    var isWeightManual: Bool
+    var birthDate: Date?
+    var isBirthManual: Bool
+    var sexRaw: String?
+    var isSexManual: Bool
+
+    init(heightCm: Double? = nil, isHeightManual: Bool = false,
+         weightKg: Double? = nil, isWeightManual: Bool = false,
+         birthDate: Date? = nil, isBirthManual: Bool = false,
+         sexRaw: String? = nil, isSexManual: Bool = false) {
+        self.heightCm = heightCm
+        self.isHeightManual = isHeightManual
+        self.weightKg = weightKg
+        self.isWeightManual = isWeightManual
+        self.birthDate = birthDate
+        self.isBirthManual = isBirthManual
+        self.sexRaw = sexRaw
+        self.isSexManual = isSexManual
+    }
+
+    var sex: BodySex {
+        get { sexRaw.flatMap(BodySex.init(rawValue:)) ?? .unspecified }
+        set { sexRaw = newValue == .unspecified ? nil : newValue.rawValue }
+    }
+
+    var age: Int? {
+        guard let birthDate else { return nil }
+        return Calendar.current.dateComponents([.year], from: birthDate, to: .now).year
+    }
+
+    var bodyMetrics: BodyMetrics {
+        BodyMetrics(weightKg: weightKg, heightCm: heightCm, sex: sex, age: age)
     }
 }

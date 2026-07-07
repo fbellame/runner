@@ -87,4 +87,30 @@ struct DataStoreTests {
                                                                           to: Calendar.current.startOfDay(for: .now))!)
         #expect(prior?.totalPoints == 120)
     }
+
+    @Test @MainActor func profileIsSingletonAndPersists() throws {
+        let store = try DataStore(inMemory: true)
+        let p1 = try store.profile()
+        p1.weightKg = 72
+        p1.isWeightManual = true
+        try store.save()
+        let p2 = try store.profile()
+        #expect(p2.weightKg == 72)
+        #expect(p2.isWeightManual == true)
+        // Still exactly one row.
+        #expect(try store.profileCount() == 1)
+    }
+
+    @Test @MainActor func upsertWritesDerivedDayFields() throws {
+        let store = try DataStore(inMemory: true)
+        let date = Calendar.current.startOfDay(for: .now)
+        let day = LedgerDay(date: date, steps: 5000,
+                            breakdown: PointsEngine.breakdown(steps: 5000, workouts: [], streakBefore: 0),
+                            goal: 100, isGold: false, streakAfter: 0)
+        try store.upsert([day], derived: [date: DayDerived(activeCalories: 210, distanceMeters: 4200, activeSeconds: 1800)])
+        let row = try store.ledger(on: date)
+        #expect(row?.activeCalories == 210)
+        #expect(row?.distanceMeters == 4200)
+        #expect(row?.activeSeconds == 1800)
+    }
 }
