@@ -7,7 +7,7 @@ struct HistoryView: View {
     @Query(sort: \DayLedger.date, order: .forward) private var ledgers: [DayLedger]
     @Query(sort: \WorkoutRec.start, order: .reverse) private var workouts: [WorkoutRec]
     @State private var chartRange = 7
-    @State private var selectedDate: Date?
+    @State private var selectedDay: SelectedDay?
 
     private var snapshots: [DaySnapshot] {
         ledgers.map { DaySnapshot(date: $0.date, points: $0.totalPoints, isGold: $0.isGold) }
@@ -24,7 +24,7 @@ struct HistoryView: View {
                                                                     weekCount: 13,
                                                                     calendar: .current),
                                     goal: model.dailyGoal,
-                                    onSelect: { selectedDate = $0 })
+                                    onSelect: { selectedDay = SelectedDay(date: $0) })
                     }
 
                     chartSection
@@ -36,8 +36,8 @@ struct HistoryView: View {
             }
             .background(Color.rBackground)
             .navigationTitle(String(localized: "History"))
-            .navigationDestination(item: $selectedDate) { date in
-                DayDetailView(date: date)
+            .navigationDestination(item: $selectedDay) { selection in
+                DayDetailView(date: selection.date)
             }
         }
     }
@@ -71,8 +71,9 @@ struct HistoryView: View {
                 GeometryReader { geo in
                     Rectangle().fill(.clear).contentShape(Rectangle())
                         .onTapGesture { location in
-                            if let date: Date = proxy.value(atX: location.x - geo.frame(in: .local).minX) {
-                                selectedDate = Calendar.current.startOfDay(for: date)
+                            let originX = geo[proxy.plotAreaFrame].origin.x
+                            if let date: Date = proxy.value(atX: location.x - originX) {
+                                selectedDay = SelectedDay(date: Calendar.current.startOfDay(for: date))
                             }
                         }
                 }
@@ -148,7 +149,8 @@ struct HistoryView: View {
     }
 }
 
-// Enables `.navigationDestination(item:)` with a tapped calendar day.
-extension Date: @retroactive Identifiable {
-    public var id: TimeInterval { timeIntervalSince1970 }
+// A tapped calendar day, wrapped so `.navigationDestination(item:)` has an
+// Identifiable without a retroactive conformance on the stdlib `Date` type.
+struct SelectedDay: Hashable {
+    let date: Date
 }

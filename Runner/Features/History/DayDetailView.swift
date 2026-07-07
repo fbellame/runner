@@ -61,7 +61,7 @@ struct DayDetailView: View {
                     detailRow("🔥 \(String(localized: "Streak bonus"))",
                               "×\(m.formatted(.number.precision(.fractionLength(2))))", .rOrange)
                 }
-                detailRow(String(localized: "Goal that day"), "\(day?.goalAtThatTime ?? 0)", .rTextSecondary)
+                detailRow(String(localized: "Goal that day"), "\(day?.goalAtThatTime ?? model.dailyGoal)", .rTextSecondary)
             }
         }
     }
