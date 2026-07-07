@@ -10,6 +10,8 @@ final class HealthStore: HealthStoring {
     private let routeType = HKSeriesType.workoutRoute()
     private let distanceWalkRun = HKQuantityType(.distanceWalkingRunning)
     private let distanceCycling = HKQuantityType(.distanceCycling)
+    private let heightType = HKQuantityType(.height)
+    private let bodyMassType = HKQuantityType(.bodyMass)
 
     static let pointsMetadataKey = "com.farid.runner.points"
 
@@ -17,7 +19,9 @@ final class HealthStore: HealthStoring {
         [workoutType, routeType, distanceWalkRun, distanceCycling]
     }
     private var readTypes: Set<HKObjectType> {
-        [stepType, workoutType, routeType, distanceWalkRun, distanceCycling]
+        [stepType, workoutType, routeType, distanceWalkRun, distanceCycling,
+         heightType, bodyMassType,
+         HKCharacteristicType(.dateOfBirth), HKCharacteristicType(.biologicalSex)]
     }
 
     var isAvailable: Bool { HKHealthStore.isHealthDataAvailable() }
@@ -138,5 +142,31 @@ final class HealthStore: HealthStoring {
         }
         store.execute(query)
         store.enableBackgroundDelivery(for: stepType, frequency: .hourly) { _, _ in }
+    }
+
+    func bodyMetrics() async throws -> HealthBody {
+        async let heightCm = latestQuantity(heightType, unit: .meterUnit(with: .centi))
+        async let massKg = latestQuantity(bodyMassType, unit: .gramUnit(with: .kilo))
+        let birth = try? store.dateOfBirthComponents().date
+        let sex: BodySex = switch (try? store.biologicalSex().biologicalSex) ?? .notSet {
+        case .male: .male
+        case .female: .female
+        default: .unspecified
+        }
+        return HealthBody(heightCm: try await heightCm, weightKg: try await massKg,
+                          birthDate: birth, sex: sex)
+    }
+
+    private func latestQuantity(_ type: HKQuantityType, unit: HKUnit) async throws -> Double? {
+        try await withCheckedThrowingContinuation { continuation in
+            let sort = [NSSortDescriptor(key: HKSampleSortIdentifierEndDate, ascending: false)]
+            let query = HKSampleQuery(sampleType: type, predicate: nil, limit: 1,
+                                      sortDescriptors: sort) { _, samples, error in
+                if let error { continuation.resume(throwing: error); return }
+                let value = (samples?.first as? HKQuantitySample)?.quantity.doubleValue(for: unit)
+                continuation.resume(returning: value)
+            }
+            store.execute(query)
+        }
     }
 }

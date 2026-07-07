@@ -11,6 +11,13 @@ struct ExternalWorkout: Equatable, Sendable {
     let isFromThisApp: Bool
 }
 
+struct HealthBody: Sendable {
+    let heightCm: Double?
+    let weightKg: Double?
+    let birthDate: Date?
+    let sex: BodySex
+}
+
 @MainActor
 protocol HealthStoring: AnyObject {
     var isAvailable: Bool { get }
@@ -21,4 +28,5 @@ protocol HealthStoring: AnyObject {
     func workouts(daysBack: Int) async throws -> [ExternalWorkout]
     func saveWorkout(_ workout: RecordedWorkout, points: Int) async throws -> UUID
     func startObservingSteps(_ onChange: @escaping @Sendable () -> Void)
+    func bodyMetrics() async throws -> HealthBody
 }

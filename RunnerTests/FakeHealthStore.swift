@@ -13,8 +13,11 @@ final class FakeHealthStore: HealthStoring {
     var workoutsHook: (() async -> Void)?
     var saveHook: (() async -> Void)?
 
+    var cannedBody = HealthBody(heightCm: nil, weightKg: nil, birthDate: nil, sex: .unspecified)
+
     func requestAuthorization() async throws {}
     func shouldRequestAuthorization() async -> Bool { false }
+    func bodyMetrics() async throws -> HealthBody { cannedBody }
     func dailySteps(daysBack: Int) async throws -> [Date: Int] { stepsByDay }
     func workouts(daysBack: Int) async throws -> [ExternalWorkout] {
         await workoutsHook?()
