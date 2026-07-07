@@ -3,17 +3,66 @@ import SwiftUI
 struct GlowNumber: View {
     let value: Int
     let unitLabel: String
+    var prefix = ""
+    var size: Double = 64
+    var unitSize: Double = 16
+    var numberColor: Color = .white
 
     var body: some View {
         HStack(alignment: .firstTextBaseline, spacing: 6) {
-            Text("\(value)")
-                .font(.system(size: 64, weight: .heavy, design: .rounded))
-                .foregroundStyle(.white)
+            Text("\(prefix)\(value)")
+                .font(.system(size: size, weight: .heavy, design: .rounded))
+                .foregroundStyle(numberColor)
                 .contentTransition(.numericText())
                 .modifier(GlowShadow(color: .rLime))
             Text(unitLabel)
-                .font(.system(size: 16, weight: .bold, design: .rounded))
+                .font(.system(size: unitSize, weight: .bold, design: .rounded))
                 .foregroundStyle(Color.rLime)
+        }
+    }
+}
+
+struct StatTile: View {
+    let label: String
+    let value: String
+    var accent: Color = .white
+
+    var body: some View {
+        SurfaceCard {
+            VStack(alignment: .leading, spacing: 4) {
+                MicroLabel(text: label)
+                Text(value)
+                    .font(.system(size: 18, weight: .bold, design: .rounded))
+                    .foregroundStyle(accent)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.7)
+            }
+        }
+    }
+}
+
+struct SplitsCard: View {
+    let splitSeconds: [Double]
+    var title: String?
+
+    var body: some View {
+        SurfaceCard {
+            VStack(spacing: 6) {
+                if let title {
+                    MicroLabel(text: title)
+                }
+                ForEach(Array(splitSeconds.enumerated()), id: \.offset) { index, seconds in
+                    HStack {
+                        Text(String(localized: "Km \(index + 1)"))
+                            .font(.system(size: 13))
+                            .foregroundStyle(Color.rTextSecondary)
+                        Spacer()
+                        Text(Format.duration(seconds))
+                            .font(.system(size: 14, weight: .semibold, design: .monospaced))
+                            .foregroundStyle(.white)
+                    }
+                }
+            }
         }
     }
 }

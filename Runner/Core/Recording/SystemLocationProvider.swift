@@ -14,10 +14,14 @@ final class SystemLocationProvider: NSObject, LocationProviding, CLLocationManag
         manager.pausesLocationUpdatesAutomatically = false
     }
 
-    var authorizationStatus: CLAuthorizationStatus { manager.authorizationStatus }
+    var accuracyAuthorization: CLAccuracyAuthorization { manager.accuracyAuthorization }
 
     func requestWhenInUseAuthorization() {
         manager.requestWhenInUseAuthorization()
+    }
+
+    func requestTemporaryFullAccuracy(purposeKey: String) {
+        manager.requestTemporaryFullAccuracyAuthorization(withPurposeKey: purposeKey)
     }
 
     func startUpdates() {

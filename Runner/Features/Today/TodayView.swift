@@ -1,11 +1,14 @@
 import SwiftUI
 import SwiftData
+import UIKit
 
 struct TodayView: View {
     @Environment(AppModel.self) private var model
     @Query(sort: \DayLedger.date, order: .reverse) private var ledgers: [DayLedger]
     @Query(sort: \WorkoutRec.start, order: .reverse) private var workouts: [WorkoutRec]
     @State private var celebrate = false
+    // Decoded once when today's workouts change, not twice per body pass.
+    @State private var latestRoute: [RoutePoint] = []
 
     private var today: DayLedger? {
         ledgers.first { Calendar.current.isDateInToday($0.date) }
@@ -19,11 +22,12 @@ struct TodayView: View {
         ledgers.first { !Calendar.current.isDateInToday($0.date) }?.streakAfter ?? 0
     }
 
-    private var latestRoute: [RoutePoint] {
+    private func rebuildLatestRoute() {
         guard let data = todayWorkouts.first(where: { $0.routeData != nil })?.routeData else {
-            return []
+            latestRoute = []
+            return
         }
-        return [RoutePoint].decode(data)
+        latestRoute = [RoutePoint].decode(data)
     }
 
     var body: some View {
@@ -34,6 +38,19 @@ struct TodayView: View {
                 breakdown
                 if !latestRoute.isEmpty {
                     miniMap
+                }
+                if (today?.steps ?? 0) == 0 {
+                    // Never silent zeros: a read denial is indistinguishable from no
+                    // data in HealthKit, so zero steps always comes with an explainer.
+                    healthExplainerCard
+                }
+                if let storeError = model.storeFailureMessage {
+                    SurfaceCard {
+                        Label(String(localized: "Storage is unavailable (\(storeError)). Nothing recorded now will survive an app restart."),
+                              systemImage: "externaldrive.badge.exclamationmark")
+                            .font(.caption)
+                            .foregroundStyle(Color.rOrange)
+                    }
                 }
                 if let error = model.sync.lastError {
                     SurfaceCard {
@@ -48,6 +65,8 @@ struct TodayView: View {
             .padding(.top, 8)
         }
         .background(Color.rBackground)
+        .onAppear(perform: rebuildLatestRoute)
+        .onChange(of: workouts.map(\.id)) { _, _ in rebuildLatestRoute() }
         .overlay {
             if celebrate {
                 CelebrationBurst()
@@ -145,6 +164,24 @@ struct TodayView: View {
                 .foregroundStyle(accent)
         }
         .padding(.vertical, 10)
+    }
+
+    private var healthExplainerCard: some View {
+        SurfaceCard {
+            VStack(alignment: .leading, spacing: 8) {
+                Label(String(localized: "No steps from Apple Health yet. If Runner was denied access, allow reading under Health → Sharing → Apps."),
+                      systemImage: "heart.text.square")
+                    .font(.caption)
+                    .foregroundStyle(Color.rTextSecondary)
+                Button(String(localized: "Open Health sharing")) {
+                    if let url = URL(string: "x-apple-health://") {
+                        UIApplication.shared.open(url)
+                    }
+                }
+                .font(.system(size: 13, weight: .bold))
+                .foregroundStyle(Color.rLime)
+            }
+        }
     }
 
     private var miniMap: some View {

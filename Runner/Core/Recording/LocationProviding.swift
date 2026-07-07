@@ -3,8 +3,9 @@ import CoreLocation
 @MainActor
 protocol LocationProviding: AnyObject {
     var delegate: LocationProvidingDelegate? { get set }
-    var authorizationStatus: CLAuthorizationStatus { get }
+    var accuracyAuthorization: CLAccuracyAuthorization { get }
     func requestWhenInUseAuthorization()
+    func requestTemporaryFullAccuracy(purposeKey: String)
     func startUpdates()
     func stopUpdates()
 }

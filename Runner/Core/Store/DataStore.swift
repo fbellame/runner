@@ -14,13 +14,20 @@ final class DataStore {
     // MARK: Ledger
 
     func upsert(_ days: [LedgerDay]) throws {
+        guard !days.isEmpty else { return }
+        let cal = Calendar.current
+        // One ranged fetch for the whole batch instead of a predicate fetch per day.
+        let keys = days.map { cal.startOfDay(for: $0.date) }
+        var byDay = Dictionary(uniqueKeysWithValues:
+            try ledgers(from: keys.min()!, through: keys.max()!).map { ($0.date, $0) })
         for day in days {
-            if let existing = try ledger(on: day.date) {
+            let key = cal.startOfDay(for: day.date)
+            if let existing = byDay[key] {
                 existing.apply(day)
             } else {
                 // Normalize at write time so the unique key is always startOfDay,
                 // regardless of caller discipline.
-                context.insert(DayLedger(date: Calendar.current.startOfDay(for: day.date),
+                let inserted = DayLedger(date: key,
                                          steps: day.steps,
                                          stepPoints: day.breakdown.stepPoints,
                                          workoutPoints: day.breakdown.workoutPoints,
@@ -28,7 +35,9 @@ final class DataStore {
                                          totalPoints: day.breakdown.total,
                                          goalAtThatTime: day.goal,
                                          isGold: day.isGold,
-                                         streakAfter: day.streakAfter))
+                                         streakAfter: day.streakAfter)
+                context.insert(inserted)
+                byDay[key] = inserted // dedupe repeated keys within the same batch
             }
         }
         try context.save()
@@ -117,13 +126,15 @@ final class DataStore {
 
     // MARK: Goals
 
-    func goalProvider(currentGoal: Int) -> (Date) -> Int {
-        let stored: [Date: Int]
-        if let all = try? context.fetch(FetchDescriptor<DayLedger>()) {
-            stored = Dictionary(uniqueKeysWithValues: all.map { ($0.date, $0.goalAtThatTime) })
+    func goalProvider(currentGoal: Int, from: Date? = nil) -> (Date) -> Int {
+        // When a window start is given, fetch only that range instead of every ledger.
+        let rows: [DayLedger]
+        if let from {
+            rows = (try? ledgers(from: from, through: .now)) ?? []
         } else {
-            stored = [:]
+            rows = (try? context.fetch(FetchDescriptor<DayLedger>())) ?? []
         }
+        let stored = Dictionary(uniqueKeysWithValues: rows.map { ($0.date, $0.goalAtThatTime) })
         let todayStart = Calendar.current.startOfDay(for: .now)
         return { date in
             let day = Calendar.current.startOfDay(for: date)

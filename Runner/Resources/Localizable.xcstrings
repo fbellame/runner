@@ -1,666 +1,716 @@
 {
-  "sourceLanguage" : "en",
-  "strings" : {
-    "%@ steps" : {
-      "localizations" : {
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "%@ pas"
+  "sourceLanguage": "en",
+  "strings": {
+    "%@ steps": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@ pas"
           }
         }
       }
     },
-    "%lld days" : {
-      "localizations" : {
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "%lld jours"
+    "%lld days": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%lld jours"
           }
         }
       }
     },
-    "%lld workout(s) waiting to sync to Health" : {
-      "localizations" : {
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "%lld entraînement(s) en attente de synchronisation vers Santé"
+    "%lld workout(s) waiting to sync to Health": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%lld entraînement(s) en attente de synchronisation vers Santé"
           }
         }
       }
     },
-    "1 pt per 100 steps (max 200/day)" : {
-      "localizations" : {
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "1 pt par 100 pas (max 200/jour)"
+    "All": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Tous"
           }
         }
       }
     },
-    "All" : {
-      "localizations" : {
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Tous"
+    "Apple Health": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Apple Santé"
           }
         }
       }
     },
-    "Apple Health" : {
-      "localizations" : {
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Apple Santé"
+    "Apple Health refused the save (%@). The workout is kept in Runner and will retry automatically.": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Apple Santé a refusé la sauvegarde (%@). L'entraînement est conservé dans Runner et réessaiera automatiquement."
           }
         }
       }
     },
-    "Apple Health refused the save (%@). The workout is kept in Runner and will retry automatically." : {
-      "localizations" : {
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Apple Santé a refusé la sauvegarde (%@). L'entraînement est conservé dans Runner et réessaiera automatiquement."
+    "Auto-paused": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Pause auto"
           }
         }
       }
     },
-    "Auto-paused" : {
-      "localizations" : {
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Pause auto"
+    "Best day": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Meilleure journée"
           }
         }
       }
     },
-    "Best day" : {
-      "localizations" : {
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Meilleure journée"
+    "Best streak": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Meilleure série"
           }
         }
       }
     },
-    "Best streak" : {
-      "localizations" : {
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Meilleure série"
+    "Bike": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Vélo"
           }
         }
       }
     },
-    "Bike" : {
-      "localizations" : {
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Vélo"
+    "Cancel": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Annuler"
           }
         }
       }
     },
-    "Bike: 6 pts per km" : {
-      "localizations" : {
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Vélo : 6 pts par km"
+    "Connected": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Connecté"
           }
         }
       }
     },
-    "Cancel" : {
-      "localizations" : {
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Annuler"
+    "Daily goal": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Objectif quotidien"
           }
         }
       }
     },
-    "Connected" : {
-      "localizations" : {
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Connecté"
+    "Day": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Jour"
           }
         }
       }
     },
-    "Daily goal" : {
-      "localizations" : {
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Objectif quotidien"
+    "Denied — recording won't work": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Refusée — l'enregistrement ne fonctionnera pas"
           }
         }
       }
     },
-    "Day" : {
-      "localizations" : {
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Jour"
+    "Discard": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Abandonner"
           }
         }
       }
     },
-    "Denied — recording won't work" : {
-      "localizations" : {
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Refusée — l'enregistrement ne fonctionnera pas"
+    "Distance": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Distance"
           }
         }
       }
     },
-    "Discard" : {
-      "localizations" : {
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Abandonner"
+    "Done": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "OK"
           }
         }
       }
     },
-    "Distance" : {
-      "localizations" : {
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Distance"
+    "GO": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "GO"
           }
         }
       }
     },
-    "Done" : {
-      "localizations" : {
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "OK"
+    "GOLD DAY": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "JOUR EN OR"
           }
         }
       }
     },
-    "GO" : {
-      "localizations" : {
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "GO"
+    "Goal": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Objectif"
           }
         }
       }
     },
-    "GOLD DAY" : {
-      "localizations" : {
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "JOUR EN OR"
+    "Goal: %lld pts": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Objectif : %lld pts"
           }
         }
       }
     },
-    "Goal" : {
-      "localizations" : {
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Objectif"
+    "History": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Historique"
           }
         }
       }
     },
-    "Goal: %lld pts" : {
-      "localizations" : {
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Objectif : %lld pts"
+    "How points work": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Comment fonctionnent les points"
           }
         }
       }
     },
-    "History" : {
-      "localizations" : {
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Historique"
+    "Km %lld": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Km %lld"
           }
         }
       }
     },
-    "How points work" : {
-      "localizations" : {
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Comment fonctionnent les points"
+    "Last 13 weeks": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "13 dernières semaines"
           }
         }
       }
     },
-    "Km %lld" : {
-      "localizations" : {
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Km %lld"
+    "Latest parcours": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Dernier parcours"
           }
         }
       }
     },
-    "Last 13 weeks" : {
-      "localizations" : {
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "13 dernières semaines"
+    "Location": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Localisation"
           }
         }
       }
     },
-    "Latest parcours" : {
-      "localizations" : {
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Dernier parcours"
+    "Longest ride": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Plus longue sortie vélo"
           }
         }
       }
     },
-    "Location" : {
-      "localizations" : {
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Localisation"
+    "Longest run": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Plus longue course"
           }
         }
       }
     },
-    "Longest ride" : {
-      "localizations" : {
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Plus longue sortie vélo"
+    "Month": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Mois"
           }
         }
       }
     },
-    "Longest run" : {
-      "localizations" : {
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Plus longue course"
+    "No route for this workout (imported from Health)": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Pas de tracé pour cet entraînement (importé de Santé)"
           }
         }
       }
     },
-    "Month" : {
-      "localizations" : {
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Mois"
+    "No routes yet — record a run, walk or ride and your city starts glowing.": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Aucun parcours — enregistrez une course, une marche ou une sortie vélo et votre ville s'illumine."
           }
         }
       }
     },
-    "No route for this workout (imported from Health)" : {
-      "localizations" : {
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Pas de tracé pour cet entraînement (importé de Santé)"
+    "No workouts yet — hit the ▶ button!": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Aucun entraînement — appuyez sur ▶ !"
           }
         }
       }
     },
-    "No routes yet — record a run, walk or ride and your city starts glowing." : {
-      "localizations" : {
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Aucun parcours — enregistrez une course, une marche ou une sortie vélo et votre ville s'illumine."
+    "Open iOS Settings": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ouvrir les réglages iOS"
           }
         }
       }
     },
-    "No workouts yet — hit the ▶ button!" : {
-      "localizations" : {
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Aucun entraînement — appuyez sur ▶ !"
+    "Pace": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Allure"
           }
         }
       }
     },
-    "Open iOS Settings" : {
-      "localizations" : {
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Ouvrir les réglages iOS"
+    "Permissions": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Autorisations"
           }
         }
       }
     },
-    "Pace" : {
-      "localizations" : {
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Allure"
+    "Points": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Points"
           }
         }
       }
     },
-    "Permissions" : {
-      "localizations" : {
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Autorisations"
+    "Range": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Période"
           }
         }
       }
     },
-    "Points" : {
-      "localizations" : {
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Points"
+    "Ready": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Prêt"
           }
         }
       }
     },
-    "Range" : {
-      "localizations" : {
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Période"
+    "Record a workout": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Enregistrer un entraînement"
           }
         }
       }
     },
-    "Ready" : {
-      "localizations" : {
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Prêt"
+    "Records": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Records"
           }
         }
       }
     },
-    "Record a workout" : {
-      "localizations" : {
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Enregistrer un entraînement"
+    "Resume": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Reprendre"
           }
         }
       }
     },
-    "Records" : {
-      "localizations" : {
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Records"
+    "Resume your workout?": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Reprendre votre entraînement ?"
           }
         }
       }
     },
-    "Resume" : {
-      "localizations" : {
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Reprendre"
+    "Routes": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Parcours"
           }
         }
       }
     },
-    "Resume your workout?" : {
-      "localizations" : {
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Reprendre votre entraînement ?"
+    "Run": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Course"
           }
         }
       }
     },
-    "Routes" : {
-      "localizations" : {
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Parcours"
+    "Runner needs location access to draw your parcours.": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Runner a besoin de la localisation pour tracer votre parcours."
           }
         }
       }
     },
-    "Run" : {
-      "localizations" : {
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Course"
+    "Runner was interrupted mid-workout. Your progress was saved.": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Runner a été interrompu en plein entraînement. Votre progression a été sauvegardée."
           }
         }
       }
     },
-    "Run: 15 pts per km" : {
-      "localizations" : {
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Course : 15 pts par km"
+    "Save workout": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Sauvegarder l'entraînement"
           }
         }
       }
     },
-    "Runner needs location access to draw your parcours." : {
-      "localizations" : {
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Runner a besoin de la localisation pour tracer votre parcours."
+    "Saved locally": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Sauvegardé localement"
           }
         }
       }
     },
-    "Runner was interrupted mid-workout. Your progress was saved." : {
-      "localizations" : {
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Runner a été interrompu en plein entraînement. Votre progression a été sauvegardée."
+    "Settings": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Réglages"
           }
         }
       }
     },
-    "Save workout" : {
-      "localizations" : {
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Sauvegarder l'entraînement"
+    "Slide to finish": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Glisser pour terminer"
           }
         }
       }
     },
-    "Saved locally" : {
-      "localizations" : {
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Sauvegardé localement"
+    "Splits": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Intermédiaires"
           }
         }
       }
     },
-    "Settings" : {
-      "localizations" : {
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Réglages"
+    "Streak bonus": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Bonus de série"
           }
         }
       }
     },
-    "Slide to finish" : {
-      "localizations" : {
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Glisser pour terminer"
+    "Today": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Aujourd'hui"
           }
         }
       }
     },
-    "Splits" : {
-      "localizations" : {
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Intermédiaires"
+    "Time": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Durée"
           }
         }
       }
     },
-    "Streak bonus" : {
-      "localizations" : {
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Bonus de série"
+    "Version": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Version"
           }
         }
       }
     },
-    "Streak: +5% per gold day, max ×1.5" : {
-      "localizations" : {
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Série : +5 % par jour en or, max ×1,5"
+    "Walk": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Marche"
           }
         }
       }
     },
-    "Today" : {
-      "localizations" : {
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Aujourd'hui"
+    "Week": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Semaine"
           }
         }
       }
     },
-    "Time" : {
-      "localizations" : {
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Durée"
+    "Workouts": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Entraînements"
           }
         }
       }
     },
-    "Version" : {
-      "localizations" : {
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Version"
+    "Write access denied — points may be incomplete": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Écriture refusée — les points peuvent être incomplets"
           }
         }
       }
     },
-    "Walk" : {
-      "localizations" : {
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Marche"
+    "Precise Location is off — distance and route can't be recorded.": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "La localisation précise est désactivée — la distance et le parcours ne peuvent pas être enregistrés."
           }
         }
       }
     },
-    "Walk: 10 pts per km" : {
-      "localizations" : {
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Marche : 10 pts par km"
+    "Storage is unavailable (%@). Nothing recorded now will survive an app restart.": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Le stockage est indisponible (%@). Rien de ce qui est enregistré maintenant ne survivra à un redémarrage de l'app."
           }
         }
       }
     },
-    "Week" : {
-      "localizations" : {
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Semaine"
+    "1 pt per %lld steps (max %lld/day)": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "1 pt par %lld pas (max %lld/jour)"
           }
         }
       }
     },
-    "Workouts" : {
-      "localizations" : {
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Entraînements"
+    "Run: %lld pts per km": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Course : %lld pts par km"
           }
         }
       }
     },
-    "Write access denied — points may be incomplete" : {
-      "localizations" : {
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Écriture refusée — les points peuvent être incomplets"
+    "Walk: %lld pts per km": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Marche : %lld pts par km"
+          }
+        }
+      }
+    },
+    "Bike: %lld pts per km": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Vélo : %lld pts par km"
+          }
+        }
+      }
+    },
+    "Streak: +%@ per gold day, max ×%@": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Série : +%@ par jour doré, max ×%@"
+          }
+        }
+      }
+    },
+    "Save as-is": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Enregistrer tel quel"
+          }
+        }
+      }
+    },
+    "No steps from Apple Health yet. If Runner was denied access, allow reading under Health → Sharing → Apps.": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Aucun pas depuis Apple Santé pour l'instant. Si l'accès a été refusé à Runner, autorisez la lecture dans Santé → Partage → Apps."
+          }
+        }
+      }
+    },
+    "Open Health sharing": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ouvrir le partage Santé"
           }
         }
       }
     }
   },
-  "version" : "1.0"
+  "version": "1.0"
 }

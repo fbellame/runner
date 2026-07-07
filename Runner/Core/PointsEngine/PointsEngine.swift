@@ -46,7 +46,9 @@ enum PointsEngine {
         return PointsBreakdown(stepPoints: sp, workoutPoints: wp, multiplier: m, total: total)
     }
 
+    /// Same rounding as workoutPoints so the live HUD never disagrees with the
+    /// summary shown the moment the user finishes.
     static func livePoints(type: ActivityType, distanceMeters: Double) -> Int {
-        Int((distanceMeters / 1000.0) * rate(for: type))
+        workoutPoints(type: type, distanceMeters: distanceMeters)
     }
 }

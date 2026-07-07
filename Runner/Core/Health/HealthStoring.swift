@@ -5,6 +5,8 @@ struct ExternalWorkout: Equatable, Sendable {
     let id: UUID
     let type: ActivityType
     let start: Date
+    let end: Date
+    let movingSeconds: Double
     let distanceMeters: Double
     let isFromThisApp: Bool
 }

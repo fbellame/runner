@@ -10,13 +10,19 @@ final class FakeHealthStore: HealthStoring {
     var saveError: Error?
     var savedWorkouts: [(RecordedWorkout, Int)] = []
     var observers: [() -> Void] = []
+    var workoutsHook: (() async -> Void)?
+    var saveHook: (() async -> Void)?
 
     func requestAuthorization() async throws {}
     func shouldRequestAuthorization() async -> Bool { false }
     func dailySteps(daysBack: Int) async throws -> [Date: Int] { stepsByDay }
-    func workouts(daysBack: Int) async throws -> [ExternalWorkout] { cannedWorkouts }
+    func workouts(daysBack: Int) async throws -> [ExternalWorkout] {
+        await workoutsHook?()
+        return cannedWorkouts
+    }
 
     func saveWorkout(_ workout: RecordedWorkout, points: Int) async throws -> UUID {
+        await saveHook?()
         if let saveError { throw saveError }
         savedWorkouts.append((workout, points))
         // Mirror real HealthKit visibility: a successful save is immediately
@@ -25,6 +31,8 @@ final class FakeHealthStore: HealthStoring {
         let id = UUID()
         cannedWorkouts.append(ExternalWorkout(id: id, type: workout.type,
                                               start: workout.start,
+                                              end: workout.end,
+                                              movingSeconds: workout.movingSeconds,
                                               distanceMeters: workout.distanceMeters,
                                               isFromThisApp: true))
         return id

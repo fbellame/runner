@@ -17,7 +17,7 @@ struct RouteMapView: View {
         var id = 0
 
         for point in points {
-            let coord = CLLocationCoordinate2D(latitude: point.lat, longitude: point.lon)
+            let coord = point.coordinate
             if point.afterGap, let last = current.last {
                 out.append(Segment(id: id, coords: current, isGapConnector: false))
                 id += 1
@@ -86,8 +86,7 @@ struct RouteMapView: View {
                 }
             }
             if let first = points.first {
-                Annotation("", coordinate: CLLocationCoordinate2D(latitude: first.lat,
-                                                                  longitude: first.lon)) {
+                Annotation("", coordinate: first.coordinate) {
                     Circle()
                         .stroke(Color.rLime, lineWidth: 3)
                         .background(Circle().fill(Color.rBackground))
@@ -95,8 +94,7 @@ struct RouteMapView: View {
                 }
             }
             if points.count > 1, let last = points.last {
-                Annotation("", coordinate: CLLocationCoordinate2D(latitude: last.lat,
-                                                                  longitude: last.lon)) {
+                Annotation("", coordinate: last.coordinate) {
                     Circle()
                         .fill(Color.rLime)
                         .frame(width: 11, height: 11)

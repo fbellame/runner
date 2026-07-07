@@ -58,9 +58,13 @@ struct PointsEngineTests {
         #expect(b.total == 157) // (10+147)×1.0
     }
 
-    // Live HUD floors
-    @Test func livePointsFloors() {
-        #expect(PointsEngine.livePoints(type: .run, distanceMeters: 2_100) == 31)  // floor(31.5)
-        #expect(PointsEngine.livePoints(type: .walk, distanceMeters: 999) == 9)    // floor(9.99)
+    // Live HUD shows exactly what the summary would award at this distance —
+    // no +1 jump the moment the user slides to finish.
+    @Test func livePointsMatchesWorkoutPoints() {
+        #expect(PointsEngine.livePoints(type: .run, distanceMeters: 2_970) ==
+                PointsEngine.workoutPoints(type: .run, distanceMeters: 2_970)) // 44.55 → 45
+        #expect(PointsEngine.livePoints(type: .run, distanceMeters: 2_100) == 32)  // 31.5 → 32
+        #expect(PointsEngine.livePoints(type: .walk, distanceMeters: 999) == 10)   // 9.99 → 10
+        #expect(PointsEngine.livePoints(type: .run, distanceMeters: 0) == 0)
     }
 }

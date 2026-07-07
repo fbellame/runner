@@ -10,6 +10,16 @@ struct RecordedWorkout: Equatable, Sendable {
     let distanceMeters: Double
     let route: [RoutePoint]
     let splitSeconds: [Double]
+
+    var paceSecondsPerKm: Double? {
+        Self.pace(movingSeconds: movingSeconds, distanceMeters: distanceMeters)
+    }
+
+    /// nil under 100 m — too little signal for a meaningful pace.
+    static func pace(movingSeconds: Double, distanceMeters: Double) -> Double? {
+        guard distanceMeters >= 100 else { return nil }
+        return movingSeconds / (distanceMeters / 1000.0)
+    }
 }
 
 @MainActor
@@ -25,28 +35,36 @@ final class WorkoutRecorder: LocationProvidingDelegate {
     private(set) var route: [RoutePoint] = []
     private(set) var splitSeconds: [Double] = []
     private(set) var authorizationDenied = false
+    private(set) var reducedAccuracy = false
+
+    /// Must match a key in Info.plist's NSLocationTemporaryUsageDescriptionDictionary.
+    static let fullAccuracyPurposeKey = "PreciseWorkout"
 
     var livePoints: Int { PointsEngine.livePoints(type: activity, distanceMeters: distanceMeters) }
     var paceSecondsPerKm: Double? {
-        guard distanceMeters >= 100 else { return nil }
-        return movingSeconds / (distanceMeters / 1000.0)
+        RecordedWorkout.pace(movingSeconds: movingSeconds, distanceMeters: distanceMeters)
     }
     var onKmSplit: ((Int) -> Void)?
 
     private let provider: LocationProviding
     private let checkpoints: CheckpointStore
     private let checkpointInterval: TimeInterval
+    private let clock: () -> Date
     private var lastKeptLocation: CLLocation?
     private var autoPause: AutoPauseDetector?
     private var lastCheckpointAt: Date?
     private var lastSplitMovingSeconds: Double = 0
+    private var timeAnchor: Date?
+    private var pendingGap = false
 
     init(provider: LocationProviding,
          checkpoints: CheckpointStore = CheckpointStore(),
-         checkpointInterval: TimeInterval = 30) {
+         checkpointInterval: TimeInterval = 30,
+         clock: @escaping () -> Date = { Date() }) {
         self.provider = provider
         self.checkpoints = checkpoints
         self.checkpointInterval = checkpointInterval
+        self.clock = clock
         provider.delegate = self
     }
 
@@ -63,44 +81,59 @@ final class WorkoutRecorder: LocationProvidingDelegate {
             route = checkpoint.route
             splitSeconds = checkpoint.splitSeconds
             lastSplitMovingSeconds = checkpoint.splitSeconds.reduce(0, +)
+            pendingGap = !checkpoint.route.isEmpty // relaunch point must not join old route
         } else {
-            startedAt = Date()
+            startedAt = clock()
             movingSeconds = 0
             distanceMeters = 0
             route = []
             splitSeconds = []
             lastSplitMovingSeconds = 0
+            pendingGap = false
         }
         lastKeptLocation = nil
         lastCheckpointAt = nil
         autoPause = AutoPauseDetector(activity: activity)
+        timeAnchor = clock()
         state = .recording
+        // Approximate location (~km accuracy) fails the filter's 30 m gate, so the
+        // session would silently record nothing: ask for precise, and flag the UI.
+        reducedAccuracy = provider.accuracyAuthorization == .reducedAccuracy
+        if reducedAccuracy {
+            provider.requestTemporaryFullAccuracy(purposeKey: Self.fullAccuracyPurposeKey)
+        }
         provider.startUpdates()
     }
 
     func pauseManually() {
         guard state == .recording || state == .autoPaused else { return }
+        if state == .recording { advanceTimer(to: clock()) }
         state = .manuallyPaused
-        saveCheckpoint(at: Date())
+        saveCheckpoint(at: clock())
     }
 
     func resumeManually() {
         guard state == .manuallyPaused else { return }
         autoPause = AutoPauseDetector(activity: activity)
-        lastKeptLocation = nil // fresh segment; gap marker will show honestly
+        lastKeptLocation = nil
+        pendingGap = !route.isEmpty // fresh segment; gap marker will show honestly
+        timeAnchor = clock()
         state = .recording
     }
 
     func finish() -> RecordedWorkout {
         provider.stopUpdates()
+        if state == .recording { advanceTimer(to: clock()) }
         let workout = RecordedWorkout(type: activity,
-                                      start: startedAt ?? Date(),
-                                      end: Date(),
+                                      start: startedAt ?? clock(),
+                                      end: clock(),
                                       movingSeconds: movingSeconds,
                                       distanceMeters: distanceMeters,
                                       route: route,
                                       splitSeconds: splitSeconds)
-        checkpoints.clear()
+        // Keep a final checkpoint: the workout lives only in memory until the user
+        // saves or discards the summary, so a kill here must stay recoverable.
+        saveCheckpoint(at: clock())
         reset()
         return workout
     }
@@ -122,6 +155,8 @@ final class WorkoutRecorder: LocationProvidingDelegate {
         lastCheckpointAt = nil
         autoPause = nil
         lastSplitMovingSeconds = 0
+        timeAnchor = nil
+        pendingGap = false
     }
 
     // MARK: LocationProvidingDelegate
@@ -132,10 +167,18 @@ final class WorkoutRecorder: LocationProvidingDelegate {
 
     func didChangeAuthorization(_ status: CLAuthorizationStatus) {
         authorizationDenied = (status == .denied || status == .restricted)
+        reducedAccuracy = provider.accuracyAuthorization == .reducedAccuracy
     }
 
     func didFail(_ error: Error) {
         // GPS hiccups: keep the session alive; the gap logic handles the hole.
+    }
+
+    private func advanceTimer(to time: Date) {
+        if let anchor = timeAnchor {
+            movingSeconds += max(0, time.timeIntervalSince(anchor))
+        }
+        timeAnchor = time
     }
 
     // MARK: Core ingestion
@@ -143,7 +186,11 @@ final class WorkoutRecorder: LocationProvidingDelegate {
     private func ingest(_ location: CLLocation) {
         guard state == .recording || state == .autoPaused else { return }
 
-        // 1. Speed for auto-pause: sensor speed, else computed from last kept point.
+        // 1. Timer: wall time accrues sample-to-sample while recording, uncapped —
+        //    GPS gaps (tunnels) keep the timer running; only pauses stop it.
+        if state == .recording { advanceTimer(to: location.timestamp) }
+
+        // 2. Speed for auto-pause: sensor speed, else computed from last kept point.
         let sensorSpeed = location.speed
         let computedSpeed: Double
         if let last = lastKeptLocation {
@@ -154,35 +201,36 @@ final class WorkoutRecorder: LocationProvidingDelegate {
         }
         let speed = sensorSpeed >= 0 ? sensorSpeed : computedSpeed
 
-        // 2. Feed the detector on EVERY sample so standing still triggers a pause.
+        // 3. Feed the detector on EVERY sample so standing still triggers a pause.
+        //    A resume starts a fresh timer segment: the paused interval is never credited.
         if var detector = autoPause {
+            let wasAutoPaused = state == .autoPaused
             let paused = detector.update(speed: speed, at: location.timestamp)
             autoPause = detector
+            if wasAutoPaused && !paused { timeAnchor = location.timestamp }
             state = paused ? .autoPaused : .recording
         }
 
-        // 3. Accept or reject the sample.
+        // 4. Accept or reject the sample.
         let decision = LocationFilter.evaluate(candidate: location,
                                                lastKept: lastKeptLocation,
                                                now: Date())
         guard decision.accepted, state == .recording else { return }
 
-        // 4. Credit moving time (capped) and distance (not across gaps).
-        if let last = lastKeptLocation {
-            let dt = min(location.timestamp.timeIntervalSince(last.timestamp),
-                         LocationFilter.maxSampleAge)
-            if dt > 0 { movingSeconds += dt }
-            if !decision.afterGap {
-                distanceMeters += location.distance(from: last)
-            }
+        // 5. Distance (not across gaps); a resume after pause/relaunch marks the
+        //    first point as a gap so the map never draws a line the user didn't move.
+        let afterGap = decision.afterGap || pendingGap
+        if let last = lastKeptLocation, !afterGap {
+            distanceMeters += location.distance(from: last)
         }
         route.append(RoutePoint(lat: location.coordinate.latitude,
                                 lon: location.coordinate.longitude,
                                 t: location.timestamp,
-                                afterGap: decision.afterGap))
+                                afterGap: afterGap))
+        pendingGap = false
         lastKeptLocation = location
 
-        // 5. Km splits.
+        // 6. Km splits.
         let completedKm = Int(distanceMeters / 1000.0)
         while splitSeconds.count < completedKm {
             splitSeconds.append(movingSeconds - lastSplitMovingSeconds)
@@ -190,7 +238,7 @@ final class WorkoutRecorder: LocationProvidingDelegate {
             onKmSplit?(splitSeconds.count)
         }
 
-        // 6. Periodic checkpoint.
+        // 7. Periodic checkpoint.
         if lastCheckpointAt == nil ||
             location.timestamp.timeIntervalSince(lastCheckpointAt!) >= checkpointInterval {
             saveCheckpoint(at: location.timestamp)

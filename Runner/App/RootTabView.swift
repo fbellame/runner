@@ -29,6 +29,9 @@ struct RootTabView: View {
         }
         .alert("Resume your workout?", isPresented: resumeAlertBinding) {
             Button("Resume") { model.showRecordSheet = true }
+            Button("Save as-is") {
+                Task { await model.saveCheckpointedWorkout() }
+            }
             Button("Discard", role: .destructive) {
                 model.checkpoints.clear()
                 model.pendingResume = nil

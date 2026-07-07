@@ -31,6 +31,11 @@
 	<string>Runner reads your daily steps and workouts to compute your daily points.</string>
 	<key>NSHealthUpdateUsageDescription</key>
 	<string>Runner saves your recorded runs, walks and rides to Apple Health so your data is permanently yours.</string>
+	<key>NSLocationTemporaryUsageDescriptionDictionary</key>
+	<dict>
+		<key>PreciseWorkout</key>
+		<string>Precise location is needed to measure your distance and draw your route while recording a workout.</string>
+	</dict>
 	<key>NSLocationWhenInUseUsageDescription</key>
 	<string>Runner uses your location to record your route while you run, walk or ride.</string>
 	<key>UIBackgroundModes</key>

@@ -29,10 +29,13 @@ struct HealthMappersTests {
         let todayNoon = cal.date(bySettingHour: 12, minute: 0, second: 0, of: now)!
         let yesterdayNoon = cal.date(byAdding: .day, value: -1, to: todayNoon)!
         let list = [
-            ExternalWorkout(id: UUID(), type: .run, start: todayNoon, distanceMeters: 5000, isFromThisApp: false),
+            ExternalWorkout(id: UUID(), type: .run, start: todayNoon, end: todayNoon.addingTimeInterval(1500),
+                            movingSeconds: 1500, distanceMeters: 5000, isFromThisApp: false),
             ExternalWorkout(id: UUID(), type: .bike, start: todayNoon.addingTimeInterval(3600),
+                            end: todayNoon.addingTimeInterval(5400), movingSeconds: 1800,
                             distanceMeters: 10_000, isFromThisApp: true),
-            ExternalWorkout(id: UUID(), type: .walk, start: yesterdayNoon, distanceMeters: 2000, isFromThisApp: false),
+            ExternalWorkout(id: UUID(), type: .walk, start: yesterdayNoon, end: yesterdayNoon.addingTimeInterval(1200),
+                            movingSeconds: 1200, distanceMeters: 2000, isFromThisApp: false),
         ]
         let grouped = HealthMappers.groupByDay(list, calendar: cal)
         #expect(grouped[cal.startOfDay(for: todayNoon)]?.count == 2)

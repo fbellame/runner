@@ -1,10 +1,15 @@
 import Foundation
+import CoreLocation
 
 struct RoutePoint: Codable, Equatable, Sendable {
     let lat: Double
     let lon: Double
     let t: Date
     let afterGap: Bool
+
+    var coordinate: CLLocationCoordinate2D {
+        CLLocationCoordinate2D(latitude: lat, longitude: lon)
+    }
 }
 
 extension [RoutePoint] {

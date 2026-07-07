@@ -22,6 +22,8 @@ struct SyncCoordinatorTests {
         health.cannedWorkouts = [
             ExternalWorkout(id: UUID(), type: .run,
                             start: day(0).addingTimeInterval(9 * 3600),
+                            end: day(0).addingTimeInterval(9 * 3600 + 720),
+                            movingSeconds: 700,
                             distanceMeters: 2_100, isFromThisApp: false)
         ]
         await sync.syncNow()
@@ -74,6 +76,100 @@ struct SyncCoordinatorTests {
         #expect(sync.lastError != nil)
         // ledger still computed: 100 steps pts + 60 bike = 160
         #expect(try store.ledger(on: day(0))?.totalPoints == 160)
+    }
+
+    @Test func externalWorkoutKeepsDuration() async throws {
+        let (sync, health, store) = try make()
+        let start = day(0).addingTimeInterval(9 * 3600)
+        health.stepsByDay = [day(0): 1_000]
+        health.cannedWorkouts = [
+            ExternalWorkout(id: UUID(), type: .run, start: start,
+                            end: start.addingTimeInterval(2_700), movingSeconds: 2_640,
+                            distanceMeters: 8_000, isFromThisApp: false)
+        ]
+        await sync.syncNow()
+        let cached = try #require(try store.workouts(onDay: day(0)).first)
+        #expect(cached.end == start.addingTimeInterval(2_700))   // real end, not start
+        #expect(cached.movingSeconds == 2_640)                   // real duration, not 0
+    }
+
+    @Test func syncRequestedMidSyncRunsAgain() async throws {
+        let (sync, health, store) = try make()
+        health.stepsByDay = [day(0): 1_000]
+        var reentered = false
+        health.workoutsHook = { [weak sync, weak health] in
+            guard let sync, let health, !reentered else { return }
+            reentered = true
+            // New data lands while the first sync is mid-flight; the request
+            // must be queued as a trailing rerun, not silently dropped.
+            health.stepsByDay = [self.day(0): 5_000]
+            await sync.syncNow()
+        }
+        await sync.syncNow()
+        #expect(reentered)
+        #expect(try store.ledger(on: day(0))?.totalPoints == 50) // rerun picked up 5 000 steps
+    }
+
+    @Test func saveRecordedPersistsLocallyBeforeHealthKit() async throws {
+        let (sync, health, store) = try make()
+        health.stepsByDay = [day(0): 1_000]
+        let workout = RecordedWorkout(type: .run, start: day(0).addingTimeInterval(8 * 3600),
+                                      end: day(0).addingTimeInterval(8 * 3600 + 1500),
+                                      movingSeconds: 1500, distanceMeters: 5_000,
+                                      route: [], splitSeconds: [300, 300, 300, 300, 300])
+        var pendingAtHKSaveTime = -1
+        health.saveHook = {
+            pendingAtHKSaveTime = (try? store.pendingSync().count) ?? -1
+        }
+        let failure = await sync.saveRecorded(workout)
+        #expect(failure == nil)
+        #expect(pendingAtHKSaveTime == 1)   // durable locally before HealthKit ran
+        let all = try store.allWorkouts()
+        #expect(all.count == 1)             // one record, marked synced afterwards
+        #expect(all[0].hkSynced == true)
+        // counted exactly once in the ledger: 10 step pts + 75 workout pts
+        #expect(try store.ledger(on: day(0))?.totalPoints == 85)
+    }
+
+    @Test func saveRecordedKeepsStableIdAcrossFailureAndRetry() async throws {
+        let (sync, health, store) = try make()
+        health.stepsByDay = [day(0): 1_000]
+        health.saveError = NSError(domain: "HK", code: 5,
+                                   userInfo: [NSLocalizedDescriptionKey: "refused"])
+        let workout = RecordedWorkout(type: .run, start: day(0).addingTimeInterval(8 * 3600),
+                                      end: day(0).addingTimeInterval(8 * 3600 + 1500),
+                                      movingSeconds: 1500, distanceMeters: 5_000,
+                                      route: [], splitSeconds: [])
+        let failure = await sync.saveRecorded(workout)
+        #expect(failure != nil)
+        let id = try #require(try store.allWorkouts().first?.id)
+        #expect(try store.pendingSync().count == 1)
+        // HealthKit recovers; the retry syncs the SAME record, no duplicate
+        health.saveError = nil
+        await sync.syncNow()
+        let all = try store.allWorkouts()
+        #expect(all.count == 1)
+        #expect(all[0].id == id)
+        #expect(all[0].hkSynced == true)
+        #expect(try store.ledger(on: day(0))?.totalPoints == 85)
+    }
+
+    @Test func saveRecordedIgnoresReentrantDuplicate() async throws {
+        let (sync, health, store) = try make()
+        health.stepsByDay = [day(0): 1_000]
+        let workout = RecordedWorkout(type: .run, start: day(0).addingTimeInterval(8 * 3600),
+                                      end: day(0).addingTimeInterval(8 * 3600 + 1500),
+                                      movingSeconds: 1500, distanceMeters: 5_000,
+                                      route: [], splitSeconds: [])
+        health.saveHook = { [weak sync, weak health] in
+            // A second tap on Save while the first is in flight must be a no-op.
+            health?.saveHook = nil
+            await sync?.saveRecorded(workout)
+        }
+        await sync.saveRecorded(workout)
+        #expect(health.savedWorkouts.count == 1)
+        #expect(try store.allWorkouts().count == 1)
+        #expect(try store.ledger(on: day(0))?.totalPoints == 85)
     }
 
     @Test func storedGoalsPreservedOnResync() async throws {

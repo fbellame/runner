@@ -81,6 +81,8 @@ final class HealthStore: HealthStoring {
             let meters = workout.statistics(for: distanceType)?.sumQuantity()?
                 .doubleValue(for: .meter()) ?? 0
             return ExternalWorkout(id: workout.uuid, type: type, start: workout.startDate,
+                                   end: workout.endDate,
+                                   movingSeconds: workout.duration,
                                    distanceMeters: meters,
                                    isFromThisApp: workout.sourceRevision.source.bundleIdentifier == bundleID)
         }
@@ -113,13 +115,18 @@ final class HealthStore: HealthStoring {
 
         // Attach the GPS route (needs ≥2 locations).
         let locations = workout.route.map {
-            CLLocation(coordinate: CLLocationCoordinate2D(latitude: $0.lat, longitude: $0.lon),
+            CLLocation(coordinate: $0.coordinate,
                        altitude: 0, horizontalAccuracy: 5, verticalAccuracy: 5, timestamp: $0.t)
         }
         if locations.count >= 2 {
+            // Best-effort: the workout is already committed above, so a failed route
+            // attach must not throw — reporting failure here would make the caller
+            // keep a pending copy and re-save a duplicate workout on every sync.
             let routeBuilder = HKWorkoutRouteBuilder(healthStore: store, device: .local())
-            try await routeBuilder.insertRouteData(locations)
-            try await routeBuilder.finishRoute(with: hkWorkout, metadata: nil)
+            do {
+                try await routeBuilder.insertRouteData(locations)
+                try await routeBuilder.finishRoute(with: hkWorkout, metadata: nil)
+            } catch {}
         }
         return hkWorkout.uuid
     }

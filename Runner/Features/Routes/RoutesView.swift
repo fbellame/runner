@@ -6,9 +6,11 @@ struct RoutesView: View {
     @Query(sort: \WorkoutRec.start, order: .reverse) private var workouts: [WorkoutRec]
     @State private var filter: ActivityType?
     @State private var selected: WorkoutRec?
+    // Decoded once when the workout set or filter changes, not on every body pass.
+    @State private var routed: [(rec: WorkoutRec, points: [RoutePoint])] = []
 
-    private var routed: [(rec: WorkoutRec, points: [RoutePoint])] {
-        workouts.compactMap { rec in
+    private func rebuild() {
+        routed = workouts.compactMap { rec in
             guard filter == nil || rec.type == filter,
                   let data = rec.routeData else { return nil }
             let points = [RoutePoint].decode(data)
@@ -54,6 +56,9 @@ struct RoutesView: View {
                 filterChips
             }
             .background(Color.rBackground)
+            .onAppear(perform: rebuild)
+            .onChange(of: workouts.map(\.id)) { _, _ in rebuild() }
+            .onChange(of: filter) { _, _ in rebuild() }
             .navigationDestination(item: $selected) { workout in
                 WorkoutDetailView(workout: workout)
             }

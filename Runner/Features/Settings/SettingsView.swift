@@ -11,7 +11,7 @@ struct SettingsView: View {
         NavigationStack {
             List {
                 Section(String(localized: "Daily goal")) {
-                    Stepper(value: $model.dailyGoal, in: 50...500, step: 10) {
+                    Stepper(value: $model.dailyGoal, in: AppModel.goalRange, step: 10) {
                         HStack {
                             Text(String(localized: "Goal"))
                             Spacer()
@@ -45,12 +45,14 @@ struct SettingsView: View {
                     }
                 }
 
+                // Copy is derived from PointsEngine constants so tuning a rule can
+                // never leave Settings describing the old math.
                 Section(String(localized: "How points work")) {
-                    ruleRow("👟", String(localized: "1 pt per 100 steps (max 200/day)"))
-                    ruleRow("🏃", String(localized: "Run: 15 pts per km"))
-                    ruleRow("🚶", String(localized: "Walk: 10 pts per km"))
-                    ruleRow("🚴", String(localized: "Bike: 6 pts per km"))
-                    ruleRow("🔥", String(localized: "Streak: +5% per gold day, max ×1.5"))
+                    ruleRow("👟", String(localized: "1 pt per \(PointsEngine.stepDivisor) steps (max \(PointsEngine.stepCap)/day)"))
+                    ruleRow("🏃", String(localized: "Run: \(Int(PointsEngine.rate(for: .run))) pts per km"))
+                    ruleRow("🚶", String(localized: "Walk: \(Int(PointsEngine.rate(for: .walk))) pts per km"))
+                    ruleRow("🚴", String(localized: "Bike: \(Int(PointsEngine.rate(for: .bike))) pts per km"))
+                    ruleRow("🔥", String(localized: "Streak: +\(PointsEngine.streakBonusPerDay.formatted(.percent)) per gold day, max ×\(PointsEngine.multiplierCap.formatted())"))
                 }
 
                 Section {

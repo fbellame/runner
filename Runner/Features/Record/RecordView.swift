@@ -11,6 +11,7 @@ struct RecordView: View {
     @State private var camera: MapCameraPosition = .userLocation(fallback: .automatic)
     @State private var finished: RecordedWorkout?
     @State private var saveFailedMessage: String?
+    @State private var isSaving = false
 
     private var recorder: WorkoutRecorder { model.recorder }
     private var isActive: Bool { recorder.state != .idle }
@@ -20,9 +21,7 @@ struct RecordView: View {
             Map(position: $camera) {
                 UserAnnotation()
                 if recorder.route.count >= 2 {
-                    MapPolyline(coordinates: recorder.route.map {
-                        CLLocationCoordinate2D(latitude: $0.lat, longitude: $0.lon)
-                    })
+                    MapPolyline(coordinates: recorder.route.map(\.coordinate))
                     .stroke(Color.rLime,
                             style: StrokeStyle(lineWidth: 4, lineCap: .round, lineJoin: .round))
                 }
@@ -48,8 +47,10 @@ struct RecordView: View {
         }
         .sheet(item: $finished) { workout in
             WorkoutSummaryView(workout: workout,
+                               isSaving: isSaving,
                                onSave: { Task { await save(workout) } },
                                onDiscard: {
+                                   model.checkpoints.clear()
                                    finished = nil
                                    dismiss()
                                })
@@ -64,8 +65,32 @@ struct RecordView: View {
         }
     }
 
+    private var reducedAccuracyBanner: some View {
+        VStack(spacing: 6) {
+            Label(String(localized: "Precise Location is off — distance and route can't be recorded."),
+                  systemImage: "location.slash.fill")
+                .font(.system(size: 13, weight: .semibold))
+                .foregroundStyle(Color.rOrange)
+                .multilineTextAlignment(.center)
+            Button(String(localized: "Open iOS Settings")) {
+                if let url = URL(string: UIApplication.openSettingsURLString) {
+                    UIApplication.shared.open(url)
+                }
+            }
+            .font(.system(size: 13, weight: .bold))
+            .foregroundStyle(Color.rLime)
+        }
+        .padding(.vertical, 8)
+        .padding(.horizontal, 12)
+        .frame(maxWidth: .infinity)
+        .background(RoundedRectangle(cornerRadius: 12).fill(Color.rOrange.opacity(0.12)))
+    }
+
     private var setupPanel: some View {
         VStack(spacing: 18) {
+            if recorder.reducedAccuracy {
+                reducedAccuracyBanner
+            }
             HStack(spacing: 10) {
                 ForEach(ActivityType.allCases, id: \.self) { activity in
                     Button {
@@ -123,6 +148,9 @@ struct RecordView: View {
 
     private var activeHUD: some View {
         VStack(spacing: 14) {
+            if recorder.reducedAccuracy {
+                reducedAccuracyBanner
+            }
             if recorder.state == .autoPaused {
                 Label(String(localized: "Auto-paused"), systemImage: "pause.circle.fill")
                     .font(.system(size: 13, weight: .bold))
@@ -132,17 +160,9 @@ struct RecordView: View {
                     .background(Capsule().fill(Color.rOrange.opacity(0.15)))
             }
 
-            HStack(alignment: .firstTextBaseline, spacing: 4) {
-                Text("\(recorder.livePoints)")
-                    .font(.system(size: 54, weight: .heavy, design: .rounded))
-                    .foregroundStyle(Color.rLime)
-                    .contentTransition(.numericText())
-                    .animation(.spring(duration: 0.4), value: recorder.livePoints)
-                    .modifier(GlowShadow(color: .rLime))
-                Text("PTS")
-                    .font(.system(size: 14, weight: .bold))
-                    .foregroundStyle(Color.rLime)
-            }
+            GlowNumber(value: recorder.livePoints, unitLabel: "PTS",
+                       size: 54, unitSize: 14, numberColor: .rLime)
+                .animation(.spring(duration: 0.4), value: recorder.livePoints)
 
             HStack(spacing: 10) {
                 hudStat(String(localized: "Time"), Format.duration(recorder.movingSeconds))
@@ -224,40 +244,17 @@ struct RecordView: View {
     }
 
     private func save(_ workout: RecordedWorkout) async {
-        let points = PointsEngine.workoutPoints(type: workout.type,
-                                                distanceMeters: workout.distanceMeters)
-        let routeData = try? workout.route.encoded()
-        do {
-            let hkID = try await model.health.saveWorkout(workout, points: points)
-            _ = try? model.store.upsertWorkout(id: hkID,
-                                               type: workout.type,
-                                               start: workout.start,
-                                               end: workout.end,
-                                               movingSeconds: workout.movingSeconds,
-                                               distanceMeters: workout.distanceMeters,
-                                               points: points,
-                                               routeData: routeData,
-                                               splitSeconds: workout.splitSeconds,
-                                               source: "runner",
-                                               hkSynced: true)
-            await model.sync.syncNow()
-            finished = nil
+        guard !isSaving else { return }
+        isSaving = true
+        defer { isSaving = false }
+        // One shared save path (local-first, then HealthKit) lives on the coordinator.
+        let failure = await model.sync.saveRecorded(workout)
+        model.checkpoints.clear()
+        finished = nil
+        if let failure {
+            saveFailedMessage = failure
+        } else {
             dismiss()
-        } catch {
-            _ = try? model.store.upsertWorkout(id: UUID(),
-                                               type: workout.type,
-                                               start: workout.start,
-                                               end: workout.end,
-                                               movingSeconds: workout.movingSeconds,
-                                               distanceMeters: workout.distanceMeters,
-                                               points: points,
-                                               routeData: routeData,
-                                               splitSeconds: workout.splitSeconds,
-                                               source: "runner",
-                                               hkSynced: false)
-            await model.sync.syncNow()
-            finished = nil
-            saveFailedMessage = error.localizedDescription
         }
     }
 }

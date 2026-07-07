@@ -31,6 +31,13 @@ struct AppModelTests {
         UserDefaults.standard.removeObject(forKey: AppModel.goalKey)
     }
 
+    @Test func storeFailureMessageSurfacesDegradedMode() throws {
+        let (model, _, _) = try makeModel()
+        #expect(model.storeFailureMessage == nil)     // healthy store: no banner
+        model.storeFailureMessage = "disk full"
+        #expect(model.storeFailureMessage == "disk full")
+    }
+
     @Test func launchDetectsCheckpoint() async throws {
         let (model, _, checkpoints) = try makeModel()
         try checkpoints.save(SessionCheckpoint(activity: .run,
@@ -45,6 +52,46 @@ struct AppModelTests {
 
         #expect(model.pendingResume != nil)
         #expect(model.pendingResume?.activity == .run)
+    }
+
+    @Test func saveAsIsPersistsCheckpointedWorkoutWithoutResuming() async throws {
+        let (model, health, checkpoints) = try makeModel()
+        let start = Date().addingTimeInterval(-1_800)
+        let checkpoint = SessionCheckpoint(activity: .run, startedAt: start,
+                                           movingSeconds: 900, distanceMeters: 3_000,
+                                           route: [], splitSeconds: [300, 300, 300],
+                                           savedAt: start.addingTimeInterval(900))
+        try checkpoints.save(checkpoint)
+        await model.onLaunch()
+        #expect(model.pendingResume != nil)
+
+        await model.saveCheckpointedWorkout()
+
+        let recs = try model.store.allWorkouts()
+        #expect(recs.count == 1)
+        #expect(recs[0].distanceMeters == 3_000)
+        #expect(recs[0].movingSeconds == 900)
+        #expect(recs[0].end == checkpoint.savedAt)   // ends at last known progress
+        #expect(recs[0].hkSynced == true)
+        #expect(health.savedWorkouts.count == 1)
+        #expect(model.pendingResume == nil)          // prompt dismissed
+        #expect(checkpoints.load() == nil)           // nothing left to resume
+    }
+
+    @Test func dayChangeNotificationTriggersSync() async throws {
+        let (model, health, _) = try makeModel()
+        await model.onLaunch()
+        // Midnight passes while the app stays open: new data must be picked up
+        // without waiting for a foreground or observer event.
+        health.stepsByDay = [Calendar.current.startOfDay(for: .now): 7_000]
+        NotificationCenter.default.post(name: .NSCalendarDayChanged, object: nil)
+        var points: Int?
+        for _ in 0..<100 {
+            try await Task.sleep(for: .milliseconds(10))
+            points = try model.store.ledger(on: .now)?.totalPoints
+            if points == 70 { break }
+        }
+        #expect(points == 70)
     }
 
     @Test func launchSyncsAndObserves() async throws {

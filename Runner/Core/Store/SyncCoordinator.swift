@@ -8,9 +8,10 @@ final class SyncCoordinator {
     private let store: DataStore
     private let currentGoal: () -> Int
 
-    private(set) var lastSyncAt: Date?
     private(set) var lastError: String?
     private(set) var isSyncing = false
+    private var rerunRequested = false
+    private var isSavingRecorded = false
 
     init(health: HealthStoring, store: DataStore, currentGoal: @escaping () -> Int) {
         self.health = health
@@ -19,22 +20,71 @@ final class SyncCoordinator {
     }
 
     func syncNow() async {
-        guard !isSyncing else { return }
+        // A request landing mid-sync must not be lost: the in-flight pass already
+        // read HealthKit, so queue one trailing rerun instead of dropping it.
+        guard !isSyncing else {
+            rerunRequested = true
+            return
+        }
         isSyncing = true
-        lastError = nil
         defer { isSyncing = false }
+        repeat {
+            rerunRequested = false
+            await performSync()
+        } while rerunRequested
+    }
 
+    /// Persists a freshly recorded workout: local store first (durable even if the
+    /// app dies mid-save), then HealthKit, then mark synced under the same id —
+    /// the one save path shared with retryPendingSaves. Returns an error message
+    /// when the HealthKit save failed (the workout is kept locally and retried).
+    @discardableResult
+    func saveRecorded(_ workout: RecordedWorkout) async -> String? {
+        guard !isSavingRecorded else { return nil }
+        isSavingRecorded = true
+        defer { isSavingRecorded = false }
+
+        let points = PointsEngine.workoutPoints(type: workout.type,
+                                                distanceMeters: workout.distanceMeters)
+        let routeData = try? workout.route.encoded()
+        let id = UUID()
+        try? store.upsertWorkout(id: id, type: workout.type, start: workout.start,
+                                 end: workout.end, movingSeconds: workout.movingSeconds,
+                                 distanceMeters: workout.distanceMeters, points: points,
+                                 routeData: routeData, splitSeconds: workout.splitSeconds,
+                                 source: "runner", hkSynced: false)
+        var failure: String?
+        do {
+            _ = try await health.saveWorkout(workout, points: points)
+            try? store.upsertWorkout(id: id, type: workout.type, start: workout.start,
+                                     end: workout.end, movingSeconds: workout.movingSeconds,
+                                     distanceMeters: workout.distanceMeters, points: points,
+                                     routeData: routeData, splitSeconds: workout.splitSeconds,
+                                     source: "runner", hkSynced: true)
+        } catch {
+            failure = error.localizedDescription
+        }
+        await syncNow()
+        return failure
+    }
+
+    private func performSync() async {
+        lastError = nil
         await retryPendingSaves()
 
         do {
             let cal = Calendar.current
-            let steps = try await health.dailySteps(daysBack: Self.windowDays)
-            let hkWorkouts = try await health.workouts(daysBack: Self.windowDays)
+            // The two HealthKit queries are independent — run them concurrently while
+            // keeping the @MainActor-isolated `health` on the main actor.
+            let stepsTask = Task { @MainActor in try await health.dailySteps(daysBack: Self.windowDays) }
+            let workoutsTask = Task { @MainActor in try await health.workouts(daysBack: Self.windowDays) }
+            let steps = try await stepsTask.value
+            let hkWorkouts = try await workoutsTask.value
 
             // Cache external workouts for the UI (ours are already cached at record time).
             for w in hkWorkouts where !w.isFromThisApp {
                 try store.upsertWorkout(id: w.id, type: w.type, start: w.start,
-                                        end: w.start, movingSeconds: 0,
+                                        end: w.end, movingSeconds: w.movingSeconds,
                                         distanceMeters: w.distanceMeters,
                                         points: PointsEngine.workoutPoints(type: w.type,
                                                                            distanceMeters: w.distanceMeters),
@@ -63,10 +113,10 @@ final class SyncCoordinator {
 
             let initialStreak = try store.latestLedger(before: windowStart)?.streakAfter ?? 0
             let ledgers = LedgerBuilder.build(days: days,
-                                              goalProvider: store.goalProvider(currentGoal: currentGoal()),
+                                              goalProvider: store.goalProvider(currentGoal: currentGoal(),
+                                                                               from: windowStart),
                                               initialStreak: initialStreak)
             try store.upsert(ledgers)
-            lastSyncAt = Date()
         } catch {
             lastError = error.localizedDescription
         }
