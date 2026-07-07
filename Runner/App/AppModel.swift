@@ -20,6 +20,7 @@ final class AppModel {
     let sync: SyncCoordinator
     let recorder: WorkoutRecorder
     let checkpoints: CheckpointStore
+    let profile: ProfileStore
 
     var pendingResume: SessionCheckpoint?
     var showRecordSheet = false
@@ -54,7 +55,11 @@ final class AppModel {
         self.recorder = recorder
         self.checkpoints = checkpoints
         self.dailyGoal = Self.storedGoal()
-        self.sync = SyncCoordinator(health: health, store: store, currentGoal: { Self.storedGoal() })
+        let profile = ProfileStore(store: store, health: health)
+        self.profile = profile
+        self.sync = SyncCoordinator(health: health, store: store,
+                                    currentGoal: { Self.storedGoal() },
+                                    metricsProvider: { profile.currentMetrics() })
     }
 
     static func live() -> AppModel {
@@ -84,6 +89,7 @@ final class AppModel {
         if await health.shouldRequestAuthorization() {
             try? await health.requestAuthorization()
         }
+        await profile.refreshFromHealth()
         health.startObservingSteps { [weak self] in
             Task { @MainActor [weak self] in
                 await self?.sync.syncNow()
@@ -111,6 +117,7 @@ final class AppModel {
     }
 
     func onForeground() async {
+        await profile.refreshFromHealth()
         await sync.syncNow()
     }
 

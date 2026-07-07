@@ -9,11 +9,33 @@ struct SyncCoordinatorTests {
         return cal.date(byAdding: .day, value: offset, to: cal.startOfDay(for: .now))!
     }
 
-    private func make(goal: Int = 100) throws -> (SyncCoordinator, FakeHealthStore, DataStore) {
+    private func make(goal: Int = 100,
+                      metrics: BodyMetrics = BodyMetrics(weightKg: nil, heightCm: nil,
+                                                         sex: .unspecified, age: nil))
+        throws -> (SyncCoordinator, FakeHealthStore, DataStore) {
         let health = FakeHealthStore()
         let store = try DataStore(inMemory: true)
-        let sync = SyncCoordinator(health: health, store: store, currentGoal: { goal })
+        let sync = SyncCoordinator(health: health, store: store, currentGoal: { goal },
+                                   metricsProvider: { metrics })
         return (sync, health, store)
+    }
+
+    @Test func syncFillsDerivedCalorieFields() async throws {
+        let (sync, health, store) = try make(metrics: BodyMetrics(weightKg: 70, heightCm: 180,
+                                                                  sex: .male, age: 30))
+        let today = day(0)
+        health.stepsByDay = [today: 10_000]
+        health.cannedWorkouts = [ExternalWorkout(id: UUID(), type: .run,
+                                                 start: today.addingTimeInterval(3600),
+                                                 end: today.addingTimeInterval(5400),
+                                                 movingSeconds: 1800, distanceMeters: 5000,
+                                                 isFromThisApp: false)]
+        await sync.syncNow()
+
+        let row = try store.ledger(on: today)
+        #expect((row?.activeCalories ?? 0) > 300)   // run + everyday steps
+        #expect(row?.distanceMeters == 5000)
+        #expect(row?.activeSeconds == 1800)
     }
 
     @Test func backfillBuildsLedgersWithStreaks() async throws {
