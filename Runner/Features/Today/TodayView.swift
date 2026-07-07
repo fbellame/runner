@@ -1,6 +1,7 @@
 import SwiftUI
 import SwiftData
 import UIKit
+import Charts
 
 struct TodayView: View {
     @Environment(AppModel.self) private var model
@@ -9,6 +10,7 @@ struct TodayView: View {
     @State private var celebrate = false
     // Decoded once when today's workouts change, not twice per body pass.
     @State private var latestRoute: [RoutePoint] = []
+    @State private var trendMode = 0   // 0 = points, 1 = calories
 
     private var today: DayLedger? {
         ledgers.first { Calendar.current.isDateInToday($0.date) }
@@ -36,6 +38,13 @@ struct TodayView: View {
                 header
                 pointsBlock
                 breakdown
+                statStrip
+                if model.profile.currentMetrics().weightKg != nil {
+                    caloriesCard
+                } else {
+                    addWeightCard
+                }
+                trendCard
                 if !latestRoute.isEmpty {
                     miniMap
                 }
@@ -192,6 +201,126 @@ struct TodayView: View {
                 .clipShape(RoundedRectangle(cornerRadius: 16))
                 .overlay(RoundedRectangle(cornerRadius: 16).stroke(Color.rBorder, lineWidth: 1))
         }
+    }
+
+    private var todayEnergyInputs: [WorkoutEnergyInput] {
+        todayWorkouts.map { WorkoutEnergyInput(type: $0.type, distanceMeters: $0.distanceMeters,
+                                               movingSeconds: $0.movingSeconds) }
+    }
+
+    private var statStrip: some View {
+        HStack(spacing: 10) {
+            statTile("🔥", (today?.activeCalories ?? 0) > 0
+                     ? "\(Int((today?.activeCalories ?? 0).rounded()))"
+                     : "—", String(localized: "kcal"))
+            statTile("📏", Format.km(today?.distanceMeters ?? 0), String(localized: "today"))
+            statTile("⏱️", Format.duration(today?.activeSeconds ?? 0), String(localized: "active"))
+        }
+    }
+
+    private func statTile(_ emoji: String, _ value: String, _ unit: String) -> some View {
+        VStack(spacing: 3) {
+            Text(emoji).font(.system(size: 18))
+            Text(value).font(.system(size: 16, weight: .bold, design: .rounded)).foregroundStyle(.white)
+            Text(unit.uppercased()).font(.system(size: 9, weight: .semibold)).tracking(1)
+                .foregroundStyle(Color.rTextSecondary)
+        }
+        .frame(maxWidth: .infinity)
+        .padding(.vertical, 12)
+        .background(RoundedRectangle(cornerRadius: 14).fill(Color.rSurface))
+        .overlay(RoundedRectangle(cornerRadius: 14).stroke(Color.rBorder, lineWidth: 1))
+    }
+
+    private var caloriesCard: some View {
+        let breakdown = CalorieEngine.dayCalories(steps: today?.steps ?? 0,
+                                                  workouts: todayEnergyInputs,
+                                                  metrics: model.profile.currentMetrics())
+        return SurfaceCard {
+            VStack(spacing: 0) {
+                HStack {
+                    Text("🔥 \(String(localized: "Calories burned"))").font(.system(size: 14))
+                    Spacer()
+                    Text("\(Int((breakdown?.total ?? 0).rounded())) \(String(localized: "kcal"))")
+                        .font(.system(size: 17, weight: .bold, design: .rounded))
+                        .foregroundStyle(Color.rOrange)
+                }
+                .padding(.vertical, 10)
+                Divider().overlay(Color.rBorder)
+                calorieRow(String(localized: "Everyday steps"),
+                           Int((breakdown?.everydayKcal ?? 0).rounded()))
+                ForEach(Array(todayWorkouts.enumerated()), id: \.element.id) { index, workout in
+                    Divider().overlay(Color.rBorder)
+                    calorieRow("\(workout.type.emoji) \(workout.type.localizedName) · \(Format.km(workout.distanceMeters))",
+                               Int((breakdown?.workoutKcal[safe: index] ?? 0).rounded()))
+                }
+                Text(String(localized: "Estimated from your body metrics.")).font(.system(size: 11))
+                    .foregroundStyle(Color.rTextSecondary)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .padding(.top, 8)
+            }
+        }
+    }
+
+    private func calorieRow(_ label: String, _ kcal: Int) -> some View {
+        HStack {
+            Text(label).font(.system(size: 14)).foregroundStyle(.white)
+            Spacer()
+            Text("\(kcal) \(String(localized: "kcal"))")
+                .font(.system(size: 15, weight: .bold, design: .rounded))
+                .foregroundStyle(Color.rOrange)
+        }
+        .padding(.vertical, 10)
+    }
+
+    private var addWeightCard: some View {
+        SurfaceCard {
+            VStack(alignment: .leading, spacing: 8) {
+                Label(String(localized: "Add your weight to see calories"), systemImage: "scalemass")
+                    .font(.subheadline).foregroundStyle(.white)
+                Text(String(localized: "Open Settings → Profile to add your weight, or allow Runner to read it from Apple Health."))
+                    .font(.caption).foregroundStyle(Color.rTextSecondary)
+            }
+        }
+    }
+
+    private var last7: [DayLedger] {
+        let cal = Calendar.current
+        let start = cal.date(byAdding: .day, value: -6, to: cal.startOfDay(for: .now))!
+        return ledgers.filter { $0.date >= start }.sorted { $0.date < $1.date }
+    }
+
+    private var trendCard: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            HStack {
+                MicroLabel(text: String(localized: "Last 7 days"))
+                Spacer()
+                Picker("", selection: $trendMode) {
+                    Text(String(localized: "Points")).tag(0)
+                    Text(String(localized: "Calories")).tag(1)
+                }
+                .pickerStyle(.segmented)
+                .frame(width: 170)
+            }
+            Chart(last7, id: \.date) { day in
+                BarMark(x: .value("Day", day.date, unit: .day),
+                        y: .value("Value", trendMode == 0 ? Double(day.totalPoints) : day.activeCalories))
+                    .foregroundStyle(trendMode == 0 ? Color.rLime : Color.rOrange)
+                    .cornerRadius(3)
+                if trendMode == 0 {
+                    RuleMark(y: .value("Goal", model.dailyGoal))
+                        .foregroundStyle(Color.rOrange.opacity(0.5))
+                        .lineStyle(StrokeStyle(lineWidth: 1, dash: [4, 4]))
+                }
+            }
+            .frame(height: 120)
+            .chartYAxis { AxisMarks(position: .trailing) }
+        }
+    }
+}
+
+extension Array {
+    subscript(safe index: Int) -> Element? {
+        indices.contains(index) ? self[index] : nil
     }
 }
 
