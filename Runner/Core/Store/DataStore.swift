@@ -124,7 +124,11 @@ final class DataStore {
             existing.splitSeconds = splitSeconds
             existing.source = source
             existing.hkSynced = hkSynced
-            existing.calories = calories
+            // Freeze calories once computed: external HK workouts are re-cached on
+            // every sync, so keep the value they were burned at instead of letting
+            // it drift with the user's current weight. A still-zero value (recorded
+            // before any weight was known) is (re)computed until it becomes non-zero.
+            if existing.calories == 0 { existing.calories = calories }
             rec = existing
         } else {
             rec = WorkoutRec(id: id, typeRaw: type.rawValue, start: start, end: end,

@@ -13,9 +13,11 @@ final class DayLedger {
     var isGold: Bool
     var streakAfter: Int
     // Derived, recomputed by the ledger-rebuild path (SyncCoordinator). Cache-safe.
-    var activeCalories: Double
-    var distanceMeters: Double
-    var activeSeconds: Double
+    // Inline defaults let SwiftData lightweight-migrate an existing v1 store by
+    // backfilling these columns on rows written before v1.1.
+    var activeCalories: Double = 0
+    var distanceMeters: Double = 0
+    var activeSeconds: Double = 0
 
     init(date: Date, steps: Int, stepPoints: Int, workoutPoints: Int, multiplier: Double,
          totalPoints: Int, goalAtThatTime: Int, isGold: Bool, streakAfter: Int,
@@ -61,7 +63,8 @@ final class WorkoutRec {
     var hkSynced: Bool
     // Persisted at save time from the body metrics in effect then, so a workout
     // keeps the calories it was burned at even if weight later changes.
-    var calories: Double
+    // Inline default backfills this column when migrating an existing v1 store.
+    var calories: Double = 0
 
     var type: ActivityType { ActivityType(rawValue: typeRaw) ?? .run }
 
