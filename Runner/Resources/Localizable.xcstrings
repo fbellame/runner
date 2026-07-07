@@ -31,6 +31,36 @@
         }
       }
     },
+    "1 pt per %lld steps (max %lld/day)": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "1 pt par %lld pas (max %lld/jour)"
+          }
+        }
+      }
+    },
+    "Active time": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Temps actif"
+          }
+        }
+      }
+    },
+    "Add your weight to see calories": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ajoutez votre poids pour voir les calories"
+          }
+        }
+      }
+    },
     "All": {
       "localizations": {
         "fr": {
@@ -101,6 +131,56 @@
         }
       }
     },
+    "Bike: %lld pts per km": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Vélo : %lld pts par km"
+          }
+        }
+      }
+    },
+    "Body": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Corps"
+          }
+        }
+      }
+    },
+    "Calories": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Calories"
+          }
+        }
+      }
+    },
+    "Calories are estimated from your weight, the activity type, and how fast and long you moved — no heart-rate sensor needed.": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Les calories sont estimées à partir de votre poids, du type d’activité et de la vitesse et de la durée de l’effort — sans capteur de fréquence cardiaque."
+          }
+        }
+      }
+    },
+    "Calories burned": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Calories brûlées"
+          }
+        }
+      }
+    },
     "Cancel": {
       "localizations": {
         "fr": {
@@ -127,6 +207,16 @@
           "stringUnit": {
             "state": "translated",
             "value": "Objectif quotidien"
+          }
+        }
+      }
+    },
+    "Date of birth": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Date de naissance"
           }
         }
       }
@@ -181,12 +271,72 @@
         }
       }
     },
+    "Estimated from your body metrics.": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Estimé à partir de vos mesures corporelles."
+          }
+        }
+      }
+    },
+    "Everyday steps": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Pas quotidiens"
+          }
+        }
+      }
+    },
+    "Female": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Femme"
+          }
+        }
+      }
+    },
+    "From steps (%@)": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "À partir des pas (%@)"
+          }
+        }
+      }
+    },
+    "From workouts": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "À partir des séances"
+          }
+        }
+      }
+    },
     "GO": {
       "localizations": {
         "fr": {
           "stringUnit": {
             "state": "translated",
             "value": "GO"
+          }
+        }
+      }
+    },
+    "GOLD": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "OR"
           }
         }
       }
@@ -211,6 +361,16 @@
         }
       }
     },
+    "Goal that day": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Objectif du jour"
+          }
+        }
+      }
+    },
     "Goal: %lld pts": {
       "localizations": {
         "fr": {
@@ -221,12 +381,32 @@
         }
       }
     },
+    "Height (cm)": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Taille (cm)"
+          }
+        }
+      }
+    },
     "History": {
       "localizations": {
         "fr": {
           "stringUnit": {
             "state": "translated",
             "value": "Historique"
+          }
+        }
+      }
+    },
+    "How calories work": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Le calcul des calories"
           }
         }
       }
@@ -257,6 +437,16 @@
           "stringUnit": {
             "state": "translated",
             "value": "13 dernières semaines"
+          }
+        }
+      }
+    },
+    "Last 7 days": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "7 derniers jours"
           }
         }
       }
@@ -301,6 +491,16 @@
         }
       }
     },
+    "Male": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Homme"
+          }
+        }
+      }
+    },
     "Month": {
       "localizations": {
         "fr": {
@@ -331,12 +531,62 @@
         }
       }
     },
+    "No steps from Apple Health yet. If Runner was denied access, allow reading under Health → Sharing → Apps.": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Aucun pas depuis Apple Santé pour l'instant. Si l'accès a été refusé à Runner, autorisez la lecture dans Santé → Partage → Apps."
+          }
+        }
+      }
+    },
     "No workouts yet — hit the ▶ button!": {
       "localizations": {
         "fr": {
           "stringUnit": {
             "state": "translated",
             "value": "Aucun entraînement — appuyez sur ▶ !"
+          }
+        }
+      }
+    },
+    "Not set": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Non défini"
+          }
+        }
+      }
+    },
+    "OK": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "OK"
+          }
+        }
+      }
+    },
+    "Open Health sharing": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ouvrir le partage Santé"
+          }
+        }
+      }
+    },
+    "Open Settings → Profile to add your weight, or allow Runner to read it from Apple Health.": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ouvrez Réglages → Profil pour ajouter votre poids, ou autorisez Runner à le lire depuis Santé."
           }
         }
       }
@@ -381,6 +631,36 @@
         }
       }
     },
+    "Precise Location is off — distance and route can't be recorded.": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "La localisation précise est désactivée — la distance et le parcours ne peuvent pas être enregistrés."
+          }
+        }
+      }
+    },
+    "Profile": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Profil"
+          }
+        }
+      }
+    },
+    "Profile & body metrics": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Profil et mesures"
+          }
+        }
+      }
+    },
     "Range": {
       "localizations": {
         "fr": {
@@ -421,6 +701,16 @@
         }
       }
     },
+    "Reset to Apple Health": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Réinitialiser depuis Santé"
+          }
+        }
+      }
+    },
     "Resume": {
       "localizations": {
         "fr": {
@@ -437,6 +727,16 @@
           "stringUnit": {
             "state": "translated",
             "value": "Reprendre votre entraînement ?"
+          }
+        }
+      }
+    },
+    "Review your profile": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Vérifiez votre profil"
           }
         }
       }
@@ -461,6 +761,16 @@
         }
       }
     },
+    "Run: %lld pts per km": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Course : %lld pts par km"
+          }
+        }
+      }
+    },
     "Runner needs location access to draw your parcours.": {
       "localizations": {
         "fr": {
@@ -471,12 +781,32 @@
         }
       }
     },
+    "Runner now estimates calories from your body metrics. Check them under Settings → Profile.": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Runner estime désormais les calories à partir de vos mesures corporelles. Vérifiez-les dans Réglages → Profil."
+          }
+        }
+      }
+    },
     "Runner was interrupted mid-workout. Your progress was saved.": {
       "localizations": {
         "fr": {
           "stringUnit": {
             "state": "translated",
             "value": "Runner a été interrompu en plein entraînement. Votre progression a été sauvegardée."
+          }
+        }
+      }
+    },
+    "Save as-is": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Enregistrer tel quel"
           }
         }
       }
@@ -501,12 +831,32 @@
         }
       }
     },
+    "Set date of birth": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Définir la date de naissance"
+          }
+        }
+      }
+    },
     "Settings": {
       "localizations": {
         "fr": {
           "stringUnit": {
             "state": "translated",
             "value": "Réglages"
+          }
+        }
+      }
+    },
+    "Sex": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Sexe"
           }
         }
       }
@@ -531,12 +881,42 @@
         }
       }
     },
+    "Storage is unavailable (%@). Nothing recorded now will survive an app restart.": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Le stockage est indisponible (%@). Rien de ce qui est enregistré maintenant ne survivra à un redémarrage de l'app."
+          }
+        }
+      }
+    },
     "Streak bonus": {
       "localizations": {
         "fr": {
           "stringUnit": {
             "state": "translated",
             "value": "Bonus de série"
+          }
+        }
+      }
+    },
+    "Streak: +%@ per gold day, max ×%@": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Série : +%@ par jour doré, max ×%@"
+          }
+        }
+      }
+    },
+    "Time": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Durée"
           }
         }
       }
@@ -551,12 +931,12 @@
         }
       }
     },
-    "Time": {
+    "Total points": {
       "localizations": {
         "fr": {
           "stringUnit": {
             "state": "translated",
-            "value": "Durée"
+            "value": "Points totaux"
           }
         }
       }
@@ -581,12 +961,32 @@
         }
       }
     },
+    "Walk: %lld pts per km": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Marche : %lld pts par km"
+          }
+        }
+      }
+    },
     "Week": {
       "localizations": {
         "fr": {
           "stringUnit": {
             "state": "translated",
             "value": "Semaine"
+          }
+        }
+      }
+    },
+    "Weight (kg)": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Poids (kg)"
           }
         }
       }
@@ -611,102 +1011,42 @@
         }
       }
     },
-    "Precise Location is off — distance and route can't be recorded.": {
+    "Your height, weight, age and sex power the calorie estimates. Values come from Apple Health; edit any of them to override.": {
       "localizations": {
         "fr": {
           "stringUnit": {
             "state": "translated",
-            "value": "La localisation précise est désactivée — la distance et le parcours ne peuvent pas être enregistrés."
+            "value": "Votre taille, poids, âge et sexe alimentent l’estimation des calories. Les valeurs proviennent de Santé ; modifiez-les pour les remplacer."
           }
         }
       }
     },
-    "Storage is unavailable (%@). Nothing recorded now will survive an app restart.": {
+    "active": {
       "localizations": {
         "fr": {
           "stringUnit": {
             "state": "translated",
-            "value": "Le stockage est indisponible (%@). Rien de ce qui est enregistré maintenant ne survivra à un redémarrage de l'app."
+            "value": "actif"
           }
         }
       }
     },
-    "1 pt per %lld steps (max %lld/day)": {
+    "kcal": {
       "localizations": {
         "fr": {
           "stringUnit": {
             "state": "translated",
-            "value": "1 pt par %lld pas (max %lld/jour)"
+            "value": "kcal"
           }
         }
       }
     },
-    "Run: %lld pts per km": {
+    "today": {
       "localizations": {
         "fr": {
           "stringUnit": {
             "state": "translated",
-            "value": "Course : %lld pts par km"
-          }
-        }
-      }
-    },
-    "Walk: %lld pts per km": {
-      "localizations": {
-        "fr": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Marche : %lld pts par km"
-          }
-        }
-      }
-    },
-    "Bike: %lld pts per km": {
-      "localizations": {
-        "fr": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Vélo : %lld pts par km"
-          }
-        }
-      }
-    },
-    "Streak: +%@ per gold day, max ×%@": {
-      "localizations": {
-        "fr": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Série : +%@ par jour doré, max ×%@"
-          }
-        }
-      }
-    },
-    "Save as-is": {
-      "localizations": {
-        "fr": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Enregistrer tel quel"
-          }
-        }
-      }
-    },
-    "No steps from Apple Health yet. If Runner was denied access, allow reading under Health → Sharing → Apps.": {
-      "localizations": {
-        "fr": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Aucun pas depuis Apple Santé pour l'instant. Si l'accès a été refusé à Runner, autorisez la lecture dans Santé → Partage → Apps."
-          }
-        }
-      }
-    },
-    "Open Health sharing": {
-      "localizations": {
-        "fr": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Ouvrir le partage Santé"
+            "value": "aujourd’hui"
           }
         }
       }

@@ -11,6 +11,7 @@ enum AppTab {
 @Observable
 final class AppModel {
     static let goalKey = "dailyGoal"
+    static let profilePromptKey = "didShowProfilePrompt_v1_1"
     /// Single source for the allowed daily-goal bounds — the Settings stepper,
     /// the didSet clamp, and storedGoal() must never disagree.
     static let goalRange = 50...500
@@ -29,6 +30,8 @@ final class AppModel {
     /// in-memory fallback: everything recorded now is lost on relaunch, so the UI
     /// must say so instead of looking healthy.
     var storeFailureMessage: String?
+    /// One-time invitation (first v1.1 launch) to review body metrics for calories.
+    var showProfilePrompt = false
 
     @ObservationIgnored nonisolated(unsafe) private var dayChangeObserver: (any NSObjectProtocol)?
 
@@ -108,6 +111,10 @@ final class AppModel {
         }
         pendingResume = checkpoints.load()
         await sync.syncNow()
+        if !UserDefaults.standard.bool(forKey: Self.profilePromptKey) {
+            showProfilePrompt = true
+            UserDefaults.standard.set(true, forKey: Self.profilePromptKey)
+        }
     }
 
     deinit {

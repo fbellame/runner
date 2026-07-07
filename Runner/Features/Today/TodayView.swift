@@ -33,7 +33,8 @@ struct TodayView: View {
     }
 
     var body: some View {
-        ScrollView {
+        @Bindable var model = model
+        return ScrollView {
             VStack(alignment: .leading, spacing: 16) {
                 header
                 pointsBlock
@@ -92,6 +93,11 @@ struct TodayView: View {
         }
         .refreshable {
             await model.sync.syncNow()
+        }
+        .alert(String(localized: "Review your profile"), isPresented: $model.showProfilePrompt) {
+            Button(String(localized: "OK"), role: .cancel) {}
+        } message: {
+            Text(String(localized: "Runner now estimates calories from your body metrics. Check them under Settings → Profile."))
         }
     }
 

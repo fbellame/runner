@@ -63,8 +63,14 @@ struct SettingsView: View {
                     ruleRow("🔥", String(localized: "Streak: +\(PointsEngine.streakBonusPerDay.formatted(.percent)) per gold day, max ×\(PointsEngine.multiplierCap.formatted())"))
                 }
 
+                Section(String(localized: "How calories work")) {
+                    Text(String(localized: "Calories are estimated from your weight, the activity type, and how fast and long you moved — no heart-rate sensor needed."))
+                        .font(.subheadline)
+                        .foregroundStyle(Color.rTextSecondary)
+                }
+
                 Section {
-                    LabeledContent(String(localized: "Version"), value: "1.0")
+                    LabeledContent(String(localized: "Version"), value: "1.1")
                 }
             }
             .scrollContentBackground(.hidden)
