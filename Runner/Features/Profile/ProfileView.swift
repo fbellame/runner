@@ -7,6 +7,14 @@ struct ProfileView: View {
     @State private var birthDate = Date()
     @State private var hasBirthDate = false
     @State private var sex: BodySex = .unspecified
+    // Snapshot of what load() showed, so save() flips isManual only for fields the
+    // user actually changed — comparing raw stored Doubles against rounded display
+    // strings would flip every field "manual" on an unedited visit.
+    @State private var initialHeightText = ""
+    @State private var initialWeightText = ""
+    @State private var initialBirthDate = Date()
+    @State private var initialHasBirthDate = false
+    @State private var initialSex: BodySex = .unspecified
 
     var body: some View {
         List {
@@ -60,19 +68,38 @@ struct ProfileView: View {
         guard let row = try? model.profile.row() else { return }
         heightText = row.heightCm.map { String(Int($0.rounded())) } ?? ""
         weightText = row.weightKg.map { $0.formatted(.number.precision(.fractionLength(1))) } ?? ""
-        if let b = row.birthDate { birthDate = b; hasBirthDate = true }
+        hasBirthDate = row.birthDate != nil
+        if let b = row.birthDate { birthDate = b }
         sex = row.sex
+        // Remember exactly what we showed, to detect real edits in save().
+        initialHeightText = heightText
+        initialWeightText = weightText
+        initialHasBirthDate = hasBirthDate
+        initialBirthDate = birthDate
+        initialSex = sex
     }
 
     private func save() {
         guard let row = try? model.profile.row() else { return }
-        let newHeight = Double(heightText.replacingOccurrences(of: ",", with: "."))
-        if newHeight != row.heightCm { row.heightCm = newHeight; row.isHeightManual = newHeight != nil }
-        let newWeight = Double(weightText.replacingOccurrences(of: ",", with: "."))
-        if newWeight != row.weightKg { row.weightKg = newWeight; row.isWeightManual = newWeight != nil }
-        let newBirth = hasBirthDate ? birthDate : nil
-        if newBirth != row.birthDate { row.birthDate = newBirth; row.isBirthManual = newBirth != nil }
-        if sex != row.sex { row.sex = sex; row.isSexManual = sex != .unspecified }
+        if heightText != initialHeightText {
+            let v = Double(heightText.replacingOccurrences(of: ",", with: "."))
+            row.heightCm = v
+            row.isHeightManual = v != nil
+        }
+        if weightText != initialWeightText {
+            let v = Double(weightText.replacingOccurrences(of: ",", with: "."))
+            row.weightKg = v
+            row.isWeightManual = v != nil
+        }
+        if hasBirthDate != initialHasBirthDate || (hasBirthDate && birthDate != initialBirthDate) {
+            let newBirth = hasBirthDate ? birthDate : nil
+            row.birthDate = newBirth
+            row.isBirthManual = newBirth != nil
+        }
+        if sex != initialSex {
+            row.sex = sex
+            row.isSexManual = sex != .unspecified
+        }
         try? model.store.save()
         Task { await model.sync.syncNow() }
     }
