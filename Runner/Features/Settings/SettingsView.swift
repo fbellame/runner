@@ -10,6 +10,14 @@ struct SettingsView: View {
         @Bindable var model = model
         NavigationStack {
             List {
+                Section {
+                    NavigationLink {
+                        ProfileView()
+                    } label: {
+                        Label(String(localized: "Profile & body metrics"), systemImage: "person.text.rectangle")
+                    }
+                }
+
                 Section(String(localized: "Daily goal")) {
                     Stepper(value: $model.dailyGoal, in: AppModel.goalRange, step: 10) {
                         HStack {
