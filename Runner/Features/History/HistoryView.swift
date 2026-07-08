@@ -28,12 +28,16 @@ struct HistoryView: View {
             .navigationDestination(for: ActivityType.self) { type in
                 ActivityDetailView(type: type)
             }
+            .navigationDestination(for: InsightsRoute.self) { route in
+                InsightsView(initialType: route.initialType)
+            }
         }
     }
 
     private var content: some View {
         let summaries = workoutSummaries
         let totals = ActivityStats.lifetimeTotals(summaries)
+        let mostUsedType = mostUsedType(in: totals)
 
         return ScrollView {
             VStack(alignment: .leading, spacing: 18) {
@@ -47,6 +51,7 @@ struct HistoryView: View {
                                 onSelect: { selectedDay = SelectedDay(date: $0) })
                 }
 
+                insightsEntryCard(initialType: mostUsedType)
                 chartSection
                 lifetimeTotalsSection(totals)
                 activityTypesSection(totals)
@@ -57,6 +62,53 @@ struct HistoryView: View {
             }
             .padding(.horizontal, 18)
         }
+    }
+
+    private func insightsEntryCard(initialType: ActivityType) -> some View {
+        NavigationLink(value: InsightsRoute(initialType: initialType)) {
+            SurfaceCard {
+                HStack(spacing: 12) {
+                    Image(systemName: "chart.line.uptrend.xyaxis")
+                        .font(.system(size: 22, weight: .bold))
+                        .foregroundStyle(Color.rLime)
+                        .frame(width: 42, height: 42)
+                        .background(
+                            RoundedRectangle(cornerRadius: 12)
+                                .fill(Color.rLime.opacity(0.14))
+                                .overlay(RoundedRectangle(cornerRadius: 12)
+                                    .stroke(Color.rLime.opacity(0.45), lineWidth: 1))
+                        )
+                    VStack(alignment: .leading, spacing: 3) {
+                        Text(String(localized: "Insights"))
+                            .font(.system(size: 17, weight: .bold, design: .rounded))
+                            .foregroundStyle(.white)
+                        Text(String(localized: "Trends, pace & consistency"))
+                            .font(.system(size: 13, weight: .semibold))
+                            .foregroundStyle(Color.rTextSecondary)
+                    }
+                    Spacer()
+                    Image(systemName: "chevron.right")
+                        .font(.system(size: 13, weight: .bold))
+                        .foregroundStyle(Color.rLime)
+                }
+            }
+        }
+        .buttonStyle(.plain)
+    }
+
+    private func mostUsedType(in totals: LifetimeTotals) -> ActivityType {
+        var bestType: ActivityType = .run
+        var bestCount = 0
+
+        for type in ActivityType.allCases {
+            let count = totals.perType[type]?.workouts ?? 0
+            if count > bestCount {
+                bestType = type
+                bestCount = count
+            }
+        }
+
+        return bestCount > 0 ? bestType : .run
     }
 
     private var chartSection: some View {
@@ -342,6 +394,10 @@ struct HistoryView: View {
 // Identifiable without a retroactive conformance on the stdlib `Date` type.
 struct SelectedDay: Hashable {
     let date: Date
+}
+
+struct InsightsRoute: Hashable {
+    let initialType: ActivityType
 }
 
 extension ActivityWorkoutSummary {

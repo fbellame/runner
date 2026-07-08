@@ -11,12 +11,32 @@
         }
       }
     },
+    "%@/wk": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@/sem."
+          }
+        }
+      }
+    },
     "%lld days": {
       "localizations": {
         "fr": {
           "stringUnit": {
             "state": "translated",
             "value": "%lld jours"
+          }
+        }
+      }
+    },
+    "%llds/km": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%lld s/km"
           }
         }
       }
@@ -47,6 +67,26 @@
           "stringUnit": {
             "state": "translated",
             "value": "%lld entraînements"
+          }
+        }
+      }
+    },
+    ", down from %@": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": ", en baisse par rapport à %@"
+          }
+        }
+      }
+    },
+    ", up from %@": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": ", en hausse par rapport à %@"
           }
         }
       }
@@ -511,6 +551,16 @@
         }
       }
     },
+    "Insights": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Analyses"
+          }
+        }
+      }
+    },
     "Km %lld": {
       "localizations": {
         "fr": {
@@ -681,6 +731,26 @@
         }
       }
     },
+    "Not enough data yet — keep at it!": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Pas encore assez de données — continuez !"
+          }
+        }
+      }
+    },
+    "Not enough pace data yet": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Pas encore assez de données d’allure"
+          }
+        }
+      }
+    },
     "Not set": {
       "localizations": {
         "fr": {
@@ -737,6 +807,46 @@
           "stringUnit": {
             "state": "translated",
             "value": "Allure"
+          }
+        }
+      }
+    },
+    "Pace by week (lower = faster)": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Allure par semaine (plus bas = plus rapide)"
+          }
+        }
+      }
+    },
+    "Pace is declining — %@ slower than the previous 4 weeks.": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "L’allure ralentit — %@ plus lente que les 4 semaines précédentes."
+          }
+        }
+      }
+    },
+    "Pace is holding steady.": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "L’allure reste stable."
+          }
+        }
+      }
+    },
+    "Pace is improving — %@ faster than the previous 4 weeks.": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "L’allure s’améliore — %@ plus rapide que les 4 semaines précédentes."
           }
         }
       }
@@ -1091,6 +1201,16 @@
         }
       }
     },
+    "Trends, pace & consistency": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Tendances, allure et régularité"
+          }
+        }
+      }
+    },
     "Version": {
       "localizations": {
         "fr": {
@@ -1171,6 +1291,36 @@
         }
       }
     },
+    "You're biking %@× per week": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Vous roulez à vélo %@× par semaine"
+          }
+        }
+      }
+    },
+    "You're running %@× per week": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Vous courez %@× par semaine"
+          }
+        }
+      }
+    },
+    "You're walking %@× per week": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Vous marchez %@× par semaine"
+          }
+        }
+      }
+    },
     "active": {
       "localizations": {
         "fr": {
@@ -1191,12 +1341,32 @@
         }
       }
     },
+    "new": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "nouveau"
+          }
+        }
+      }
+    },
     "today": {
       "localizations": {
         "fr": {
           "stringUnit": {
             "state": "translated",
             "value": "aujourd’hui"
+          }
+        }
+      }
+    },
+    "vs previous 4 weeks": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "vs 4 semaines précédentes"
           }
         }
       }
