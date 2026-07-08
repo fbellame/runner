@@ -70,7 +70,7 @@ struct SettingsView: View {
                 }
 
                 Section {
-                    LabeledContent(String(localized: "Version"), value: "1.1")
+                    LabeledContent(String(localized: "Version"), value: appVersion)
                 }
             }
             .scrollContentBackground(.hidden)
@@ -84,6 +84,13 @@ struct SettingsView: View {
             .task { pendingCount = (try? model.store.pendingSync().count) ?? 0 }
         }
         .preferredColorScheme(.dark)
+    }
+
+    private var appVersion: String {
+        let info = Bundle.main.infoDictionary
+        let version = info?["CFBundleShortVersionString"] as? String ?? "?"
+        let build = info?["CFBundleVersion"] as? String ?? "?"
+        return "\(version) (\(build))"
     }
 
     private func permissionRow(title: String, ok: Bool, detail: String) -> some View {

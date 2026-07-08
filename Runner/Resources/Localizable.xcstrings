@@ -1570,6 +1570,26 @@
           }
         }
       }
+    },
+    "History re-imported": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Historique réimporté"
+          }
+        }
+      }
+    },
+    "Your past activity from Apple Health has been re-imported. Check the History tab.": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ton activité passée d'Apple Santé a été réimportée. Regarde l'onglet Historique."
+          }
+        }
+      }
     }
   },
   "version": "1.0"

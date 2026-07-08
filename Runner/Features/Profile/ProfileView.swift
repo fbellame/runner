@@ -15,6 +15,8 @@ struct ProfileView: View {
     @State private var initialBirthDate = Date()
     @State private var initialHasBirthDate = false
     @State private var initialSex: BodySex = .unspecified
+    @State private var isReimporting = false
+    @State private var reimportDone = false
 
     var body: some View {
         List {
@@ -48,14 +50,21 @@ struct ProfileView: View {
                 Button {
                     reimportFullHistory()
                 } label: {
-                    VStack(alignment: .leading, spacing: 3) {
-                        Text(String(localized: "Re-import full history"))
-                            .foregroundStyle(Color.rOrange)
-                        Text(String(localized: "Imports all past activity from Apple Health"))
-                            .font(.caption)
-                            .foregroundStyle(Color.rTextSecondary)
+                    HStack {
+                        VStack(alignment: .leading, spacing: 3) {
+                            Text(String(localized: "Re-import full history"))
+                                .foregroundStyle(isReimporting ? Color.rTextSecondary : Color.rOrange)
+                            Text(String(localized: "Imports all past activity from Apple Health"))
+                                .font(.caption)
+                                .foregroundStyle(Color.rTextSecondary)
+                        }
+                        Spacer()
+                        if isReimporting {
+                            ProgressView()
+                        }
                     }
                 }
+                .disabled(isReimporting)
             } footer: {
                 Text(appVersionLine)
                     .font(.caption2)
@@ -69,6 +78,11 @@ struct ProfileView: View {
         .preferredColorScheme(.dark)
         .onAppear(perform: load)
         .onDisappear(perform: save)
+        .alert(String(localized: "History re-imported"), isPresented: $reimportDone) {
+            Button(String(localized: "OK"), role: .cancel) {}
+        } message: {
+            Text(String(localized: "Your past activity from Apple Health has been re-imported. Check the History tab."))
+        }
     }
 
     private func metricField(_ label: String, text: Binding<String>) -> some View {
@@ -143,7 +157,13 @@ struct ProfileView: View {
     }
 
     private func reimportFullHistory() {
-        model.sync.resetFullHistory()
-        Task { await model.sync.syncNow() }
+        guard !isReimporting else { return }
+        isReimporting = true
+        Task {
+            model.sync.resetFullHistory()
+            await model.sync.syncNow()
+            isReimporting = false
+            reimportDone = true
+        }
     }
 }

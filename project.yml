@@ -24,12 +24,12 @@ targets:
         ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
         INFOPLIST_KEY_UIUserInterfaceStyle: Dark
         SWIFT_STRICT_CONCURRENCY: complete
-        MARKETING_VERSION: "1.2"
-        CURRENT_PROJECT_VERSION: "2"
     info:
       path: Runner/Info.plist
       properties:
         CFBundleDisplayName: Runner
+        CFBundleShortVersionString: "1.2"
+        CFBundleVersion: "3"
         CFBundleLocalizations: [en, fr]
         CFBundleDevelopmentRegion: en
         UILaunchScreen:
