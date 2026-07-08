@@ -53,13 +53,16 @@ struct DataStoreTests {
                                 routeData: nil, splitSeconds: [300, 300, 300, 300, 300],
                                 source: "runner", hkSynced: false)
         #expect(try store.pendingSync().count == 1)
+        #expect(try store.allWorkouts().first?.distanceEstimated == false)
         // same id upsert flips synced without duplicating
         try store.upsertWorkout(id: id, type: .run, start: .now, end: .now.addingTimeInterval(1500),
-                                movingSeconds: 1500, distanceMeters: 5000, points: 75,
+                                movingSeconds: 1500, distanceMeters: 5000,
+                                distanceEstimated: true, points: 75,
                                 routeData: nil, splitSeconds: [300, 300, 300, 300, 300],
                                 source: "runner", hkSynced: true)
         #expect(try store.pendingSync().isEmpty)
         #expect(try store.allWorkouts().count == 1)
+        #expect(try store.allWorkouts().first?.distanceEstimated == true)
         #expect(try store.workouts(onDay: .now).count == 1)
     }
 

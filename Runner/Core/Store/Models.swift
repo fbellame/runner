@@ -56,6 +56,7 @@ final class WorkoutRec {
     var end: Date
     var movingSeconds: Double
     var distanceMeters: Double
+    var distanceEstimated: Bool = false
     var points: Int
     var routeData: Data?
     var splitSeconds: [Double]
@@ -69,7 +70,8 @@ final class WorkoutRec {
     var type: ActivityType { ActivityType(rawValue: typeRaw) ?? .run }
 
     init(id: UUID, typeRaw: String, start: Date, end: Date, movingSeconds: Double,
-         distanceMeters: Double, points: Int, routeData: Data?, splitSeconds: [Double],
+         distanceMeters: Double, distanceEstimated: Bool = false, points: Int,
+         routeData: Data?, splitSeconds: [Double],
          source: String, hkSynced: Bool, calories: Double = 0) {
         self.id = id
         self.typeRaw = typeRaw
@@ -77,6 +79,7 @@ final class WorkoutRec {
         self.end = end
         self.movingSeconds = movingSeconds
         self.distanceMeters = distanceMeters
+        self.distanceEstimated = distanceEstimated
         self.points = points
         self.routeData = routeData
         self.splitSeconds = splitSeconds

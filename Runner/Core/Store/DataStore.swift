@@ -107,9 +107,10 @@ final class DataStore {
 
     @discardableResult
     func upsertWorkout(id: UUID, type: ActivityType, start: Date, end: Date,
-                       movingSeconds: Double, distanceMeters: Double, points: Int,
-                       routeData: Data?, splitSeconds: [Double],
-                       source: String, hkSynced: Bool, calories: Double = 0) throws -> WorkoutRec {
+                       movingSeconds: Double, distanceMeters: Double,
+                       distanceEstimated: Bool = false, points: Int, routeData: Data?,
+                       splitSeconds: [Double], source: String, hkSynced: Bool,
+                       calories: Double = 0) throws -> WorkoutRec {
         var descriptor = FetchDescriptor<WorkoutRec>(predicate: #Predicate { $0.id == id })
         descriptor.fetchLimit = 1
         let rec: WorkoutRec
@@ -119,6 +120,7 @@ final class DataStore {
             existing.end = end
             existing.movingSeconds = movingSeconds
             existing.distanceMeters = distanceMeters
+            existing.distanceEstimated = distanceEstimated
             existing.points = points
             existing.routeData = routeData ?? existing.routeData
             existing.splitSeconds = splitSeconds
@@ -133,6 +135,7 @@ final class DataStore {
         } else {
             rec = WorkoutRec(id: id, typeRaw: type.rawValue, start: start, end: end,
                              movingSeconds: movingSeconds, distanceMeters: distanceMeters,
+                             distanceEstimated: distanceEstimated,
                              points: points, routeData: routeData, splitSeconds: splitSeconds,
                              source: source, hkSynced: hkSynced, calories: calories)
             context.insert(rec)
