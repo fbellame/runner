@@ -1500,6 +1500,76 @@
           }
         }
       }
+    },
+    "This week": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Cette semaine"
+          }
+        }
+      }
+    },
+    "vs last week": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "vs semaine dernière"
+          }
+        }
+      }
+    },
+    "distance": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "distance"
+          }
+        }
+      }
+    },
+    "sessions": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "séances"
+          }
+        }
+      }
+    },
+    "Best run": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Meilleure sortie"
+          }
+        }
+      }
+    },
+    "1 gold day": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "1 jour en or"
+          }
+        }
+      }
+    },
+    "%lld gold days": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%lld jours en or"
+          }
+        }
+      }
     }
   },
   "version": "1.0"

@@ -45,6 +45,7 @@ struct TodayView: View {
                 } else {
                     addWeightCard
                 }
+                weeklyRecapCard
                 trendCard
                 if !latestRoute.isEmpty {
                     miniMap
@@ -287,6 +288,88 @@ struct TodayView: View {
                     .font(.caption).foregroundStyle(Color.rTextSecondary)
             }
         }
+    }
+
+    private var weeklyRecap: WeeklyRecap {
+        WeeklyRecapMath.recap(
+            ledgers: ledgers.map { RecapLedgerDay(date: $0.date, totalPoints: $0.totalPoints, isGold: $0.isGold) },
+            workouts: workouts.map(ActivityWorkoutSummary.init(workout:)),
+            now: .now,
+            calendar: .current)
+    }
+
+    @ViewBuilder
+    private var weeklyRecapCard: some View {
+        let recap = weeklyRecap
+        if recap.hasActivity {
+            SurfaceCard {
+                VStack(alignment: .leading, spacing: 12) {
+                    MicroLabel(text: String(localized: "This week"))
+                    HStack(alignment: .firstTextBaseline) {
+                        Text("\(recap.points)")
+                            .font(.system(size: 28, weight: .bold, design: .rounded))
+                            .foregroundStyle(.white)
+                        Text("PTS")
+                            .font(.system(size: 12, weight: .semibold))
+                            .foregroundStyle(Color.rTextSecondary)
+                        Spacer()
+                        let delta = recapDelta(recap.pointsDeltaFraction)
+                        VStack(alignment: .trailing, spacing: 2) {
+                            Text(delta.text)
+                                .font(.system(size: 14, weight: .bold, design: .rounded))
+                                .foregroundStyle(delta.accent)
+                            MicroLabel(text: String(localized: "vs last week"))
+                        }
+                    }
+                    HStack(spacing: 10) {
+                        recapStat(Format.km(recap.distanceMeters), String(localized: "distance"))
+                        recapStat("\(recap.sessions)", String(localized: "sessions"))
+                    }
+                    if let best = recap.bestRun {
+                        HStack {
+                            MicroLabel(text: String(localized: "Best run"))
+                            Spacer()
+                            Text("\(best.type.emoji) \(Format.km(best.distanceMeters)) · \(best.date.formatted(.dateTime.weekday(.abbreviated)))")
+                                .font(.system(size: 13, weight: .semibold, design: .rounded))
+                                .foregroundStyle(best.type.accent)
+                        }
+                    }
+                    if recap.goldDays > 0 {
+                        Text(goldDaysText(recap.goldDays))
+                            .font(.system(size: 13, weight: .semibold))
+                            .foregroundStyle(Color.rOrange)
+                    }
+                }
+            }
+        }
+    }
+
+    private func recapDelta(_ fraction: Double?) -> (text: String, accent: Color) {
+        guard let fraction else {
+            return (String(localized: "new"), Color.rTextSecondary)
+        }
+        let pct = abs(fraction).formatted(.percent.precision(.fractionLength(0)))
+        if fraction > 0 { return ("▲ \(pct)", Color.rLime) }
+        if fraction < 0 { return ("▼ \(pct)", Color.rOrange) }
+        return (pct, Color.rTextSecondary)
+    }
+
+    private func recapStat(_ value: String, _ label: String) -> some View {
+        VStack(alignment: .leading, spacing: 2) {
+            Text(value)
+                .font(.system(size: 16, weight: .bold, design: .rounded))
+                .foregroundStyle(.white)
+            Text(label.uppercased())
+                .font(.system(size: 9, weight: .semibold)).tracking(1)
+                .foregroundStyle(Color.rTextSecondary)
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+    }
+
+    private func goldDaysText(_ count: Int) -> String {
+        count == 1
+            ? String(localized: "1 gold day")
+            : String(format: String(localized: "%lld gold days"), count)
     }
 
     private var last7: [DayLedger] {
