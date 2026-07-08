@@ -19,8 +19,9 @@ enum Format {
         return duration(secondsPerKm) + " /km"
     }
 
-    static func km(_ meters: Double) -> String {
+    static func km(_ meters: Double, estimated: Bool = false) -> String {
         let value = meters / 1000.0
-        return value.formatted(.number.precision(.fractionLength(2))) + " km"
+        let prefix = estimated ? "~" : ""
+        return prefix + value.formatted(.number.precision(.fractionLength(2))) + " km"
     }
 }

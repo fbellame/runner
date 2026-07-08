@@ -631,12 +631,12 @@
         }
       }
     },
-    "Last 13 weeks": {
+    "Last 52 weeks": {
       "localizations": {
         "fr": {
           "stringUnit": {
             "state": "translated",
-            "value": "13 dernières semaines"
+            "value": "52 dernières semaines"
           }
         }
       }
@@ -1377,6 +1377,16 @@
           "stringUnit": {
             "state": "translated",
             "value": "Semaine"
+          }
+        }
+      }
+    },
+    "Year": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Année"
           }
         }
       }

@@ -8,7 +8,20 @@ struct ExternalWorkout: Equatable, Sendable {
     let end: Date
     let movingSeconds: Double
     let distanceMeters: Double
+    let distanceEstimated: Bool
     let isFromThisApp: Bool
+
+    init(id: UUID, type: ActivityType, start: Date, end: Date, movingSeconds: Double,
+         distanceMeters: Double, distanceEstimated: Bool = false, isFromThisApp: Bool) {
+        self.id = id
+        self.type = type
+        self.start = start
+        self.end = end
+        self.movingSeconds = movingSeconds
+        self.distanceMeters = distanceMeters
+        self.distanceEstimated = distanceEstimated
+        self.isFromThisApp = isFromThisApp
+    }
 }
 
 struct HealthBody: Sendable {
@@ -27,6 +40,7 @@ protocol HealthStoring: AnyObject {
     func earliestHistoryDate() async throws -> Date?
     func diagnosticsReport() async -> String
     func dailySteps(daysBack: Int) async throws -> [Date: Int]
+    func dailyWalkRunDistance(daysBack: Int) async throws -> [Date: Double]
     func workouts(daysBack: Int) async throws -> [ExternalWorkout]
     func saveWorkout(_ workout: RecordedWorkout, points: Int) async throws -> UUID
     func startObservingSteps(_ onChange: @escaping @Sendable () -> Void)

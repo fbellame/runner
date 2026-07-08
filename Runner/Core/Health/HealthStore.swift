@@ -148,6 +148,32 @@ final class HealthStore: HealthStoring {
         }
     }
 
+    func dailyWalkRunDistance(daysBack: Int) async throws -> [Date: Double] {
+        let cal = Calendar.current
+        let (start, end) = HealthMappers.window(daysBack: daysBack, endingAt: Date(), calendar: cal)
+        let predicate = HKQuery.predicateForSamples(withStart: start, end: end, options: .strictStartDate)
+        return try await withCheckedThrowingContinuation { continuation in
+            let query = HKStatisticsCollectionQuery(quantityType: distanceWalkRun,
+                                                    quantitySamplePredicate: predicate,
+                                                    options: .cumulativeSum,
+                                                    anchorDate: start,
+                                                    intervalComponents: DateComponents(day: 1))
+            query.initialResultsHandler = { _, collection, error in
+                if let error {
+                    continuation.resume(throwing: error)
+                    return
+                }
+                var out: [Date: Double] = [:]
+                collection?.enumerateStatistics(from: start, to: end) { stats, _ in
+                    let meters = stats.sumQuantity()?.doubleValue(for: .meter()) ?? 0
+                    out[cal.startOfDay(for: stats.startDate)] = meters
+                }
+                continuation.resume(returning: out)
+            }
+            store.execute(query)
+        }
+    }
+
     func workouts(daysBack: Int) async throws -> [ExternalWorkout] {
         let cal = Calendar.current
         let (start, end) = HealthMappers.window(daysBack: daysBack, endingAt: Date(), calendar: cal)
@@ -166,11 +192,16 @@ final class HealthStore: HealthStoring {
         return samples.compactMap { sample in
             guard let workout = sample as? HKWorkout,
                   let type = HealthMappers.activityType(from: workout.workoutActivityType) else { return nil }
-            let meters = workoutDistanceMeters(workout, type: type)
+            let realMeters = workoutDistanceMeters(workout, type: type)
+            let estimatedMeters = realMeters == 0
+                ? WorkoutEstimation.estimatedMeters(type: type, movingSeconds: workout.duration)
+                : nil
+            let meters = estimatedMeters ?? realMeters
             return ExternalWorkout(id: workout.uuid, type: type, start: workout.startDate,
                                    end: workout.endDate,
                                    movingSeconds: workout.duration,
                                    distanceMeters: meters,
+                                   distanceEstimated: estimatedMeters != nil,
                                    isFromThisApp: workout.sourceRevision.source.bundleIdentifier == bundleID)
         }
     }

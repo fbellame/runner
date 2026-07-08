@@ -5,11 +5,27 @@ struct ActivityWorkoutSummary {
     let type: ActivityType
     let date: Date
     let distanceMeters: Double
+    let distanceEstimated: Bool
     let movingSeconds: Double
     let points: Int
     let calories: Double
     let splitSeconds: [Double]
     let hasRoute: Bool
+
+    init(id: UUID, type: ActivityType, date: Date, distanceMeters: Double,
+         distanceEstimated: Bool = false, movingSeconds: Double, points: Int,
+         calories: Double, splitSeconds: [Double], hasRoute: Bool) {
+        self.id = id
+        self.type = type
+        self.date = date
+        self.distanceMeters = distanceMeters
+        self.distanceEstimated = distanceEstimated
+        self.movingSeconds = movingSeconds
+        self.points = points
+        self.calories = calories
+        self.splitSeconds = splitSeconds
+        self.hasRoute = hasRoute
+    }
 }
 
 struct TypeStats {
@@ -36,8 +52,18 @@ struct LifetimeTotals {
 struct PersonalRecord {
     let kind: RecordKind
     let value: Double
+    let distanceEstimated: Bool
     let workoutID: UUID?
     let date: Date?
+
+    init(kind: RecordKind, value: Double, distanceEstimated: Bool = false,
+         workoutID: UUID?, date: Date?) {
+        self.kind = kind
+        self.value = value
+        self.distanceEstimated = distanceEstimated
+        self.workoutID = workoutID
+        self.date = date
+    }
 }
 
 enum RecordKind: CaseIterable {
@@ -121,6 +147,7 @@ enum ActivityStats {
         if let longest = scoped.max(by: { $0.distanceMeters < $1.distanceMeters }) {
             records.append(PersonalRecord(kind: .longestDistance,
                                           value: longest.distanceMeters,
+                                          distanceEstimated: longest.distanceEstimated,
                                           workoutID: longest.id,
                                           date: longest.date))
         }

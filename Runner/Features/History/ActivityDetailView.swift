@@ -211,7 +211,7 @@ struct ActivityDetailView: View {
     private func recordValue(_ record: PersonalRecord) -> String {
         switch record.kind {
         case .longestDistance:
-            Format.km(record.value)
+            Format.km(record.value, estimated: record.distanceEstimated)
         case .fastestOneKilometer:
             Format.pace(record.value)
         case .fastestFiveKilometers:

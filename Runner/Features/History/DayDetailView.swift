@@ -86,7 +86,7 @@ struct DayDetailView: View {
                     SurfaceCard {
                         HStack {
                             Text(workout.type.emoji).font(.system(size: 20))
-                            Text("\(workout.type.localizedName) · \(Format.km(workout.distanceMeters))")
+                            Text("\(workout.type.localizedName) · \(Format.km(workout.distanceMeters, estimated: workout.distanceEstimated))")
                                 .font(.system(size: 15, weight: .semibold)).foregroundStyle(.white)
                             Spacer()
                             Text("+\(workout.points)").font(.system(size: 15, weight: .bold, design: .rounded))

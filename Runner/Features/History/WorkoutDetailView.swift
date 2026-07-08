@@ -27,7 +27,9 @@ struct WorkoutDetailView: View {
 
                 HStack(spacing: 10) {
                     StatTile(label: String(localized: "Points"), value: "+\(workout.points)", accent: .rLime)
-                    StatTile(label: String(localized: "Distance"), value: Format.km(workout.distanceMeters))
+                    StatTile(label: String(localized: "Distance"),
+                             value: Format.km(workout.distanceMeters,
+                                              estimated: workout.distanceEstimated))
                     StatTile(label: String(localized: "Time"),
                              value: workout.movingSeconds > 0 ? Format.duration(workout.movingSeconds) : "—")
                 }

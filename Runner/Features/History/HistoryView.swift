@@ -41,11 +41,11 @@ struct HistoryView: View {
 
         return ScrollView {
             VStack(alignment: .leading, spacing: 18) {
-                MicroLabel(text: String(localized: "Last 13 weeks"))
+                MicroLabel(text: String(localized: "Last 52 weeks"))
                 ScrollView(.horizontal, showsIndicators: false) {
                     HeatmapView(weeks: HistoryMath.heatmapWeeks(days: snapshots,
                                                                 today: .now,
-                                                                weekCount: 13,
+                                                                weekCount: 52,
                                                                 calendar: .current),
                                 goal: model.dailyGoal,
                                 onSelect: { selectedDay = SelectedDay(date: $0) })
@@ -116,6 +116,7 @@ struct HistoryView: View {
             Picker(String(localized: "Range"), selection: $chartRange) {
                 Text(String(localized: "Week")).tag(7)
                 Text(String(localized: "Month")).tag(30)
+                Text(String(localized: "Year")).tag(365)
             }
             .pickerStyle(.segmented)
 
@@ -232,17 +233,17 @@ struct HistoryView: View {
                 workoutRecordRow("🏃",
                                  String(localized: "Longest run"),
                                  typedRecord(.longestDistance, type: .run, summaries: summaries),
-                                 value: { Format.km($0.value) },
+                                 value: { Format.km($0.value, estimated: $0.distanceEstimated) },
                                  workoutByID: workoutByID)
                 workoutRecordRow("🚶",
                                  String(localized: "Longest walk"),
                                  typedRecord(.longestDistance, type: .walk, summaries: summaries),
-                                 value: { Format.km($0.value) },
+                                 value: { Format.km($0.value, estimated: $0.distanceEstimated) },
                                  workoutByID: workoutByID)
                 workoutRecordRow("🚴",
                                  String(localized: "Longest ride"),
                                  typedRecord(.longestDistance, type: .bike, summaries: summaries),
-                                 value: { Format.km($0.value) },
+                                 value: { Format.km($0.value, estimated: $0.distanceEstimated) },
                                  workoutByID: workoutByID)
                 workoutRecordRow("⚡️",
                                  String(localized: "Fastest 1 km"),
@@ -406,6 +407,7 @@ extension ActivityWorkoutSummary {
                   type: workout.type,
                   date: workout.start,
                   distanceMeters: workout.distanceMeters,
+                  distanceEstimated: workout.distanceEstimated,
                   movingSeconds: workout.movingSeconds,
                   points: workout.points,
                   calories: workout.calories,
@@ -423,7 +425,7 @@ struct WorkoutRowCard: View {
                 Text(workout.type.emoji)
                     .font(.system(size: 22))
                 VStack(alignment: .leading, spacing: 2) {
-                    Text("\(workout.type.localizedName) · \(Format.km(workout.distanceMeters))")
+                    Text("\(workout.type.localizedName) · \(Format.km(workout.distanceMeters, estimated: workout.distanceEstimated))")
                         .font(.system(size: 15, weight: .semibold))
                         .foregroundStyle(.white)
                     Text(workout.start.formatted(date: .abbreviated, time: .shortened))

@@ -67,6 +67,59 @@ struct SyncCoordinatorTests {
         #expect(row?.activeSeconds == 1800)
     }
 
+    @Test func syncStoresEstimatedBikeDistanceAndAwardsPoints() async throws {
+        let (sync, health, store) = try make()
+        let today = day(0)
+        let start = today.addingTimeInterval(9 * 3600)
+        let estimatedMeters = try #require(WorkoutEstimation.estimatedMeters(type: .bike,
+                                                                             movingSeconds: 1_800))
+        let id = UUID()
+        health.stepsByDay = [today: 1_000]
+        health.cannedWorkouts = [
+            ExternalWorkout(id: id, type: .bike,
+                            start: start,
+                            end: start.addingTimeInterval(1_800),
+                            movingSeconds: 1_800,
+                            distanceMeters: estimatedMeters,
+                            distanceEstimated: true,
+                            isFromThisApp: false)
+        ]
+
+        await sync.syncNow()
+
+        let cached = try #require(try store.workouts(onDay: today).first)
+        #expect(cached.id == id)
+        #expect(cached.distanceMeters == estimatedMeters)
+        #expect(cached.distanceEstimated)
+        #expect(cached.points == 45)
+        #expect(try store.ledger(on: today)?.workoutPoints == 45)
+    }
+
+    @Test func syncAddsAmbientWalkRunDistanceToDerivedLedgerDistanceOnly() async throws {
+        let (sync, health, store) = try make()
+        let today = day(0)
+        let start = today.addingTimeInterval(9 * 3600)
+        health.stepsByDay = [today: 1_000]
+        health.walkRunByDay = [today: 2_400]
+        health.cannedWorkouts = [
+            ExternalWorkout(id: UUID(), type: .bike,
+                            start: start,
+                            end: start.addingTimeInterval(1_800),
+                            movingSeconds: 1_800,
+                            distanceMeters: 7_500,
+                            distanceEstimated: true,
+                            isFromThisApp: false)
+        ]
+
+        await sync.syncNow()
+
+        let row = try store.ledger(on: today)
+        #expect(row?.distanceMeters == 9_900)
+        #expect(row?.workoutPoints == 45)
+        #expect(row?.totalPoints == 55)
+        #expect(health.dailyWalkRunDistanceDaysBack == [90])
+    }
+
     @Test func backfillBuildsLedgersWithStreaks() async throws {
         let (sync, health, store) = try make()
         health.stepsByDay = [day(-2): 12_000, day(-1): 3_000, day(0): 8_450]
@@ -259,6 +312,7 @@ struct SyncCoordinatorTests {
         #expect(sync.lastError == nil)
         #expect(health.earliestHistoryDateCalls == 1)
         #expect(health.dailyStepsDaysBack == [121])
+        #expect(health.dailyWalkRunDistanceDaysBack == [121])
         #expect(health.workoutsDaysBack == [121])
         #expect(defaults.bool(forKey: "fullHistoryBackfilled"))
         #expect(try store.workouts(onDay: earliest).first?.id == workoutID)
@@ -276,6 +330,7 @@ struct SyncCoordinatorTests {
         #expect(sync.lastError == nil)
         #expect(health.earliestHistoryDateCalls == 1)
         #expect(health.dailyStepsDaysBack == [121, 90])
+        #expect(health.dailyWalkRunDistanceDaysBack == [121, 90])
         #expect(health.workoutsDaysBack == [121, 90])
         #expect(defaults.bool(forKey: "fullHistoryBackfilled"))
     }
@@ -304,6 +359,7 @@ struct SyncCoordinatorTests {
         await sync.syncNow()
 
         #expect(sync.lastError == nil)
+        #expect(health.dailyWalkRunDistanceDaysBack == [90])
         #expect(health.workoutsDaysBack == [90])
         #expect(defaults.object(forKey: "fullHistoryBackfilled") == nil)
 
@@ -311,6 +367,7 @@ struct SyncCoordinatorTests {
         health.earliestHistoryDateStub = day(-120)
         await sync.syncNow()
 
+        #expect(health.dailyWalkRunDistanceDaysBack == [90, 121])
         #expect(health.workoutsDaysBack == [90, 121])
         #expect(defaults.bool(forKey: "fullHistoryBackfilled"))
     }

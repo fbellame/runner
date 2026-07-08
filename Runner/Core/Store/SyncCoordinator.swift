@@ -103,11 +103,13 @@ final class SyncCoordinator {
                                          earliest: earliest,
                                          now: now,
                                          calendar: cal)
-            // The two HealthKit queries are independent — run them concurrently while
+            // The HealthKit queries are independent — run them concurrently while
             // keeping the @MainActor-isolated `health` on the main actor.
             let stepsTask = Task { @MainActor in try await health.dailySteps(daysBack: daysBack) }
+            let walkRunTask = Task { @MainActor in try await health.dailyWalkRunDistance(daysBack: daysBack) }
             let workoutsTask = Task { @MainActor in try await health.workouts(daysBack: daysBack) }
             let steps = try await stepsTask.value
+            let walkRunDistance = try await walkRunTask.value
             let hkWorkouts = try await workoutsTask.value
 
             let metrics = metricsProvider()
@@ -117,6 +119,7 @@ final class SyncCoordinator {
                 try store.upsertWorkout(id: w.id, type: w.type, start: w.start,
                                         end: w.end, movingSeconds: w.movingSeconds,
                                         distanceMeters: w.distanceMeters,
+                                        distanceEstimated: w.distanceEstimated,
                                         points: PointsEngine.workoutPoints(type: w.type,
                                                                            distanceMeters: w.distanceMeters),
                                         routeData: nil, splitSeconds: [],
@@ -158,6 +161,7 @@ final class SyncCoordinator {
                 let inputs = energyByDay[day.date] ?? []
                 let kcal = CalorieEngine.dayCalories(steps: day.steps, workouts: inputs, metrics: metrics)?.total ?? 0
                 let meters = inputs.reduce(0.0) { $0 + $1.distanceMeters }
+                    + (walkRunDistance[day.date] ?? 0)
                 let seconds = inputs.reduce(0.0) { $0 + $1.movingSeconds }
                 derived[day.date] = DayDerived(activeCalories: kcal, distanceMeters: meters, activeSeconds: seconds)
             }
@@ -193,7 +197,8 @@ final class SyncCoordinator {
                 _ = try await health.saveWorkout(workout, points: rec.points)
                 try store.upsertWorkout(id: rec.id, type: rec.type, start: rec.start, end: rec.end,
                                         movingSeconds: rec.movingSeconds,
-                                        distanceMeters: rec.distanceMeters, points: rec.points,
+                                        distanceMeters: rec.distanceMeters,
+                                        distanceEstimated: rec.distanceEstimated, points: rec.points,
                                         routeData: rec.routeData, splitSeconds: rec.splitSeconds,
                                         source: rec.source, hkSynced: true, calories: rec.calories)
             } catch {

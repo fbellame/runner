@@ -148,7 +148,7 @@ struct TodayView: View {
                 ForEach(todayWorkouts) { workout in
                     Divider().overlay(Color.rBorder)
                     breakdownRow(emoji: workout.type.emoji,
-                                 label: "\(workout.type.localizedName) · \(Format.km(workout.distanceMeters))",
+                                 label: "\(workout.type.localizedName) · \(Format.km(workout.distanceMeters, estimated: workout.distanceEstimated))",
                                  value: workout.points,
                                  accent: workout.type.accent)
                 }
@@ -257,7 +257,7 @@ struct TodayView: View {
                            Int((breakdown?.everydayKcal ?? 0).rounded()))
                 ForEach(Array(todayWorkouts.enumerated()), id: \.element.id) { index, workout in
                     Divider().overlay(Color.rBorder)
-                    calorieRow("\(workout.type.emoji) \(workout.type.localizedName) · \(Format.km(workout.distanceMeters))",
+                    calorieRow("\(workout.type.emoji) \(workout.type.localizedName) · \(Format.km(workout.distanceMeters, estimated: workout.distanceEstimated))",
                                Int((breakdown?.workoutKcal[safe: index] ?? 0).rounded()))
                 }
                 Text(String(localized: "Estimated from your body metrics.")).font(.system(size: 11))
