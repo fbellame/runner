@@ -56,6 +56,11 @@ struct ProfileView: View {
                             .foregroundStyle(Color.rTextSecondary)
                     }
                 }
+            } footer: {
+                Text(appVersionLine)
+                    .font(.caption2)
+                    .foregroundStyle(Color.rTextSecondary)
+                    .frame(maxWidth: .infinity, alignment: .center)
             }
         }
         .scrollContentBackground(.hidden)
@@ -128,6 +133,13 @@ struct ProfileView: View {
             await model.sync.syncNow()
             load()
         }
+    }
+
+    private var appVersionLine: String {
+        let info = Bundle.main.infoDictionary
+        let version = info?["CFBundleShortVersionString"] as? String ?? "?"
+        let build = info?["CFBundleVersion"] as? String ?? "?"
+        return "Runner \(version) (\(build))"
     }
 
     private func reimportFullHistory() {
