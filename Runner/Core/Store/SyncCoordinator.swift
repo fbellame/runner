@@ -168,7 +168,12 @@ final class SyncCoordinator {
                                                                                from: windowStart),
                                               initialStreak: initialStreak)
             try store.upsert(ledgers, derived: derived)
-            if !backfilled {
+            // Only "spend" the one-shot backfill once it has actually run against real
+            // HealthKit history. If `earliest` was nil — access not yet effective, or the
+            // observer fired a sync before authorization on first launch — leave the flag
+            // unset so a later sync performs the true full import instead of capping us at
+            // the rolling window forever.
+            if !backfilled && earliest != nil {
                 defaults.set(true, forKey: Self.fullHistoryKey)
             }
         } catch {

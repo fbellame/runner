@@ -89,15 +89,29 @@ final class HealthStore: HealthStoring {
         return samples.compactMap { sample in
             guard let workout = sample as? HKWorkout,
                   let type = HealthMappers.activityType(from: workout.workoutActivityType) else { return nil }
-            let distanceType = (type == .bike) ? distanceCycling : distanceWalkRun
-            let meters = workout.statistics(for: distanceType)?.sumQuantity()?
-                .doubleValue(for: .meter()) ?? 0
+            let meters = workoutDistanceMeters(workout, type: type)
             return ExternalWorkout(id: workout.uuid, type: type, start: workout.startDate,
                                    end: workout.endDate,
                                    movingSeconds: workout.duration,
                                    distanceMeters: meters,
                                    isFromThisApp: workout.sourceRevision.source.bundleIdentifier == bundleID)
         }
+    }
+
+    /// Distance for an imported workout, resilient to how the source stored it.
+    /// Cycling workouts frequently expose no per-type `distanceCycling` statistic
+    /// (indoor rides, some third-party sources), which previously read as 0 km; fall
+    /// back to the other distance type and finally to the workout's aggregate total.
+    private func workoutDistanceMeters(_ workout: HKWorkout, type: ActivityType) -> Double {
+        let primary = (type == .bike) ? distanceCycling : distanceWalkRun
+        let secondary = (type == .bike) ? distanceWalkRun : distanceCycling
+        for distanceType in [primary, secondary] {
+            if let meters = workout.statistics(for: distanceType)?.sumQuantity()?
+                .doubleValue(for: .meter()), meters > 0 {
+                return meters
+            }
+        }
+        return workout.totalDistance?.doubleValue(for: .meter()) ?? 0
     }
 
     func saveWorkout(_ workout: RecordedWorkout, points: Int) async throws -> UUID {

@@ -293,4 +293,25 @@ struct SyncCoordinatorTests {
         #expect(health.earliestHistoryDateCalls == 1)
         #expect(defaults.object(forKey: "fullHistoryBackfilled") == nil)
     }
+
+    @Test func nilEarliestDoesNotConsumeBackfillAndLaterSyncStillImportsHistory() async throws {
+        let defaults = freshDefaults()
+        let (sync, health, _) = try make(defaults: defaults)
+
+        // First launch: HealthKit not yet readable (e.g. observer-triggered sync
+        // racing authorization) — earliest is nil, so the one-shot must NOT be spent.
+        health.earliestHistoryDateStub = nil
+        await sync.syncNow()
+
+        #expect(sync.lastError == nil)
+        #expect(health.workoutsDaysBack == [90])
+        #expect(defaults.object(forKey: "fullHistoryBackfilled") == nil)
+
+        // Later sync, once history is readable: performs the true full backfill.
+        health.earliestHistoryDateStub = day(-120)
+        await sync.syncNow()
+
+        #expect(health.workoutsDaysBack == [90, 121])
+        #expect(defaults.bool(forKey: "fullHistoryBackfilled"))
+    }
 }
