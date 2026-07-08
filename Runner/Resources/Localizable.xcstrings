@@ -21,12 +21,32 @@
         }
       }
     },
+    "%lld sessions": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%lld séances"
+          }
+        }
+      }
+    },
     "%lld workout(s) waiting to sync to Health": {
       "localizations": {
         "fr": {
           "stringUnit": {
             "state": "translated",
             "value": "%lld entraînement(s) en attente de synchronisation vers Santé"
+          }
+        }
+      }
+    },
+    "%lld workouts": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%lld entraînements"
           }
         }
       }
@@ -47,6 +67,16 @@
           "stringUnit": {
             "state": "translated",
             "value": "Temps actif"
+          }
+        }
+      }
+    },
+    "Activity types": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Types d’activité"
           }
         }
       }
@@ -101,12 +131,42 @@
         }
       }
     },
+    "Average pace": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Allure moyenne"
+          }
+        }
+      }
+    },
+    "Best avg pace": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Meilleure allure moyenne"
+          }
+        }
+      }
+    },
     "Best day": {
       "localizations": {
         "fr": {
           "stringUnit": {
             "state": "translated",
             "value": "Meilleure journée"
+          }
+        }
+      }
+    },
+    "Best pace": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Meilleure allure"
           }
         }
       }
@@ -261,6 +321,16 @@
         }
       }
     },
+    "Distance by week": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Distance par semaine"
+          }
+        }
+      }
+    },
     "Done": {
       "localizations": {
         "fr": {
@@ -287,6 +357,26 @@
           "stringUnit": {
             "state": "translated",
             "value": "Pas quotidiens"
+          }
+        }
+      }
+    },
+    "Fastest 1 km": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Kilomètre le plus rapide"
+          }
+        }
+      }
+    },
+    "Fastest 5 km": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "5 km les plus rapides"
           }
         }
       }
@@ -461,12 +551,32 @@
         }
       }
     },
+    "Lifetime totals": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Totaux à vie"
+          }
+        }
+      }
+    },
     "Location": {
       "localizations": {
         "fr": {
           "stringUnit": {
             "state": "translated",
             "value": "Localisation"
+          }
+        }
+      }
+    },
+    "Longest": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Plus longue distance"
           }
         }
       }
@@ -491,12 +601,32 @@
         }
       }
     },
+    "Longest walk": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Plus longue marche"
+          }
+        }
+      }
+    },
     "Male": {
       "localizations": {
         "fr": {
           "stringUnit": {
             "state": "translated",
             "value": "Homme"
+          }
+        }
+      }
+    },
+    "Milestones": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Jalons"
           }
         }
       }
@@ -681,6 +811,16 @@
         }
       }
     },
+    "Recent sessions": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Séances récentes"
+          }
+        }
+      }
+    },
     "Record a workout": {
       "localizations": {
         "fr": {
@@ -827,6 +967,16 @@
           "stringUnit": {
             "state": "translated",
             "value": "Sauvegardé localement"
+          }
+        }
+      }
+    },
+    "Sessions": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Séances"
           }
         }
       }
