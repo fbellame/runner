@@ -45,6 +45,83 @@ final class HealthStore: HealthStoring {
         return [workoutDate, stepsDate].compactMap { $0 }.min()
     }
 
+    func diagnosticsReport() async -> String {
+        var lines: [String] = []
+        let df = DateFormatter()
+        df.dateFormat = "yyyy-MM-dd"
+
+        // Read-authorization is deliberately obscured by HealthKit, so the real signal
+        // is how much actually comes back — but include the coarse status too.
+        func authName(_ s: HKAuthorizationStatus) -> String {
+            switch s {
+            case .notDetermined: "notDetermined"
+            case .sharingDenied: "denied/unknown"
+            case .sharingAuthorized: "authorized"
+            @unknown default: "?"
+            }
+        }
+        lines.append("Auth (read is obscured by iOS):")
+        lines.append("  workouts: \(authName(store.authorizationStatus(for: workoutType)))")
+        lines.append("  distCycling: \(authName(store.authorizationStatus(for: distanceCycling)))")
+        lines.append("  distWalkRun: \(authName(store.authorizationStatus(for: distanceWalkRun)))")
+        lines.append("  steps: \(authName(store.authorizationStatus(for: stepType)))")
+
+        do {
+            let earliestWorkout = try await earliestSampleDate(for: workoutType)
+            let earliestStep = try await earliestSampleDate(for: stepType)
+            lines.append("Earliest workout: \(earliestWorkout.map { df.string(from: $0) } ?? "none")")
+            lines.append("Earliest step: \(earliestStep.map { df.string(from: $0) } ?? "none")")
+        } catch {
+            lines.append("Earliest dates: ERROR \(error.localizedDescription)")
+        }
+
+        // All workouts over ~10 years, tallied by their raw HK activity type, with how
+        // many carry a readable distance (cycling / walk-run / aggregate total).
+        do {
+            let cal = Calendar.current
+            let start = cal.date(byAdding: .day, value: -3650, to: cal.startOfDay(for: Date()))!
+            let predicate = HKQuery.predicateForSamples(withStart: start, end: Date(), options: .strictStartDate)
+            let samples: [HKSample] = try await withCheckedThrowingContinuation { cont in
+                let q = HKSampleQuery(sampleType: workoutType, predicate: predicate,
+                                      limit: HKObjectQueryNoLimit, sortDescriptors: nil) { _, s, e in
+                    if let e { cont.resume(throwing: e) } else { cont.resume(returning: s ?? []) }
+                }
+                store.execute(q)
+            }
+            let workouts = samples.compactMap { $0 as? HKWorkout }
+            lines.append("Workouts in 3650d: \(workouts.count)")
+            var byType: [UInt: Int] = [:]
+            var byTypeWithDistance: [UInt: Int] = [:]
+            var sources: Set<String> = []
+            for w in workouts {
+                let raw = w.workoutActivityType.rawValue
+                byType[raw, default: 0] += 1
+                let meters = workoutDistanceMeters(w, type: HealthMappers.activityType(from: w.workoutActivityType) ?? .run)
+                if meters > 0 { byTypeWithDistance[raw, default: 0] += 1 }
+                sources.insert(w.sourceRevision.source.name)
+            }
+            for raw in byType.keys.sorted() {
+                lines.append("  type \(raw) (\(activityTypeName(raw))): \(byType[raw] ?? 0) total, \(byTypeWithDistance[raw] ?? 0) with distance")
+            }
+            lines.append("Sources: \(sources.sorted().joined(separator: ", "))")
+        } catch {
+            lines.append("Workout scan: ERROR \(error.localizedDescription)")
+        }
+
+        return lines.joined(separator: "\n")
+    }
+
+    private func activityTypeName(_ raw: UInt) -> String {
+        switch HKWorkoutActivityType(rawValue: raw) {
+        case .running: "running"
+        case .walking: "walking"
+        case .cycling: "cycling"
+        case .hiking: "hiking"
+        case .some(let t): "hk#\(t.rawValue)"
+        case .none: "unknown"
+        }
+    }
+
     func dailySteps(daysBack: Int) async throws -> [Date: Int] {
         let cal = Calendar.current
         let (start, end) = HealthMappers.window(daysBack: daysBack, endingAt: Date(), calendar: cal)

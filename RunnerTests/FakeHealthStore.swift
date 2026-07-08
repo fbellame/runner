@@ -25,6 +25,7 @@ final class FakeHealthStore: HealthStoring {
     func requestAuthorization() async throws {}
     func shouldRequestAuthorization() async -> Bool { false }
     func bodyMetrics() async throws -> HealthBody { cannedBody }
+    func diagnosticsReport() async -> String { "fake" }
     func earliestHistoryDate() async throws -> Date? {
         earliestHistoryDateCalls += 1
         if let earliestHistoryError { throw earliestHistoryError }

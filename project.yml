@@ -29,7 +29,7 @@ targets:
       properties:
         CFBundleDisplayName: Runner
         CFBundleShortVersionString: "1.2"
-        CFBundleVersion: "3"
+        CFBundleVersion: "4"
         CFBundleLocalizations: [en, fr]
         CFBundleDevelopmentRegion: en
         UILaunchScreen:

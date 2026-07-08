@@ -70,6 +70,14 @@ struct SettingsView: View {
                 }
 
                 Section {
+                    NavigationLink {
+                        HealthDiagnosticsView()
+                    } label: {
+                        Label(String(localized: "HealthKit diagnostics"), systemImage: "stethoscope")
+                    }
+                }
+
+                Section {
                     LabeledContent(String(localized: "Version"), value: appVersion)
                 }
             }
@@ -112,5 +120,34 @@ struct SettingsView: View {
             Text(emoji)
             Text(text).font(.subheadline)
         }
+    }
+}
+
+struct HealthDiagnosticsView: View {
+    @Environment(AppModel.self) private var model
+    @State private var report = "…"
+
+    var body: some View {
+        ScrollView {
+            Text(report)
+                .font(.system(size: 13, design: .monospaced))
+                .foregroundStyle(.white)
+                .textSelection(.enabled)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .padding(16)
+        }
+        .background(Color.rBackground)
+        .navigationTitle(String(localized: "HealthKit diagnostics"))
+        .toolbar {
+            ToolbarItem(placement: .topBarTrailing) {
+                Button {
+                    UIPasteboard.general.string = report
+                } label: {
+                    Image(systemName: "doc.on.doc")
+                }
+            }
+        }
+        .task { report = await model.health.diagnosticsReport() }
+        .preferredColorScheme(.dark)
     }
 }

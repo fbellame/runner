@@ -1590,6 +1590,16 @@
           }
         }
       }
+    },
+    "HealthKit diagnostics": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Diagnostic HealthKit"
+          }
+        }
+      }
     }
   },
   "version": "1.0"
