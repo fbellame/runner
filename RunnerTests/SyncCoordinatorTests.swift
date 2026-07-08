@@ -9,15 +9,44 @@ struct SyncCoordinatorTests {
         return cal.date(byAdding: .day, value: offset, to: cal.startOfDay(for: .now))!
     }
 
+    private func freshDefaults() -> UserDefaults {
+        let name = "SyncCoordinatorTests-\(UUID().uuidString)"
+        let defaults = UserDefaults(suiteName: name)!
+        defaults.removePersistentDomain(forName: name)
+        return defaults
+    }
+
     private func make(goal: Int = 100,
                       metrics: BodyMetrics = BodyMetrics(weightKg: nil, heightCm: nil,
-                                                         sex: .unspecified, age: nil))
+                                                         sex: .unspecified, age: nil),
+                      defaults: UserDefaults? = nil)
         throws -> (SyncCoordinator, FakeHealthStore, DataStore) {
         let health = FakeHealthStore()
         let store = try DataStore(inMemory: true)
+        let defaults = defaults ?? freshDefaults()
         let sync = SyncCoordinator(health: health, store: store, currentGoal: { goal },
-                                   metricsProvider: { metrics })
+                                   metricsProvider: { metrics }, defaults: defaults)
         return (sync, health, store)
+    }
+
+    @Test func daysBackUsesRollingWindowAfterBackfill() {
+        #expect(SyncCoordinator.daysBack(backfilled: true, earliest: day(-365),
+                                        now: day(0), calendar: .current) == 90)
+    }
+
+    @Test func daysBackUsesInclusiveEarliestSpanBeforeBackfill() {
+        #expect(SyncCoordinator.daysBack(backfilled: false, earliest: day(-120),
+                                        now: day(0), calendar: .current) == 121)
+    }
+
+    @Test func daysBackFallsBackToRollingWindowWhenEarliestIsNil() {
+        #expect(SyncCoordinator.daysBack(backfilled: false, earliest: nil,
+                                        now: day(0), calendar: .current) == 90)
+    }
+
+    @Test func daysBackFloorsRecentHistoryToRollingWindow() {
+        #expect(SyncCoordinator.daysBack(backfilled: false, earliest: day(-12),
+                                        now: day(0), calendar: .current) == 90)
     }
 
     @Test func syncFillsDerivedCalorieFields() async throws {
@@ -207,5 +236,61 @@ struct SyncCoordinatorTests {
         #expect(yesterday?.goalAtThatTime == 70)
         #expect(yesterday?.isGold == true)               // 80 ≥ 70 under its own goal
         #expect(try store.ledger(on: day(0))?.goalAtThatTime == 150)
+    }
+
+    @Test func firstSyncBackfillsFromEarliestHistoryDateAndSetsFlag() async throws {
+        let defaults = freshDefaults()
+        let (sync, health, store) = try make(defaults: defaults)
+        let earliest = day(-120)
+        let workoutID = UUID()
+        health.earliestHistoryDateStub = earliest
+        health.stepsByDay = [earliest: 12_000]
+        health.cannedWorkouts = [
+            ExternalWorkout(id: workoutID, type: .run,
+                            start: earliest.addingTimeInterval(8 * 3600),
+                            end: earliest.addingTimeInterval(8 * 3600 + 1_500),
+                            movingSeconds: 1_500,
+                            distanceMeters: 5_000,
+                            isFromThisApp: false)
+        ]
+
+        await sync.syncNow()
+
+        #expect(sync.lastError == nil)
+        #expect(health.earliestHistoryDateCalls == 1)
+        #expect(health.dailyStepsDaysBack == [121])
+        #expect(health.workoutsDaysBack == [121])
+        #expect(defaults.bool(forKey: "fullHistoryBackfilled"))
+        #expect(try store.workouts(onDay: earliest).first?.id == workoutID)
+        #expect(try store.ledger(on: earliest)?.steps == 12_000)
+    }
+
+    @Test func secondSyncAfterBackfillUsesRollingWindow() async throws {
+        let defaults = freshDefaults()
+        let (sync, health, _) = try make(defaults: defaults)
+        health.earliestHistoryDateStub = day(-120)
+
+        await sync.syncNow()
+        await sync.syncNow()
+
+        #expect(sync.lastError == nil)
+        #expect(health.earliestHistoryDateCalls == 1)
+        #expect(health.dailyStepsDaysBack == [121, 90])
+        #expect(health.workoutsDaysBack == [121, 90])
+        #expect(defaults.bool(forKey: "fullHistoryBackfilled"))
+    }
+
+    @Test func failingFirstBackfillPassLeavesFlagUnset() async throws {
+        let defaults = freshDefaults()
+        let (sync, health, _) = try make(defaults: defaults)
+        health.earliestHistoryDateStub = day(-120)
+        health.dailyStepsError = NSError(domain: "HK", code: 7,
+                                         userInfo: [NSLocalizedDescriptionKey: "step read failed"])
+
+        await sync.syncNow()
+
+        #expect(sync.lastError == "step read failed")
+        #expect(health.earliestHistoryDateCalls == 1)
+        #expect(defaults.object(forKey: "fullHistoryBackfilled") == nil)
     }
 }

@@ -24,6 +24,7 @@ protocol HealthStoring: AnyObject {
     var writeDenied: Bool { get }
     func requestAuthorization() async throws
     func shouldRequestAuthorization() async -> Bool
+    func earliestHistoryDate() async throws -> Date?
     func dailySteps(daysBack: Int) async throws -> [Date: Int]
     func workouts(daysBack: Int) async throws -> [ExternalWorkout]
     func saveWorkout(_ workout: RecordedWorkout, points: Int) async throws -> UUID

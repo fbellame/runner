@@ -37,6 +37,14 @@ final class HealthStore: HealthStoring {
         return status == .shouldRequest
     }
 
+    func earliestHistoryDate() async throws -> Date? {
+        async let earliestWorkout = earliestSampleDate(for: workoutType)
+        async let earliestSteps = earliestSampleDate(for: stepType)
+        let workoutDate = try await earliestWorkout
+        let stepsDate = try await earliestSteps
+        return [workoutDate, stepsDate].compactMap { $0 }.min()
+    }
+
     func dailySteps(daysBack: Int) async throws -> [Date: Int] {
         let cal = Calendar.current
         let (start, end) = HealthMappers.window(daysBack: daysBack, endingAt: Date(), calendar: cal)
@@ -165,6 +173,21 @@ final class HealthStore: HealthStoring {
                 if let error { continuation.resume(throwing: error); return }
                 let value = (samples?.first as? HKQuantitySample)?.quantity.doubleValue(for: unit)
                 continuation.resume(returning: value)
+            }
+            store.execute(query)
+        }
+    }
+
+    private func earliestSampleDate(for type: HKSampleType) async throws -> Date? {
+        try await withCheckedThrowingContinuation { continuation in
+            let sort = [NSSortDescriptor(key: HKSampleSortIdentifierStartDate, ascending: true)]
+            let query = HKSampleQuery(sampleType: type, predicate: nil, limit: 1,
+                                      sortDescriptors: sort) { _, samples, error in
+                if let error {
+                    continuation.resume(throwing: error)
+                    return
+                }
+                continuation.resume(returning: samples?.first?.startDate)
             }
             store.execute(query)
         }

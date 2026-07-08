@@ -3,11 +3,13 @@ import Foundation
 @MainActor
 final class SyncCoordinator {
     static let windowDays = 90
+    private static let fullHistoryKey = "fullHistoryBackfilled"
 
     private let health: HealthStoring
     private let store: DataStore
     private let currentGoal: () -> Int
     private let metricsProvider: () -> BodyMetrics
+    private let defaults: UserDefaults
 
     private(set) var lastError: String?
     private(set) var isSyncing = false
@@ -15,11 +17,26 @@ final class SyncCoordinator {
     private var isSavingRecorded = false
 
     init(health: HealthStoring, store: DataStore, currentGoal: @escaping () -> Int,
-         metricsProvider: @escaping () -> BodyMetrics) {
+         metricsProvider: @escaping () -> BodyMetrics, defaults: UserDefaults = .standard) {
         self.health = health
         self.store = store
         self.currentGoal = currentGoal
         self.metricsProvider = metricsProvider
+        self.defaults = defaults
+    }
+
+    static func daysBack(backfilled: Bool, earliest: Date?, now: Date, calendar: Calendar) -> Int {
+        guard !backfilled else { return windowDays }
+        guard let earliest else { return windowDays }
+
+        let firstDay = calendar.startOfDay(for: earliest)
+        let today = calendar.startOfDay(for: now)
+        let span = (calendar.dateComponents([.day], from: firstDay, to: today).day ?? 0) + 1
+        return max(span, windowDays)
+    }
+
+    func resetFullHistory() {
+        defaults.set(false, forKey: Self.fullHistoryKey)
     }
 
     func syncNow() async {
@@ -79,10 +96,17 @@ final class SyncCoordinator {
 
         do {
             let cal = Calendar.current
+            let now = Date()
+            let backfilled = defaults.bool(forKey: Self.fullHistoryKey)
+            let earliest = backfilled ? nil : try await health.earliestHistoryDate()
+            let daysBack = Self.daysBack(backfilled: backfilled,
+                                         earliest: earliest,
+                                         now: now,
+                                         calendar: cal)
             // The two HealthKit queries are independent — run them concurrently while
             // keeping the @MainActor-isolated `health` on the main actor.
-            let stepsTask = Task { @MainActor in try await health.dailySteps(daysBack: Self.windowDays) }
-            let workoutsTask = Task { @MainActor in try await health.workouts(daysBack: Self.windowDays) }
+            let stepsTask = Task { @MainActor in try await health.dailySteps(daysBack: daysBack) }
+            let workoutsTask = Task { @MainActor in try await health.workouts(daysBack: daysBack) }
             let steps = try await stepsTask.value
             let hkWorkouts = try await workoutsTask.value
 
@@ -117,12 +141,12 @@ final class SyncCoordinator {
                     WorkoutEnergyInput(type: rec.type, distanceMeters: rec.distanceMeters, movingSeconds: rec.movingSeconds))
             }
 
-            let (windowStart, _) = HealthMappers.window(daysBack: Self.windowDays,
-                                                        endingAt: Date(), calendar: cal)
+            let (windowStart, _) = HealthMappers.window(daysBack: daysBack,
+                                                        endingAt: now, calendar: cal)
             var days: [DayActivity] = []
-            for offset in 0..<Self.windowDays {
+            for offset in 0..<daysBack {
                 let date = cal.date(byAdding: .day, value: offset, to: windowStart)!
-                guard date <= Date() else { break }
+                guard date <= now else { break }
                 days.append(DayActivity(date: date,
                                         steps: steps[date] ?? 0,
                                         workouts: workoutsByDay[date] ?? []))
@@ -144,6 +168,9 @@ final class SyncCoordinator {
                                                                                from: windowStart),
                                               initialStreak: initialStreak)
             try store.upsert(ledgers, derived: derived)
+            if !backfilled {
+                defaults.set(true, forKey: Self.fullHistoryKey)
+            }
         } catch {
             lastError = error.localizedDescription
         }

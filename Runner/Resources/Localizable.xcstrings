@@ -171,6 +171,16 @@
         }
       }
     },
+    "Avg": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Moy"
+          }
+        }
+      }
+    },
     "Average pace": {
       "localizations": {
         "fr": {
@@ -401,6 +411,16 @@
         }
       }
     },
+    "Even pace": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Allure régulière"
+          }
+        }
+      }
+    },
     "Fastest 1 km": {
       "localizations": {
         "fr": {
@@ -417,6 +437,16 @@
           "stringUnit": {
             "state": "translated",
             "value": "5 km les plus rapides"
+          }
+        }
+      }
+    },
+    "Fastest km": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Km le plus rapide"
           }
         }
       }
@@ -561,12 +591,42 @@
         }
       }
     },
+    "Imports all past activity from Apple Health": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Importe toute l'activité passée depuis Apple Santé"
+          }
+        }
+      }
+    },
     "Km %lld": {
       "localizations": {
         "fr": {
           "stringUnit": {
             "state": "translated",
             "value": "Km %lld"
+          }
+        }
+      }
+    },
+    "Km %lld · %@": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Km %lld · %@"
+          }
+        }
+      }
+    },
+    "Km": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Km"
           }
         }
       }
@@ -687,6 +747,16 @@
           "stringUnit": {
             "state": "translated",
             "value": "Mois"
+          }
+        }
+      }
+    },
+    "Negative split": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Split négatif"
           }
         }
       }
@@ -821,6 +891,16 @@
         }
       }
     },
+    "Pace per km (lower = faster)": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Allure par km (plus bas = plus rapide)"
+          }
+        }
+      }
+    },
     "Pace is declining — %@ slower than the previous 4 weeks.": {
       "localizations": {
         "fr": {
@@ -871,6 +951,16 @@
         }
       }
     },
+    "Positive split": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Split positif"
+          }
+        }
+      }
+    },
     "Precise Location is off — distance and route can't be recorded.": {
       "localizations": {
         "fr": {
@@ -907,6 +997,16 @@
           "stringUnit": {
             "state": "translated",
             "value": "Période"
+          }
+        }
+      }
+    },
+    "Re-import full history": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Réimporter tout l'historique"
           }
         }
       }
@@ -1081,6 +1181,26 @@
         }
       }
     },
+    "Second half %@ faster": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "2ᵉ moitié %@ plus rapide"
+          }
+        }
+      }
+    },
+    "Second half %@ slower": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "2ᵉ moitié %@ plus lente"
+          }
+        }
+      }
+    },
     "Sessions": {
       "localizations": {
         "fr": {
@@ -1127,6 +1247,16 @@
           "stringUnit": {
             "state": "translated",
             "value": "Glisser pour terminer"
+          }
+        }
+      }
+    },
+    "Slowest km": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Km le plus lent"
           }
         }
       }

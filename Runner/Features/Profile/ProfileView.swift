@@ -43,6 +43,20 @@ struct ProfileView: View {
                 Button(String(localized: "Reset to Apple Health")) { resetToHealth() }
                     .foregroundStyle(Color.rTeal)
             }
+
+            Section {
+                Button {
+                    reimportFullHistory()
+                } label: {
+                    VStack(alignment: .leading, spacing: 3) {
+                        Text(String(localized: "Re-import full history"))
+                            .foregroundStyle(Color.rOrange)
+                        Text(String(localized: "Imports all past activity from Apple Health"))
+                            .font(.caption)
+                            .foregroundStyle(Color.rTextSecondary)
+                    }
+                }
+            }
         }
         .scrollContentBackground(.hidden)
         .background(Color.rBackground)
@@ -114,5 +128,10 @@ struct ProfileView: View {
             await model.sync.syncNow()
             load()
         }
+    }
+
+    private func reimportFullHistory() {
+        model.sync.resetFullHistory()
+        Task { await model.sync.syncNow() }
     }
 }
