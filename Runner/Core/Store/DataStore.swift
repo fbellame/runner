@@ -110,7 +110,8 @@ final class DataStore {
                        movingSeconds: Double, distanceMeters: Double,
                        distanceEstimated: Bool = false, points: Int, routeData: Data?,
                        splitSeconds: [Double], source: String, hkSynced: Bool,
-                       calories: Double = 0) throws -> WorkoutRec {
+                       calories: Double = 0, caloriesFromHealth: Bool = false,
+                       co2SavedGrams: Double = 0, co2FromHealth: Bool = false) throws -> WorkoutRec {
         var descriptor = FetchDescriptor<WorkoutRec>(predicate: #Predicate { $0.id == id })
         descriptor.fetchLimit = 1
         let rec: WorkoutRec
@@ -130,14 +131,23 @@ final class DataStore {
             // every sync, so keep the value they were burned at instead of letting
             // it drift with the user's current weight. A still-zero value (recorded
             // before any weight was known) is (re)computed until it becomes non-zero.
-            if existing.calories == 0 { existing.calories = calories }
+            // Freeze calories (and their provenance) once computed; CO₂ is
+            // deterministic from distance/metadata, so refresh it every sync.
+            if existing.calories == 0 {
+                existing.calories = calories
+                existing.caloriesFromHealth = caloriesFromHealth
+            }
+            existing.co2SavedGrams = co2SavedGrams
+            existing.co2FromHealth = co2FromHealth
             rec = existing
         } else {
             rec = WorkoutRec(id: id, typeRaw: type.rawValue, start: start, end: end,
                              movingSeconds: movingSeconds, distanceMeters: distanceMeters,
                              distanceEstimated: distanceEstimated,
                              points: points, routeData: routeData, splitSeconds: splitSeconds,
-                             source: source, hkSynced: hkSynced, calories: calories)
+                             source: source, hkSynced: hkSynced, calories: calories,
+                             caloriesFromHealth: caloriesFromHealth,
+                             co2SavedGrams: co2SavedGrams, co2FromHealth: co2FromHealth)
             context.insert(rec)
         }
         try context.save()

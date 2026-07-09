@@ -116,4 +116,40 @@ struct DataStoreTests {
         #expect(row?.distanceMeters == 4200)
         #expect(row?.activeSeconds == 1800)
     }
+
+    @Test @MainActor func upsertPersistsHealthCalorieAndCo2Flags() throws {
+        let store = try DataStore(inMemory: true)
+        let id = UUID()
+        let rec = try store.upsertWorkout(id: id, type: .bike, start: .now, end: .now,
+                                          movingSeconds: 600, distanceMeters: 2500,
+                                          points: 5, routeData: nil, splitSeconds: [],
+                                          source: "external", hkSynced: true,
+                                          calories: 88, caloriesFromHealth: true,
+                                          co2SavedGrams: 480, co2FromHealth: true)
+        #expect(rec.caloriesFromHealth == true)
+        #expect(rec.co2SavedGrams == 480)
+        #expect(rec.co2FromHealth == true)
+    }
+
+    @Test @MainActor func co2FieldsRefreshOnResyncButCaloriesStayFrozen() throws {
+        let store = try DataStore(inMemory: true)
+        let id = UUID()
+        _ = try store.upsertWorkout(id: id, type: .bike, start: .now, end: .now,
+                                    movingSeconds: 600, distanceMeters: 2500,
+                                    points: 5, routeData: nil, splitSeconds: [],
+                                    source: "external", hkSynced: true,
+                                    calories: 88, caloriesFromHealth: true,
+                                    co2SavedGrams: 480, co2FromHealth: false)
+        // Re-sync same id with a different CO₂ figure; calories are frozen, CO₂ refreshes.
+        let rec = try store.upsertWorkout(id: id, type: .bike, start: .now, end: .now,
+                                          movingSeconds: 600, distanceMeters: 2500,
+                                          points: 5, routeData: nil, splitSeconds: [],
+                                          source: "external", hkSynced: true,
+                                          calories: 200, caloriesFromHealth: false,
+                                          co2SavedGrams: 500, co2FromHealth: true)
+        #expect(rec.calories == 88)             // frozen (was non-zero)
+        #expect(rec.caloriesFromHealth == true) // frozen alongside calories
+        #expect(rec.co2SavedGrams == 500)       // refreshed
+        #expect(rec.co2FromHealth == true)      // refreshed
+    }
 }
