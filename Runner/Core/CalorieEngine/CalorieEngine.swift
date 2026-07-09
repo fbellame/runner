@@ -15,6 +15,16 @@ struct WorkoutEnergyInput: Equatable, Sendable {
     let type: ActivityType
     let distanceMeters: Double
     let movingSeconds: Double
+    /// Real active energy from Health, when the source recorded it; else nil → MET estimate.
+    let realKcal: Double?
+
+    init(type: ActivityType, distanceMeters: Double, movingSeconds: Double,
+         realKcal: Double? = nil) {
+        self.type = type
+        self.distanceMeters = distanceMeters
+        self.movingSeconds = movingSeconds
+        self.realKcal = realKcal
+    }
 }
 
 struct CalorieBreakdown: Equatable, Sendable {
@@ -100,8 +110,8 @@ enum CalorieEngine {
         guard let weightKg = metrics.weightKg, weightKg > 0 else { return nil }
 
         let workoutKcal = workouts.map {
-            workoutCalories(type: $0.type, distanceMeters: $0.distanceMeters,
-                            movingSeconds: $0.movingSeconds, weightKg: weightKg)
+            $0.realKcal ?? workoutCalories(type: $0.type, distanceMeters: $0.distanceMeters,
+                                           movingSeconds: $0.movingSeconds, weightKg: weightKg)
         }
 
         // De-duplicate: remove steps attributable to run/walk workouts (bike has none).

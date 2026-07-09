@@ -31,6 +31,24 @@ struct CalorieEngineTests {
         #expect(CalorieEngine.workoutCalories(type: .run, distanceMeters: 3000, movingSeconds: 0, weightKg: 70) == 0)
     }
 
+    // A workout carrying a real Health kcal value uses it verbatim, not the MET math.
+    @Test func dayCaloriesPrefersRealKcalWhenPresent() {
+        let metrics = BodyMetrics(weightKg: 70, heightCm: 175, sex: .male, age: 30)
+        let real = WorkoutEnergyInput(type: .bike, distanceMeters: 5000,
+                                      movingSeconds: 1200, realKcal: 42)
+        let breakdown = CalorieEngine.dayCalories(steps: 0, workouts: [real], metrics: metrics)
+        #expect(breakdown?.workoutKcal == [42])
+    }
+
+    @Test func dayCaloriesFallsBackToMETWhenNoRealKcal() {
+        let metrics = BodyMetrics(weightKg: 70, heightCm: 175, sex: .male, age: 30)
+        let est = WorkoutEnergyInput(type: .run, distanceMeters: 5000, movingSeconds: 1800)
+        let breakdown = CalorieEngine.dayCalories(steps: 0, workouts: [est], metrics: metrics)
+        let met = CalorieEngine.workoutCalories(type: .run, distanceMeters: 5000,
+                                                movingSeconds: 1800, weightKg: 70)
+        #expect(breakdown?.workoutKcal.first.map { abs($0 - met) < 0.001 } == true)
+    }
+
     // Stride from height; fallback when height is nil.
     @Test func stride() {
         #expect(abs(CalorieEngine.strideMeters(heightCm: 180, sex: .male) - 0.747) < 0.01)
