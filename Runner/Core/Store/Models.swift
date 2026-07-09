@@ -71,6 +71,10 @@ final class WorkoutRec {
     var caloriesFromHealth: Bool = false
     var co2SavedGrams: Double = 0
     var co2FromHealth: Bool = false
+    // Opened by the walk detector rather than by a tap. Surfaced in no UI today;
+    // it exists so "why is this walk here" has an answer. Inline default, same
+    // migration reason as the columns above.
+    var autoStarted: Bool = false
 
     var type: ActivityType { ActivityType(rawValue: typeRaw) ?? .run }
 
@@ -79,7 +83,7 @@ final class WorkoutRec {
          routeData: Data?, splitSeconds: [Double],
          source: String, hkSynced: Bool, calories: Double = 0,
          caloriesFromHealth: Bool = false, co2SavedGrams: Double = 0,
-         co2FromHealth: Bool = false) {
+         co2FromHealth: Bool = false, autoStarted: Bool = false) {
         self.id = id
         self.typeRaw = typeRaw
         self.start = start
@@ -96,6 +100,7 @@ final class WorkoutRec {
         self.caloriesFromHealth = caloriesFromHealth
         self.co2SavedGrams = co2SavedGrams
         self.co2FromHealth = co2FromHealth
+        self.autoStarted = autoStarted
     }
 }
 

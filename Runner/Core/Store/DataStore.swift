@@ -111,7 +111,8 @@ final class DataStore {
                        distanceEstimated: Bool = false, points: Int, routeData: Data?,
                        splitSeconds: [Double], source: String, hkSynced: Bool,
                        calories: Double = 0, caloriesFromHealth: Bool = false,
-                       co2SavedGrams: Double = 0, co2FromHealth: Bool = false) throws -> WorkoutRec {
+                       co2SavedGrams: Double = 0, co2FromHealth: Bool = false,
+                       autoStarted: Bool = false) throws -> WorkoutRec {
         var descriptor = FetchDescriptor<WorkoutRec>(predicate: #Predicate { $0.id == id })
         descriptor.fetchLimit = 1
         let rec: WorkoutRec
@@ -139,6 +140,7 @@ final class DataStore {
             }
             existing.co2SavedGrams = co2SavedGrams
             existing.co2FromHealth = co2FromHealth
+            existing.autoStarted = autoStarted
             rec = existing
         } else {
             rec = WorkoutRec(id: id, typeRaw: type.rawValue, start: start, end: end,
@@ -147,7 +149,8 @@ final class DataStore {
                              points: points, routeData: routeData, splitSeconds: splitSeconds,
                              source: source, hkSynced: hkSynced, calories: calories,
                              caloriesFromHealth: caloriesFromHealth,
-                             co2SavedGrams: co2SavedGrams, co2FromHealth: co2FromHealth)
+                             co2SavedGrams: co2SavedGrams, co2FromHealth: co2FromHealth,
+                             autoStarted: autoStarted)
             context.insert(rec)
         }
         try context.save()

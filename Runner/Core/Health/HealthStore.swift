@@ -174,6 +174,23 @@ final class HealthStore: HealthStoring {
         }
     }
 
+    func walkRunDistance(from: Date, to: Date) async throws -> Double {
+        guard to > from else { return 0 }
+        let predicate = HKQuery.predicateForSamples(withStart: from, end: to, options: .strictStartDate)
+        return try await withCheckedThrowingContinuation { continuation in
+            let query = HKStatisticsQuery(quantityType: distanceWalkRun,
+                                          quantitySamplePredicate: predicate,
+                                          options: .cumulativeSum) { _, stats, error in
+                if let error {
+                    continuation.resume(throwing: error)
+                    return
+                }
+                continuation.resume(returning: stats?.sumQuantity()?.doubleValue(for: .meter()) ?? 0)
+            }
+            store.execute(query)
+        }
+    }
+
     func dailyWalkRunDistance(daysBack: Int) async throws -> [Date: Double] {
         let cal = Calendar.current
         let (start, end) = HealthMappers.window(daysBack: daysBack, endingAt: Date(), calendar: cal)
