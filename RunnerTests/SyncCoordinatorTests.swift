@@ -371,4 +371,44 @@ struct SyncCoordinatorTests {
         #expect(health.workoutsDaysBack == [90, 121])
         #expect(defaults.bool(forKey: "fullHistoryBackfilled"))
     }
+
+    @Test func externalWorkoutUsesRealHealthCaloriesAndCo2() async throws {
+        let (sync, health, store) = try make(metrics: BodyMetrics(weightKg: 70, heightCm: 175,
+                                                                  sex: .male, age: 30))
+        let now = day(0)
+        health.earliestHistoryDateStub = now
+        health.cannedWorkouts = [
+            ExternalWorkout(id: UUID(), type: .bike, start: now, end: now,
+                            movingSeconds: 1200, distanceMeters: 5000,
+                            activeEnergyKcal: 130, co2SavedGrams: 900,
+                            isFromThisApp: false)
+        ]
+        await sync.syncNow()
+
+        let rec = try #require(try store.allWorkouts().first)
+        #expect(rec.calories == 130)
+        #expect(rec.caloriesFromHealth == true)
+        #expect(rec.co2SavedGrams == 900)
+        #expect(rec.co2FromHealth == true)
+    }
+
+    @Test func externalWorkoutFallsBackToEstimatesWhenHealthHasNone() async throws {
+        let (sync, health, store) = try make(metrics: BodyMetrics(weightKg: 70, heightCm: 175,
+                                                                  sex: .male, age: 30))
+        let now = day(0)
+        health.earliestHistoryDateStub = now
+        health.cannedWorkouts = [
+            ExternalWorkout(id: UUID(), type: .bike, start: now, end: now,
+                            movingSeconds: 1200, distanceMeters: 5000,
+                            activeEnergyKcal: nil, co2SavedGrams: nil,
+                            isFromThisApp: false)
+        ]
+        await sync.syncNow()
+
+        let rec = try #require(try store.allWorkouts().first)
+        #expect(rec.caloriesFromHealth == false)
+        #expect(rec.co2FromHealth == false)
+        // 5 km bike → CO2Estimator computed value.
+        #expect(abs(rec.co2SavedGrams - CO2Estimator.avoidedGrams(type: .bike, distanceMeters: 5000)) < 0.001)
+    }
 }

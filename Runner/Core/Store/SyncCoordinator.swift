@@ -116,6 +116,11 @@ final class SyncCoordinator {
 
             // Cache external workouts for the UI (ours are already cached at record time).
             for w in hkWorkouts where !w.isFromThisApp {
+                let estKcal = workoutCalories(type: w.type, distanceMeters: w.distanceMeters,
+                                              movingSeconds: w.movingSeconds, metrics: metrics)
+                let kcal = w.activeEnergyKcal ?? estKcal
+                let co2 = w.co2SavedGrams
+                    ?? CO2Estimator.avoidedGrams(type: w.type, distanceMeters: w.distanceMeters)
                 try store.upsertWorkout(id: w.id, type: w.type, start: w.start,
                                         end: w.end, movingSeconds: w.movingSeconds,
                                         distanceMeters: w.distanceMeters,
@@ -124,8 +129,10 @@ final class SyncCoordinator {
                                                                            distanceMeters: w.distanceMeters),
                                         routeData: nil, splitSeconds: [],
                                         source: "external", hkSynced: true,
-                                        calories: workoutCalories(type: w.type, distanceMeters: w.distanceMeters,
-                                                                  movingSeconds: w.movingSeconds, metrics: metrics))
+                                        calories: kcal,
+                                        caloriesFromHealth: w.activeEnergyKcal != nil,
+                                        co2SavedGrams: co2,
+                                        co2FromHealth: w.co2SavedGrams != nil)
             }
 
             // Day inputs: HK workouts + local workouts that never reached HK.
@@ -134,7 +141,8 @@ final class SyncCoordinator {
             for w in hkWorkouts {
                 let day = cal.startOfDay(for: w.start)
                 energyByDay[day, default: []].append(
-                    WorkoutEnergyInput(type: w.type, distanceMeters: w.distanceMeters, movingSeconds: w.movingSeconds))
+                    WorkoutEnergyInput(type: w.type, distanceMeters: w.distanceMeters,
+                                       movingSeconds: w.movingSeconds, realKcal: w.activeEnergyKcal))
             }
             for rec in try store.pendingSync() {
                 let day = cal.startOfDay(for: rec.start)
