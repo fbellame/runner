@@ -10,6 +10,7 @@ final class HealthStore: HealthStoring {
     private let routeType = HKSeriesType.workoutRoute()
     private let distanceWalkRun = HKQuantityType(.distanceWalkingRunning)
     private let distanceCycling = HKQuantityType(.distanceCycling)
+    private let activeEnergyType = HKQuantityType(.activeEnergyBurned)
     private let heightType = HKQuantityType(.height)
     private let bodyMassType = HKQuantityType(.bodyMass)
 
@@ -20,7 +21,7 @@ final class HealthStore: HealthStoring {
     }
     private var readTypes: Set<HKObjectType> {
         [stepType, workoutType, routeType, distanceWalkRun, distanceCycling,
-         heightType, bodyMassType,
+         activeEnergyType, heightType, bodyMassType,
          HKCharacteristicType(.dateOfBirth), HKCharacteristicType(.biologicalSex)]
     }
 
@@ -102,6 +103,31 @@ final class HealthStore: HealthStoring {
             }
             for raw in byType.keys.sorted() {
                 lines.append("  type \(raw) (\(activityTypeName(raw))): \(byType[raw] ?? 0) total, \(byTypeWithDistance[raw] ?? 0) with distance")
+            }
+
+            let cyclingSamples = workouts.filter { $0.workoutActivityType == .cycling }.prefix(5)
+            if !cyclingSamples.isEmpty {
+                lines.append("Sample cycling workouts (first \(cyclingSamples.count)):")
+                for w in cyclingSamples {
+                    let type = HealthMappers.activityType(from: w.workoutActivityType) ?? .bike
+                    let cyc = w.statistics(for: distanceCycling)?.sumQuantity()?.doubleValue(for: .meter())
+                    let wr = w.statistics(for: distanceWalkRun)?.sumQuantity()?.doubleValue(for: .meter())
+                    let agg = w.totalDistance?.doubleValue(for: .meter())
+                    let kcal = workoutEnergyKcal(w)
+                    let co2 = Co2Metadata.grams(from: w.metadata)
+                    let keys = (w.metadata?.keys.sorted()).map { $0.joined(separator: ",") } ?? "none"
+                    // Precompute into concrete Ints: a long chain of optional-map
+                    // interpolations concatenated with `+` blows up Swift's type-checker.
+                    let cycI = cyc.map { Int($0) } ?? -1
+                    let wrI = wr.map { Int($0) } ?? -1
+                    let aggI = agg.map { Int($0) } ?? -1
+                    let usedI = Int(workoutDistanceMeters(w, type: type))
+                    let kcalI = kcal.map { Int($0) } ?? -1
+                    let co2I = co2.map { Int($0) } ?? -1
+                    let durI = Int(w.duration)
+                    lines.append("  \(df.string(from: w.startDate)) dur=\(durI)s dist[cyc=\(cycI),wr=\(wrI),agg=\(aggI)] used=\(usedI) kcal=\(kcalI) co2g=\(co2I)")
+                    lines.append("    metaKeys: \(keys)")
+                }
             }
             lines.append("Sources: \(sources.sorted().joined(separator: ", "))")
         } catch {
@@ -197,11 +223,15 @@ final class HealthStore: HealthStoring {
                 ? WorkoutEstimation.estimatedMeters(type: type, movingSeconds: workout.duration)
                 : nil
             let meters = estimatedMeters ?? realMeters
+            let energyKcal = workoutEnergyKcal(workout)
+            let co2Grams = Co2Metadata.grams(from: workout.metadata)
             return ExternalWorkout(id: workout.uuid, type: type, start: workout.startDate,
                                    end: workout.endDate,
                                    movingSeconds: workout.duration,
                                    distanceMeters: meters,
                                    distanceEstimated: estimatedMeters != nil,
+                                   activeEnergyKcal: energyKcal,
+                                   co2SavedGrams: co2Grams,
                                    isFromThisApp: workout.sourceRevision.source.bundleIdentifier == bundleID)
         }
     }
@@ -220,6 +250,20 @@ final class HealthStore: HealthStoring {
             }
         }
         return workout.totalDistance?.doubleValue(for: .meter()) ?? 0
+    }
+
+    /// Real active energy (kcal) for an imported workout, or nil when the source
+    /// recorded none. Prefer the per-type statistic; fall back to the aggregate.
+    private func workoutEnergyKcal(_ workout: HKWorkout) -> Double? {
+        let unit = HKUnit.kilocalorie()
+        if let kcal = workout.statistics(for: activeEnergyType)?.sumQuantity()?
+            .doubleValue(for: unit), kcal > 0 {
+            return kcal
+        }
+        if let kcal = workout.totalEnergyBurned?.doubleValue(for: unit), kcal > 0 {
+            return kcal
+        }
+        return nil
     }
 
     func saveWorkout(_ workout: RecordedWorkout, points: Int) async throws -> UUID {
