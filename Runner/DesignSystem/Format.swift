@@ -24,4 +24,14 @@ enum Format {
         let prefix = estimated ? "~" : ""
         return prefix + value.formatted(.number.precision(.fractionLength(2))) + " km"
     }
+
+    static func kcal(_ value: Double, estimated: Bool = false) -> String {
+        let prefix = estimated ? "~" : ""
+        return prefix + "\(Int(value.rounded())) kcal"
+    }
+
+    static func co2(grams: Double) -> String {
+        let kg = grams / 1000.0
+        return kg.formatted(.number.precision(.fractionLength(1))) + " kg"
+    }
 }

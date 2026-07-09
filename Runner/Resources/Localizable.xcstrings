@@ -261,6 +261,16 @@
         }
       }
     },
+    "CO₂ saved": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "CO₂ économisé"
+          }
+        }
+      }
+    },
     "Calories": {
       "localizations": {
         "fr": {

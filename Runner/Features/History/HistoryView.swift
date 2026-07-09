@@ -167,6 +167,11 @@ struct HistoryView: View {
                 StatTile(label: String(localized: "Workouts"),
                          value: "\(totals.workouts)",
                          accent: .rPurple)
+                if totals.co2SavedGrams > 0 {
+                    StatTile(label: String(localized: "CO₂ saved"),
+                             value: Format.co2(grams: totals.co2SavedGrams),
+                             accent: .rTeal)
+                }
             }
         }
     }
@@ -412,7 +417,8 @@ extension ActivityWorkoutSummary {
                   points: workout.points,
                   calories: workout.calories,
                   splitSeconds: workout.splitSeconds,
-                  hasRoute: workout.routeData != nil)
+                  hasRoute: workout.routeData != nil,
+                  co2SavedGrams: workout.co2SavedGrams)
     }
 }
 

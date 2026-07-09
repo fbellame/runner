@@ -66,13 +66,20 @@ final class WorkoutRec {
     // keeps the calories it was burned at even if weight later changes.
     // Inline default backfills this column when migrating an existing v1 store.
     var calories: Double = 0
+    // Real-vs-estimated provenance + CO₂ avoided. Inline defaults keep an existing
+    // store lightweight-migratable, mirroring `distanceEstimated` / `calories`.
+    var caloriesFromHealth: Bool = false
+    var co2SavedGrams: Double = 0
+    var co2FromHealth: Bool = false
 
     var type: ActivityType { ActivityType(rawValue: typeRaw) ?? .run }
 
     init(id: UUID, typeRaw: String, start: Date, end: Date, movingSeconds: Double,
          distanceMeters: Double, distanceEstimated: Bool = false, points: Int,
          routeData: Data?, splitSeconds: [Double],
-         source: String, hkSynced: Bool, calories: Double = 0) {
+         source: String, hkSynced: Bool, calories: Double = 0,
+         caloriesFromHealth: Bool = false, co2SavedGrams: Double = 0,
+         co2FromHealth: Bool = false) {
         self.id = id
         self.typeRaw = typeRaw
         self.start = start
@@ -86,6 +93,9 @@ final class WorkoutRec {
         self.source = source
         self.hkSynced = hkSynced
         self.calories = calories
+        self.caloriesFromHealth = caloriesFromHealth
+        self.co2SavedGrams = co2SavedGrams
+        self.co2FromHealth = co2FromHealth
     }
 }
 

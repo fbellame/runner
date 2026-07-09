@@ -9,10 +9,14 @@ struct ExternalWorkout: Equatable, Sendable {
     let movingSeconds: Double
     let distanceMeters: Double
     let distanceEstimated: Bool
+    let activeEnergyKcal: Double?
+    let co2SavedGrams: Double?
     let isFromThisApp: Bool
 
     init(id: UUID, type: ActivityType, start: Date, end: Date, movingSeconds: Double,
-         distanceMeters: Double, distanceEstimated: Bool = false, isFromThisApp: Bool) {
+         distanceMeters: Double, distanceEstimated: Bool = false,
+         activeEnergyKcal: Double? = nil, co2SavedGrams: Double? = nil,
+         isFromThisApp: Bool) {
         self.id = id
         self.type = type
         self.start = start
@@ -20,6 +24,8 @@ struct ExternalWorkout: Equatable, Sendable {
         self.movingSeconds = movingSeconds
         self.distanceMeters = distanceMeters
         self.distanceEstimated = distanceEstimated
+        self.activeEnergyKcal = activeEnergyKcal
+        self.co2SavedGrams = co2SavedGrams
         self.isFromThisApp = isFromThisApp
     }
 }
