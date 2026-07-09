@@ -346,7 +346,7 @@ struct SyncCoordinatorTests {
 
         #expect(sync.lastError == "step read failed")
         #expect(health.earliestHistoryDateCalls == 1)
-        #expect(defaults.object(forKey: "fullHistoryBackfilled") == nil)
+        #expect(defaults.bool(forKey: "fullHistoryBackfilled") == false)
     }
 
     @Test func nilEarliestDoesNotConsumeBackfillAndLaterSyncStillImportsHistory() async throws {
@@ -361,7 +361,7 @@ struct SyncCoordinatorTests {
         #expect(sync.lastError == nil)
         #expect(health.dailyWalkRunDistanceDaysBack == [90])
         #expect(health.workoutsDaysBack == [90])
-        #expect(defaults.object(forKey: "fullHistoryBackfilled") == nil)
+        #expect(defaults.bool(forKey: "fullHistoryBackfilled") == false)
 
         // Later sync, once history is readable: performs the true full backfill.
         health.earliestHistoryDateStub = day(-120)
@@ -370,6 +370,23 @@ struct SyncCoordinatorTests {
         #expect(health.dailyWalkRunDistanceDaysBack == [90, 121])
         #expect(health.workoutsDaysBack == [90, 121])
         #expect(defaults.bool(forKey: "fullHistoryBackfilled"))
+    }
+
+    @Test func v14UpgradeForcesOneTimeFullReimportThenRolls() async throws {
+        let defaults = freshDefaults()
+        // Simulate a store already backfilled under v1.3.
+        defaults.set(true, forKey: "fullHistoryBackfilled")
+        let (sync, health, _) = try make(defaults: defaults)
+        health.earliestHistoryDateStub = day(-120)
+
+        await sync.syncNow()
+        // Despite the pre-set v1.3 flag, v1.4's first sync re-imports full history…
+        #expect(health.workoutsDaysBack == [121])
+        #expect(defaults.bool(forKey: "v14MetricsBackfilled"))
+
+        // …and the next sync returns to the rolling window (one-time only).
+        await sync.syncNow()
+        #expect(health.workoutsDaysBack == [121, 90])
     }
 
     @Test func externalWorkoutUsesRealHealthCaloriesAndCo2() async throws {

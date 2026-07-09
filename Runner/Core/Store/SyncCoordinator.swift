@@ -4,6 +4,11 @@ import Foundation
 final class SyncCoordinator {
     static let windowDays = 90
     private static let fullHistoryKey = "fullHistoryBackfilled"
+    // v1.4 added real calories + CO₂ to imported workouts. Existing stores were
+    // backfilled under v1.3 (fullHistoryKey already set), so a plain upgrade would
+    // only refresh the rolling window and leave historical rides at co2 = 0. Force
+    // one more full re-import the first time a v1.4 build syncs.
+    private static let co2BackfillKey = "v14MetricsBackfilled"
 
     private let health: HealthStoring
     private let store: DataStore
@@ -97,6 +102,13 @@ final class SyncCoordinator {
         do {
             let cal = Calendar.current
             let now = Date()
+            // One-time v1.4 upgrade: re-open the full-history backfill so every
+            // imported workout gets real calories + CO₂ (previously 0). Piggybacks on
+            // the existing backfill machinery, which re-arms the rolling window after.
+            if !defaults.bool(forKey: Self.co2BackfillKey) {
+                defaults.set(false, forKey: Self.fullHistoryKey)
+                defaults.set(true, forKey: Self.co2BackfillKey)
+            }
             let backfilled = defaults.bool(forKey: Self.fullHistoryKey)
             let earliest = backfilled ? nil : try await health.earliestHistoryDate()
             let daysBack = Self.daysBack(backfilled: backfilled,
