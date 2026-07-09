@@ -166,6 +166,7 @@ struct ActivityStatsTests {
                                                             calories: 0,
                                                             workouts: 9,
                                                             routesPainted: 0,
+                                                            co2SavedGrams: 0,
                                                             perType: [:]))
         #expect(milestone(below, .totalDistance, threshold: 10)?.earned == false)
         #expect(abs((milestone(below, .totalDistance, threshold: 10)?.progress ?? 0) - 0.9999) < 0.0001)
@@ -178,6 +179,7 @@ struct ActivityStatsTests {
                                                          calories: 0,
                                                          workouts: 10,
                                                          routesPainted: 0,
+                                                         co2SavedGrams: 0,
                                                          perType: [:]))
         #expect(milestone(at, .totalDistance, threshold: 10)?.earned == true)
         #expect(milestone(at, .totalDistance, threshold: 10)?.progress == 1)
@@ -190,6 +192,7 @@ struct ActivityStatsTests {
                                                             calories: 0,
                                                             workouts: 26,
                                                             routesPainted: 0,
+                                                            co2SavedGrams: 0,
                                                             perType: [:]))
         #expect(milestone(above, .totalDistance, threshold: 25)?.earned == true)
         #expect(milestone(above, .totalDistance, threshold: 50)?.progress == 0.52)
@@ -236,5 +239,18 @@ struct ActivityStatsTests {
         #expect(stats.weeklyDistance[0].meters == 1_000)
         #expect(stats.weeklyDistance[1].weekStart == date(2026, 3, 9, hour: 0))
         #expect(stats.weeklyDistance[1].meters == 2_000)
+    }
+
+    @Test func lifetimeTotalsSumCo2Saved() {
+        let summaries = [
+            ActivityWorkoutSummary(id: UUID(), type: .bike, date: .now, distanceMeters: 5000,
+                                   movingSeconds: 1200, points: 5, calories: 100,
+                                   splitSeconds: [], hasRoute: false, co2SavedGrams: 900),
+            ActivityWorkoutSummary(id: UUID(), type: .bike, date: .now, distanceMeters: 3000,
+                                   movingSeconds: 800, points: 3, calories: 60,
+                                   splitSeconds: [], hasRoute: false, co2SavedGrams: 576),
+        ]
+        let totals = ActivityStats.lifetimeTotals(summaries)
+        #expect(abs(totals.co2SavedGrams - 1476) < 0.001)
     }
 }

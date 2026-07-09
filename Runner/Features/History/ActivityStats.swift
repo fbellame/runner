@@ -11,10 +11,12 @@ struct ActivityWorkoutSummary {
     let calories: Double
     let splitSeconds: [Double]
     let hasRoute: Bool
+    let co2SavedGrams: Double
 
     init(id: UUID, type: ActivityType, date: Date, distanceMeters: Double,
          distanceEstimated: Bool = false, movingSeconds: Double, points: Int,
-         calories: Double, splitSeconds: [Double], hasRoute: Bool) {
+         calories: Double, splitSeconds: [Double], hasRoute: Bool,
+         co2SavedGrams: Double = 0) {
         self.id = id
         self.type = type
         self.date = date
@@ -25,6 +27,7 @@ struct ActivityWorkoutSummary {
         self.calories = calories
         self.splitSeconds = splitSeconds
         self.hasRoute = hasRoute
+        self.co2SavedGrams = co2SavedGrams
     }
 }
 
@@ -46,6 +49,7 @@ struct LifetimeTotals {
     let calories: Double
     let workouts: Int
     let routesPainted: Int
+    let co2SavedGrams: Double
     let perType: [ActivityType: (distanceMeters: Double, workouts: Int)]
 }
 
@@ -135,6 +139,7 @@ enum ActivityStats {
                               calories: summaries.reduce(0) { $0 + $1.calories },
                               workouts: summaries.count,
                               routesPainted: summaries.filter(\.hasRoute).count,
+                              co2SavedGrams: summaries.reduce(0) { $0 + $1.co2SavedGrams },
                               perType: perType)
     }
 
