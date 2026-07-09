@@ -34,6 +34,22 @@ struct WorkoutDetailView: View {
                              value: workout.movingSeconds > 0 ? Format.duration(workout.movingSeconds) : "—")
                 }
 
+                if workout.calories > 0 || workout.co2SavedGrams > 0 {
+                    HStack(spacing: 10) {
+                        if workout.calories > 0 {
+                            StatTile(label: String(localized: "Calories"),
+                                     value: Format.kcal(workout.calories,
+                                                        estimated: !workout.caloriesFromHealth),
+                                     accent: .rOrange)
+                        }
+                        if workout.co2SavedGrams > 0 {
+                            StatTile(label: String(localized: "CO₂ saved"),
+                                     value: Format.co2(grams: workout.co2SavedGrams),
+                                     accent: .rLime)
+                        }
+                    }
+                }
+
                 if !workout.splitSeconds.isEmpty {
                     SplitAnalysisCard(splitSeconds: workout.splitSeconds,
                                       activityType: workout.type)
