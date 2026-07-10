@@ -45,7 +45,10 @@ struct ActivitySpecificBlock: View {
 
     private func bestEffortRow(allTime: PersonalRecord,
                                thisYear: PersonalRecord?) -> some View {
-        let beatenThisYear = thisYear.map { $0.value == allTime.value } ?? false
+        let year = Calendar.current.component(.year, from: .now)
+        let beatenThisYear = allTime.date.map {
+            Calendar.current.component(.year, from: $0) == year
+        } ?? false
 
         return HStack {
             Text(RecordRow.emoji(allTime.kind))
