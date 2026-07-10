@@ -230,6 +230,12 @@ struct TodayView: View {
             return String(format: String(localized: "%lld %@ to %lld lifetime %@"),
                           Int64(remaining), countUnit(for: badge.scope),
                           Int64(badge.threshold), countUnit(for: badge.scope))
+        case .weeklyGoal:
+            return String(localized: "First weekly goal")
+        case .weeklyStreak:
+            let remaining = Int(max(0, badge.threshold - current).rounded(.up))
+            return String(format: String(localized: "%lld more weeks to %lld-week streak"),
+                          Int64(remaining), Int64(badge.threshold))
         }
     }
 

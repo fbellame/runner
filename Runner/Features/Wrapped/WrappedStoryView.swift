@@ -366,6 +366,8 @@ private struct WrappedCardView: View {
         switch badge.kind {
         case .distance: String(format: String(localized: "%lld km"), Int64(badge.threshold))
         case .count: String(format: String(localized: "%lld workouts"), Int64(badge.threshold))
+        case .weeklyGoal: String(localized: "First weekly goal")
+        case .weeklyStreak: String(format: String(localized: "%lld-week streak"), Int64(badge.threshold))
         }
     }
 
