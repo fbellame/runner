@@ -47,6 +47,9 @@ protocol HealthStoring: AnyObject {
     func diagnosticsReport() async -> String
     func dailySteps(daysBack: Int) async throws -> [Date: Int]
     func dailyWalkRunDistance(daysBack: Int) async throws -> [Date: Double]
+    /// Walking+running distance over an arbitrary window — used to fill the stretch
+    /// of an auto-started walk that happened before GPS was running.
+    func walkRunDistance(from: Date, to: Date) async throws -> Double
     func workouts(daysBack: Int) async throws -> [ExternalWorkout]
     func saveWorkout(_ workout: RecordedWorkout, points: Int) async throws -> UUID
     func startObservingSteps(_ onChange: @escaping @Sendable () -> Void)

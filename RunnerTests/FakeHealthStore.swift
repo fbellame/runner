@@ -19,6 +19,9 @@ final class FakeHealthStore: HealthStoring {
     var saveHook: (() async -> Void)?
     var dailyStepsDaysBack: [Int] = []
     var dailyWalkRunDistanceDaysBack: [Int] = []
+    var rangedWalkRunDistance: Double = 0
+    var walkRunDistanceError: Error?
+    var walkRunDistanceWindows: [(Date, Date)] = []
     var workoutsDaysBack: [Int] = []
     var earliestHistoryDateCalls = 0
 
@@ -41,6 +44,11 @@ final class FakeHealthStore: HealthStoring {
     func dailyWalkRunDistance(daysBack: Int) async throws -> [Date: Double] {
         dailyWalkRunDistanceDaysBack.append(daysBack)
         return walkRunByDay
+    }
+    func walkRunDistance(from: Date, to: Date) async throws -> Double {
+        walkRunDistanceWindows.append((from, to))
+        if let walkRunDistanceError { throw walkRunDistanceError }
+        return rangedWalkRunDistance
     }
     func workouts(daysBack: Int) async throws -> [ExternalWorkout] {
         workoutsDaysBack.append(daysBack)

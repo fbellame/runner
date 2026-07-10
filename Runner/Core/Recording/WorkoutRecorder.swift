@@ -10,6 +10,24 @@ struct RecordedWorkout: Equatable, Sendable {
     let distanceMeters: Double
     let route: [RoutePoint]
     let splitSeconds: [Double]
+    /// Part of the distance came from Health rather than this session's GPS.
+    let distanceEstimated: Bool
+    /// The walk detector opened this session; no one tapped Start.
+    let autoStarted: Bool
+
+    init(type: ActivityType, start: Date, end: Date, movingSeconds: Double,
+         distanceMeters: Double, route: [RoutePoint], splitSeconds: [Double],
+         distanceEstimated: Bool = false, autoStarted: Bool = false) {
+        self.type = type
+        self.start = start
+        self.end = end
+        self.movingSeconds = movingSeconds
+        self.distanceMeters = distanceMeters
+        self.route = route
+        self.splitSeconds = splitSeconds
+        self.distanceEstimated = distanceEstimated
+        self.autoStarted = autoStarted
+    }
 
     var paceSecondsPerKm: Double? {
         Self.pace(movingSeconds: movingSeconds, distanceMeters: distanceMeters)
@@ -36,6 +54,11 @@ final class WorkoutRecorder: LocationProvidingDelegate {
     private(set) var splitSeconds: [Double] = []
     private(set) var authorizationDenied = false
     private(set) var reducedAccuracy = false
+    /// Opened by the walk detector rather than by a tap. Carried onto the workout.
+    private(set) var autoStarted = false
+    /// When backdated, the instant GPS actually began — the window before it has
+    /// duration but no route, and its distance must come from Health.
+    private(set) var gpsBeganAt: Date?
 
     /// Must match a key in Info.plist's NSLocationTemporaryUsageDescriptionDictionary.
     static let fullAccuracyPurposeKey = "PreciseWorkout"
@@ -72,8 +95,15 @@ final class WorkoutRecorder: LocationProvidingDelegate {
         provider.requestWhenInUseAuthorization()
     }
 
-    func start(activity: ActivityType, resumeFrom checkpoint: SessionCheckpoint? = nil) {
+    /// `backdatedTo` starts the workout when the activity really began — before the
+    /// app noticed and before GPS was running. The elapsed interval is credited as
+    /// moving time up front, so duration is honest from the very first sample.
+    func start(activity: ActivityType, resumeFrom checkpoint: SessionCheckpoint? = nil,
+               backdatedTo walkBeganAt: Date? = nil, autoStarted: Bool = false) {
         self.activity = activity
+        self.autoStarted = autoStarted
+        let now = clock()
+        gpsBeganAt = walkBeganAt == nil ? nil : now
         if let checkpoint {
             startedAt = checkpoint.startedAt
             movingSeconds = checkpoint.movingSeconds
@@ -83,12 +113,12 @@ final class WorkoutRecorder: LocationProvidingDelegate {
             lastSplitMovingSeconds = checkpoint.splitSeconds.reduce(0, +)
             pendingGap = !checkpoint.route.isEmpty // relaunch point must not join old route
         } else {
-            startedAt = clock()
-            movingSeconds = 0
+            startedAt = walkBeganAt ?? now
+            movingSeconds = walkBeganAt.map { max(0, now.timeIntervalSince($0)) } ?? 0
             distanceMeters = 0
             route = []
             splitSeconds = []
-            lastSplitMovingSeconds = 0
+            lastSplitMovingSeconds = movingSeconds
             pendingGap = false
         }
         lastKeptLocation = nil
@@ -121,16 +151,26 @@ final class WorkoutRecorder: LocationProvidingDelegate {
         state = .recording
     }
 
-    func finish() -> RecordedWorkout {
+    /// `endingAt` supplies the true end when the caller knows it — an auto-stop
+    /// fires five minutes after the walking actually stopped, and that stationary
+    /// tail must not be baked into the workout.
+    func finish(endingAt end: Date? = nil) -> RecordedWorkout {
         provider.stopUpdates()
-        if state == .recording { advanceTimer(to: clock()) }
+        if state == .recording { advanceTimer(to: end ?? clock()) }
+        let start = startedAt ?? clock()
+        let finishedAt = end ?? clock()
+        // A backdated start seeds moving time from the walk's beginning; if the
+        // walk had already ended by the time we noticed, that seed overshoots the
+        // workout's own span. Moving time can never exceed elapsed time.
+        let elapsed = max(0, finishedAt.timeIntervalSince(start))
         let workout = RecordedWorkout(type: activity,
-                                      start: startedAt ?? clock(),
-                                      end: clock(),
-                                      movingSeconds: movingSeconds,
+                                      start: start,
+                                      end: finishedAt,
+                                      movingSeconds: min(movingSeconds, elapsed),
                                       distanceMeters: distanceMeters,
                                       route: route,
-                                      splitSeconds: splitSeconds)
+                                      splitSeconds: splitSeconds,
+                                      autoStarted: autoStarted)
         // Keep a final checkpoint: the workout lives only in memory until the user
         // saves or discards the summary, so a kill here must stay recoverable.
         saveCheckpoint(at: clock())
@@ -157,6 +197,8 @@ final class WorkoutRecorder: LocationProvidingDelegate {
         lastSplitMovingSeconds = 0
         timeAnchor = nil
         pendingGap = false
+        autoStarted = false
+        gpsBeganAt = nil
     }
 
     // MARK: LocationProvidingDelegate

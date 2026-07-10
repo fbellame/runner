@@ -77,17 +77,21 @@ final class SyncCoordinator {
         let id = UUID()
         try? store.upsertWorkout(id: id, type: workout.type, start: workout.start,
                                  end: workout.end, movingSeconds: workout.movingSeconds,
-                                 distanceMeters: workout.distanceMeters, points: points,
+                                 distanceMeters: workout.distanceMeters,
+                                 distanceEstimated: workout.distanceEstimated, points: points,
                                  routeData: routeData, splitSeconds: workout.splitSeconds,
-                                 source: "runner", hkSynced: false, calories: kcal)
+                                 source: "runner", hkSynced: false, calories: kcal,
+                                 autoStarted: workout.autoStarted)
         var failure: String?
         do {
             _ = try await health.saveWorkout(workout, points: points)
             try? store.upsertWorkout(id: id, type: workout.type, start: workout.start,
                                      end: workout.end, movingSeconds: workout.movingSeconds,
-                                     distanceMeters: workout.distanceMeters, points: points,
+                                     distanceMeters: workout.distanceMeters,
+                                     distanceEstimated: workout.distanceEstimated, points: points,
                                      routeData: routeData, splitSeconds: workout.splitSeconds,
-                                     source: "runner", hkSynced: true, calories: kcal)
+                                     source: "runner", hkSynced: true, calories: kcal,
+                                     autoStarted: workout.autoStarted)
         } catch {
             failure = error.localizedDescription
         }

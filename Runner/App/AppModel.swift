@@ -22,6 +22,7 @@ final class AppModel {
     let recorder: WorkoutRecorder
     let checkpoints: CheckpointStore
     let profile: ProfileStore
+    private(set) var autoWalk: AutoWalkCoordinator?
 
     var pendingResume: SessionCheckpoint?
     var showRecordSheet = false
@@ -65,6 +66,23 @@ final class AppModel {
                                     metricsProvider: { profile.currentMetrics() })
     }
 
+    /// Opt-in so tests can build an AppModel without a motion provider. The
+    /// coordinator holds a weak-ish view of the app through closures rather than a
+    /// back-reference, keeping the dependency one-way.
+    func enableAutoWalk(motion: MotionActivityProviding) {
+        autoWalk = AutoWalkCoordinator(
+            motion: motion, recorder: recorder, health: health, checkpoints: checkpoints,
+            canAutoStart: { [weak self] in
+                guard let self else { return false }
+                // The record sheet and an unanswered resume prompt both own the
+                // recorder; a manual session must never be hijacked.
+                return self.pendingResume == nil && !self.showRecordSheet
+            },
+            save: { [weak self] workout in
+                await self?.sync.saveRecorded(workout)
+            })
+    }
+
     static func live() -> AppModel {
         let store: DataStore
         var storeFailure: String?
@@ -85,6 +103,7 @@ final class AppModel {
                                                        checkpoints: checkpoints),
                              checkpoints: checkpoints)
         model.storeFailureMessage = storeFailure
+        model.enableAutoWalk(motion: SystemMotionActivityProvider())
         return model
     }
 
@@ -92,6 +111,7 @@ final class AppModel {
         if await health.shouldRequestAuthorization() {
             try? await health.requestAuthorization()
         }
+        await autoWalk?.requestAuthorization()
         await profile.refreshFromHealth()
         health.startObservingSteps { [weak self] in
             Task { @MainActor [weak self] in
@@ -109,7 +129,10 @@ final class AppModel {
                 }
             }
         }
+        // Load the checkpoint first: a pending resume owns the recorder, and the
+        // auto-walk guard reads that flag.
         pendingResume = checkpoints.load()
+        await autoWalk?.onForeground()
         await sync.syncNow()
         if !UserDefaults.standard.bool(forKey: Self.profilePromptKey) {
             showProfilePrompt = true
@@ -125,6 +148,7 @@ final class AppModel {
 
     func onForeground() async {
         await profile.refreshFromHealth()
+        await autoWalk?.onForeground()
         await sync.syncNow()
     }
 
