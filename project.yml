@@ -28,7 +28,7 @@ targets:
       path: Runner/Info.plist
       properties:
         CFBundleDisplayName: Runner
-        CFBundleShortVersionString: "1.4"
+        CFBundleShortVersionString: "1.6"
         CFBundleVersion: "6"
         CFBundleLocalizations: [en, fr]
         CFBundleDevelopmentRegion: en

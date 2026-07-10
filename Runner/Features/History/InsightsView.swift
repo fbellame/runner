@@ -1,12 +1,9 @@
 import SwiftUI
 import SwiftData
-import Charts
 
 struct InsightsView: View {
     @Query(sort: \WorkoutRec.start, order: .reverse) private var workouts: [WorkoutRec]
     @State private var selectedType: ActivityType
-
-    private let chartWeeks = 12
 
     init(initialType: ActivityType) {
         _selectedType = State(initialValue: initialType)
@@ -27,19 +24,20 @@ struct InsightsView: View {
                                                        weeksPerPeriod: 4,
                                                        endingAt: .now,
                                                        calendar: .current)
-        let series = InsightsMath.weeklySeries(summaries,
-                                               type: selectedType,
-                                               weeks: chartWeeks,
-                                               endingAt: .now,
-                                               calendar: .current)
+        let records = ActivityStats.typeRecords(summaries, type: selectedType)
+        let workoutByID = Dictionary(uniqueKeysWithValues: workouts.map { ($0.id, $0) })
 
         ScrollView {
             VStack(alignment: .leading, spacing: 16) {
                 typePicker
                 summaryCard(summary)
                 deltaSection(comparison)
-                distanceChart(series)
-                paceChart(series)
+                YearInReviewBlock(type: selectedType, summaries: summaries)
+                HubProgressionCharts(type: selectedType, summaries: summaries)
+                ActivitySpecificBlock(type: selectedType, summaries: summaries)
+                ConsistencyBlock(type: selectedType, summaries: summaries)
+                HubRecordsBlock(type: selectedType, records: records,
+                                workoutByID: workoutByID)
                 Spacer(minLength: 60)
             }
             .padding(18)
@@ -98,51 +96,6 @@ struct InsightsView: View {
                 StatTile(label: String(localized: "Time"),
                          value: time.value,
                          accent: time.accent)
-            }
-        }
-    }
-
-    private func distanceChart(_ series: [WeeklyInsightPoint]) -> some View {
-        VStack(alignment: .leading, spacing: 10) {
-            MicroLabel(text: String(localized: "Distance by week"))
-            Chart {
-                ForEach(series) { point in
-                    BarMark(x: .value(String(localized: "Week"), point.weekStart, unit: .weekOfYear),
-                            y: .value(String(localized: "Distance"), point.distanceMeters / 1000.0))
-                        .foregroundStyle(selectedType.accent)
-                        .cornerRadius(3)
-                }
-            }
-            .frame(height: 150)
-            .chartYAxis { AxisMarks(position: .trailing) }
-        }
-    }
-
-    @ViewBuilder
-    private func paceChart(_ series: [WeeklyInsightPoint]) -> some View {
-        let points = pacePoints(from: series)
-
-        VStack(alignment: .leading, spacing: 10) {
-            MicroLabel(text: String(localized: "Pace by week (lower = faster)"))
-            if points.count < 2 {
-                SurfaceCard {
-                    Text(String(localized: "Not enough pace data yet"))
-                        .font(.subheadline)
-                        .foregroundStyle(Color.rTextSecondary)
-                }
-            } else {
-                Chart {
-                    ForEach(points) { point in
-                        LineMark(x: .value(String(localized: "Week"), point.weekStart, unit: .weekOfYear),
-                                 y: .value(String(localized: "Pace"), point.paceSecPerKm))
-                            .foregroundStyle(selectedType.accent)
-                        PointMark(x: .value(String(localized: "Week"), point.weekStart, unit: .weekOfYear),
-                                  y: .value(String(localized: "Pace"), point.paceSecPerKm))
-                            .foregroundStyle(selectedType.accent)
-                    }
-                }
-                .frame(height: 150)
-                .chartYAxis { AxisMarks(position: .trailing) }
             }
         }
     }
@@ -217,13 +170,6 @@ struct InsightsView: View {
         return (perWeek(0), Color.rTextSecondary)
     }
 
-    private func pacePoints(from series: [WeeklyInsightPoint]) -> [PaceInsightPoint] {
-        series.compactMap { point in
-            guard let pace = point.avgPaceSecPerKm else { return nil }
-            return PaceInsightPoint(weekStart: point.weekStart, paceSecPerKm: pace)
-        }
-    }
-
     private func oneDecimal(_ value: Double) -> String {
         value.formatted(.number.precision(.fractionLength(1)))
     }
@@ -240,11 +186,4 @@ struct InsightsView: View {
         String.localizedStringWithFormat(String(localized: "%llds/km"),
                                          Int64(value.rounded()))
     }
-}
-
-private struct PaceInsightPoint: Identifiable {
-    let weekStart: Date
-    let paceSecPerKm: Double
-
-    var id: Date { weekStart }
 }
