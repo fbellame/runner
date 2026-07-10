@@ -122,11 +122,11 @@ struct ActivityDetailView: View {
                         NavigationLink {
                             WorkoutDetailView(workout: workout)
                         } label: {
-                            recordRow(record, accent: type.accent, showsChevron: true)
+                            RecordRow(record: record, accent: type.accent, showsChevron: true)
                         }
                         .buttonStyle(.plain)
                     } else {
-                        recordRow(record, accent: .rTextSecondary)
+                        RecordRow(record: record, accent: .rTextSecondary)
                     }
                 }
             }
@@ -151,73 +151,6 @@ struct ActivityDetailView: View {
                 }
                 .buttonStyle(.plain)
             }
-        }
-    }
-
-    private func recordRow(_ record: PersonalRecord, accent: Color,
-                           showsChevron: Bool = false) -> some View {
-        HStack {
-            Text(recordEmoji(record.kind))
-            VStack(alignment: .leading, spacing: 2) {
-                Text(recordTitle(record.kind))
-                    .font(.system(size: 14))
-                    .foregroundStyle(.white)
-                if let date = record.date {
-                    Text(date.formatted(date: .abbreviated, time: .omitted))
-                        .font(.caption2)
-                        .foregroundStyle(Color.rTextSecondary)
-                }
-            }
-            Spacer()
-            Text(recordValue(record))
-                .font(.system(size: 14, weight: .bold, design: .rounded))
-                .foregroundStyle(accent)
-                .lineLimit(1)
-                .minimumScaleFactor(0.75)
-            if showsChevron {
-                Image(systemName: "chevron.right")
-                    .font(.system(size: 11, weight: .bold))
-                    .foregroundStyle(Color.rTextSecondary)
-            }
-        }
-    }
-
-    private func recordTitle(_ kind: RecordKind) -> String {
-        switch kind {
-        case .longestDistance:
-            String(localized: "Longest")
-        case .fastestOneKilometer:
-            String(localized: "Fastest 1 km")
-        case .fastestFiveKilometers:
-            String(localized: "Fastest 5 km")
-        case .bestAveragePace:
-            String(localized: "Best avg pace")
-        }
-    }
-
-    private func recordEmoji(_ kind: RecordKind) -> String {
-        switch kind {
-        case .longestDistance:
-            "📏"
-        case .fastestOneKilometer:
-            "⚡️"
-        case .fastestFiveKilometers:
-            "🏁"
-        case .bestAveragePace:
-            "⏱️"
-        }
-    }
-
-    private func recordValue(_ record: PersonalRecord) -> String {
-        switch record.kind {
-        case .longestDistance:
-            Format.km(record.value, estimated: record.distanceEstimated)
-        case .fastestOneKilometer:
-            Format.pace(record.value)
-        case .fastestFiveKilometers:
-            Format.duration(record.value)
-        case .bestAveragePace:
-            Format.pace(record.value)
         }
     }
 

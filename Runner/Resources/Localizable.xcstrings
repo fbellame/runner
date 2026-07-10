@@ -1,6 +1,16 @@
 {
   "sourceLanguage": "en",
   "strings": {
+    "%@ h": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@ h"
+          }
+        }
+      }
+    },
     "%@ steps": {
       "localizations": {
         "fr": {
@@ -21,6 +31,36 @@
         }
       }
     },
+    "%d sessions (vs %d) · %@ (vs %@)": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%d séances (vs %d) · %@ (vs %@)"
+          }
+        }
+      }
+    },
+    "%d vs all-time": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%d vs records absolus"
+          }
+        }
+      }
+    },
+    "%d wk": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%d sem"
+          }
+        }
+      }
+    },
     "%lld days": {
       "localizations": {
         "fr": {
@@ -31,12 +71,12 @@
         }
       }
     },
-    "%llds/km": {
+    "%lld gold days": {
       "localizations": {
         "fr": {
           "stringUnit": {
             "state": "translated",
-            "value": "%lld s/km"
+            "value": "%lld jours en or"
           }
         }
       }
@@ -71,6 +111,16 @@
         }
       }
     },
+    "%llds/km": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%lld s/km"
+          }
+        }
+      }
+    },
     ", down from %@": {
       "localizations": {
         "fr": {
@@ -91,12 +141,42 @@
         }
       }
     },
+    "1 gold day": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "1 jour en or"
+          }
+        }
+      }
+    },
     "1 pt per %lld steps (max %lld/day)": {
       "localizations": {
         "fr": {
           "stringUnit": {
             "state": "translated",
             "value": "1 pt par %lld pas (max %lld/jour)"
+          }
+        }
+      }
+    },
+    "1 yr": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "1 an"
+          }
+        }
+      }
+    },
+    "12 wk": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "12 sem"
           }
         }
       }
@@ -171,22 +251,22 @@
         }
       }
     },
-    "Avg": {
-      "localizations": {
-        "fr": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Moy"
-          }
-        }
-      }
-    },
     "Average pace": {
       "localizations": {
         "fr": {
           "stringUnit": {
             "state": "translated",
             "value": "Allure moyenne"
+          }
+        }
+      }
+    },
+    "Avg": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Moy"
           }
         }
       }
@@ -217,6 +297,16 @@
           "stringUnit": {
             "state": "translated",
             "value": "Meilleure allure"
+          }
+        }
+      }
+    },
+    "Best run": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Meilleure sortie"
           }
         }
       }
@@ -257,6 +347,26 @@
           "stringUnit": {
             "state": "translated",
             "value": "Corps"
+          }
+        }
+      }
+    },
+    "CO₂ avoided in %d": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "CO₂ évité en %d"
+          }
+        }
+      }
+    },
+    "CO₂ avoided lifetime": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "CO₂ évité à vie"
           }
         }
       }
@@ -321,12 +431,42 @@
         }
       }
     },
+    "Consistency": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Régularité"
+          }
+        }
+      }
+    },
+    "Current streak": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Série en cours"
+          }
+        }
+      }
+    },
     "Daily goal": {
       "localizations": {
         "fr": {
           "stringUnit": {
             "state": "translated",
             "value": "Objectif quotidien"
+          }
+        }
+      }
+    },
+    "Date": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Date"
           }
         }
       }
@@ -391,6 +531,26 @@
         }
       }
     },
+    "Distance in %d": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Distance en %d"
+          }
+        }
+      }
+    },
+    "Distance lifetime": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Distance à vie"
+          }
+        }
+      }
+    },
     "Done": {
       "localizations": {
         "fr": {
@@ -411,22 +571,22 @@
         }
       }
     },
-    "Everyday steps": {
-      "localizations": {
-        "fr": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Pas quotidiens"
-          }
-        }
-      }
-    },
     "Even pace": {
       "localizations": {
         "fr": {
           "stringUnit": {
             "state": "translated",
             "value": "Allure régulière"
+          }
+        }
+      }
+    },
+    "Everyday steps": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Pas quotidiens"
           }
         }
       }
@@ -551,6 +711,26 @@
         }
       }
     },
+    "Green impact": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Impact vert"
+          }
+        }
+      }
+    },
+    "HealthKit diagnostics": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Diagnostic HealthKit"
+          }
+        }
+      }
+    },
     "Height (cm)": {
       "localizations": {
         "fr": {
@@ -567,6 +747,36 @@
           "stringUnit": {
             "state": "translated",
             "value": "Historique"
+          }
+        }
+      }
+    },
+    "History re-imported": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Historique réimporté"
+          }
+        }
+      }
+    },
+    "Hours in %d": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Heures en %d"
+          }
+        }
+      }
+    },
+    "Hours lifetime": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Heures à vie"
           }
         }
       }
@@ -591,6 +801,16 @@
         }
       }
     },
+    "Imports all past activity from Apple Health": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Importe toute l'activité passée depuis Apple Santé"
+          }
+        }
+      }
+    },
     "Insights": {
       "localizations": {
         "fr": {
@@ -601,12 +821,12 @@
         }
       }
     },
-    "Imports all past activity from Apple Health": {
+    "Km": {
       "localizations": {
         "fr": {
           "stringUnit": {
             "state": "translated",
-            "value": "Importe toute l'activité passée depuis Apple Santé"
+            "value": "Km"
           }
         }
       }
@@ -631,16 +851,6 @@
         }
       }
     },
-    "Km": {
-      "localizations": {
-        "fr": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Km"
-          }
-        }
-      }
-    },
     "Last 52 weeks": {
       "localizations": {
         "fr": {
@@ -657,6 +867,36 @@
           "stringUnit": {
             "state": "translated",
             "value": "7 derniers jours"
+          }
+        }
+      }
+    },
+    "Last ride: %d days ago": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Dernier trajet : il y a %d jours"
+          }
+        }
+      }
+    },
+    "Last run: %d days ago": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Dernière course : il y a %d jours"
+          }
+        }
+      }
+    },
+    "Last walk: %d days ago": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Dernière marche : il y a %d jours"
           }
         }
       }
@@ -717,6 +957,16 @@
           "stringUnit": {
             "state": "translated",
             "value": "Plus longue course"
+          }
+        }
+      }
+    },
+    "Longest streak": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Plus longue série"
           }
         }
       }
@@ -891,22 +1141,22 @@
         }
       }
     },
+    "Pace (lower = faster)": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Allure (plus bas = plus rapide)"
+          }
+        }
+      }
+    },
     "Pace by week (lower = faster)": {
       "localizations": {
         "fr": {
           "stringUnit": {
             "state": "translated",
             "value": "Allure par semaine (plus bas = plus rapide)"
-          }
-        }
-      }
-    },
-    "Pace per km (lower = faster)": {
-      "localizations": {
-        "fr": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Allure par km (plus bas = plus rapide)"
           }
         }
       }
@@ -937,6 +1187,16 @@
           "stringUnit": {
             "state": "translated",
             "value": "L’allure s’améliore — %@ plus rapide que les 4 semaines précédentes."
+          }
+        }
+      }
+    },
+    "Pace per km (lower = faster)": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Allure par km (plus bas = plus rapide)"
           }
         }
       }
@@ -997,6 +1257,16 @@
           "stringUnit": {
             "state": "translated",
             "value": "Profil et mesures"
+          }
+        }
+      }
+    },
+    "Progression": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Progression"
           }
         }
       }
@@ -1097,6 +1367,26 @@
           "stringUnit": {
             "state": "translated",
             "value": "Vérifiez votre profil"
+          }
+        }
+      }
+    },
+    "Rides in %d": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Trajets en %d"
+          }
+        }
+      }
+    },
+    "Rides lifetime": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Trajets à vie"
           }
         }
       }
@@ -1221,6 +1511,16 @@
         }
       }
     },
+    "Sessions per week · last 52 weeks": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Séances par semaine · 52 dernières semaines"
+          }
+        }
+      }
+    },
     "Set date of birth": {
       "localizations": {
         "fr": {
@@ -1311,6 +1611,16 @@
         }
       }
     },
+    "This week": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Cette semaine"
+          }
+        }
+      }
+    },
     "Time": {
       "localizations": {
         "fr": {
@@ -1381,22 +1691,22 @@
         }
       }
     },
+    "Walking volume": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Volume de marche"
+          }
+        }
+      }
+    },
     "Week": {
       "localizations": {
         "fr": {
           "stringUnit": {
             "state": "translated",
             "value": "Semaine"
-          }
-        }
-      }
-    },
-    "Year": {
-      "localizations": {
-        "fr": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Année"
           }
         }
       }
@@ -1431,12 +1741,22 @@
         }
       }
     },
-    "Your height, weight, age and sex power the calorie estimates. Values come from Apple Health; edit any of them to override.": {
+    "Year": {
       "localizations": {
         "fr": {
           "stringUnit": {
             "state": "translated",
-            "value": "Votre taille, poids, âge et sexe alimentent l’estimation des calories. Les valeurs proviennent de Santé ; modifiez-les pour les remplacer."
+            "value": "Année"
+          }
+        }
+      }
+    },
+    "Year in review": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Bilan de l’année"
           }
         }
       }
@@ -1471,12 +1791,72 @@
         }
       }
     },
+    "Your first tracked year 🎉": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Votre première année suivie 🎉"
+          }
+        }
+      }
+    },
+    "Your height, weight, age and sex power the calorie estimates. Values come from Apple Health; edit any of them to override.": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Votre taille, poids, âge et sexe alimentent l’estimation des calories. Les valeurs proviennent de Santé ; modifiez-les pour les remplacer."
+          }
+        }
+      }
+    },
+    "Your past activity from Apple Health has been re-imported. Check the History tab.": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ton activité passée d'Apple Santé a été réimportée. Regarde l'onglet Historique."
+          }
+        }
+      }
+    },
     "active": {
       "localizations": {
         "fr": {
           "stringUnit": {
             "state": "translated",
             "value": "actif"
+          }
+        }
+      }
+    },
+    "all-time %@": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "record absolu %@"
+          }
+        }
+      }
+    },
+    "distance": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "distance"
+          }
+        }
+      }
+    },
+    "in %d": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "en %d"
           }
         }
       }
@@ -1501,6 +1881,26 @@
         }
       }
     },
+    "sessions": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "séances"
+          }
+        }
+      }
+    },
+    "set this year 🔥": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "battu cette année 🔥"
+          }
+        }
+      }
+    },
     "today": {
       "localizations": {
         "fr": {
@@ -1511,22 +1911,12 @@
         }
       }
     },
-    "vs previous 4 weeks": {
+    "vs %@ by this time in %d": {
       "localizations": {
         "fr": {
           "stringUnit": {
             "state": "translated",
-            "value": "vs 4 semaines précédentes"
-          }
-        }
-      }
-    },
-    "This week": {
-      "localizations": {
-        "fr": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Cette semaine"
+            "value": "vs %@ à pareille date en %d"
           }
         }
       }
@@ -1541,82 +1931,22 @@
         }
       }
     },
-    "distance": {
+    "vs previous 4 weeks": {
       "localizations": {
         "fr": {
           "stringUnit": {
             "state": "translated",
-            "value": "distance"
+            "value": "vs 4 semaines précédentes"
           }
         }
       }
     },
-    "sessions": {
+    "≈ %@ not driven by car 🌱": {
       "localizations": {
         "fr": {
           "stringUnit": {
             "state": "translated",
-            "value": "séances"
-          }
-        }
-      }
-    },
-    "Best run": {
-      "localizations": {
-        "fr": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Meilleure sortie"
-          }
-        }
-      }
-    },
-    "1 gold day": {
-      "localizations": {
-        "fr": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "1 jour en or"
-          }
-        }
-      }
-    },
-    "%lld gold days": {
-      "localizations": {
-        "fr": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "%lld jours en or"
-          }
-        }
-      }
-    },
-    "History re-imported": {
-      "localizations": {
-        "fr": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Historique réimporté"
-          }
-        }
-      }
-    },
-    "Your past activity from Apple Health has been re-imported. Check the History tab.": {
-      "localizations": {
-        "fr": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Ton activité passée d'Apple Santé a été réimportée. Regarde l'onglet Historique."
-          }
-        }
-      }
-    },
-    "HealthKit diagnostics": {
-      "localizations": {
-        "fr": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Diagnostic HealthKit"
+            "value": "≈ %@ non parcourus en voiture 🌱"
           }
         }
       }

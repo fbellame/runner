@@ -28,8 +28,8 @@ targets:
       path: Runner/Info.plist
       properties:
         CFBundleDisplayName: Runner
-        CFBundleShortVersionString: "1.5"
-        CFBundleVersion: "7"
+        CFBundleShortVersionString: "1.6"
+        CFBundleVersion: "8"
         CFBundleLocalizations: [en, fr]
         CFBundleDevelopmentRegion: en
         UILaunchScreen:
