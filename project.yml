@@ -29,7 +29,7 @@ targets:
       properties:
         CFBundleDisplayName: Runner
         CFBundleShortVersionString: "1.6"
-        CFBundleVersion: "6"
+        CFBundleVersion: "8"
         CFBundleLocalizations: [en, fr]
         CFBundleDevelopmentRegion: en
         UILaunchScreen:
@@ -40,6 +40,7 @@ targets:
         NSLocationWhenInUseUsageDescription: "Runner uses your location to record your route while you run, walk or ride."
         NSLocationTemporaryUsageDescriptionDictionary:
           PreciseWorkout: "Precise location is needed to measure your distance and draw your route while recording a workout."
+        NSMotionUsageDescription: "Runner uses motion activity to notice when you have been walking for a while, so it can record the walk for you."
         UIBackgroundModes: [location]
         ITSAppUsesNonExemptEncryption: false
   RunnerTests:
