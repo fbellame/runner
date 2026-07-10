@@ -31,6 +31,46 @@
         }
       }
     },
+    "%@ %@!": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%1$@ %2$@ !"
+          }
+        }
+      }
+    },
+    "%@ lifetime %@": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%1$@ à vie - %2$@"
+          }
+        }
+      }
+    },
+    "%@ to %@ lifetime %@": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%1$@ avant %2$@ %3$@ à vie"
+          }
+        }
+      }
+    },
+    "%d of %d earned": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%1$d sur %2$d obtenus"
+          }
+        }
+      }
+    },
     "%d sessions (vs %d) · %@ (vs %@)": {
       "localizations": {
         "fr": {
@@ -77,6 +117,26 @@
           "stringUnit": {
             "state": "translated",
             "value": "%lld jours en or"
+          }
+        }
+      }
+    },
+    "%lld km": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%lld km"
+          }
+        }
+      }
+    },
+    "%lld %@ to %lld lifetime %@": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%1$lld %2$@ avant %3$lld %4$@ à vie"
           }
         }
       }
@@ -521,6 +581,16 @@
         }
       }
     },
+    "Earned %@": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Obtenu le %@"
+          }
+        }
+      }
+    },
     "Distance by week": {
       "localizations": {
         "fr": {
@@ -657,6 +727,16 @@
           "stringUnit": {
             "state": "translated",
             "value": "GO"
+          }
+        }
+      }
+    },
+    "Global": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Global"
           }
         }
       }
@@ -1017,6 +1097,16 @@
           "stringUnit": {
             "state": "translated",
             "value": "Split négatif"
+          }
+        }
+      }
+    },
+    "New achievements": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Nouveaux accomplissements"
           }
         }
       }
@@ -1631,6 +1721,16 @@
         }
       }
     },
+    "Trophy Room": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Salle des trophées"
+          }
+        }
+      }
+    },
     "Today": {
       "localizations": {
         "fr": {
@@ -1747,6 +1847,16 @@
           "stringUnit": {
             "state": "translated",
             "value": "Année"
+          }
+        }
+      }
+    },
+    "all activities": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "toutes activités"
           }
         }
       }
@@ -1881,6 +1991,26 @@
         }
       }
     },
+    "rides": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "sorties à vélo"
+          }
+        }
+      }
+    },
+    "runs": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "courses"
+          }
+        }
+      }
+    },
     "sessions": {
       "localizations": {
         "fr": {
@@ -1907,6 +2037,26 @@
           "stringUnit": {
             "state": "translated",
             "value": "aujourd’hui"
+          }
+        }
+      }
+    },
+    "walks": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "marches"
+          }
+        }
+      }
+    },
+    "workouts": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "entraînements"
           }
         }
       }

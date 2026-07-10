@@ -135,6 +135,56 @@ struct TodayView: View {
             Text(String(localized: "Goal: \(model.dailyGoal) pts"))
                 .font(.caption)
                 .foregroundStyle(Color.rTextSecondary)
+            if let milestone = TrophyMath.nextMilestone(workoutSummaries) {
+                nextMilestoneTicker(milestone)
+            }
+        }
+    }
+
+    private var workoutSummaries: [ActivityWorkoutSummary] {
+        workouts.map(ActivityWorkoutSummary.init(workout:))
+    }
+
+    private func nextMilestoneTicker(_ badge: Badge) -> some View {
+        HStack(spacing: 6) {
+            Text("🎯")
+            Text(nextMilestoneText(badge))
+                .lineLimit(1)
+                .minimumScaleFactor(0.8)
+        }
+        .font(.system(size: 13, weight: .semibold))
+        .foregroundStyle(Color.rTeal)
+    }
+
+    private func nextMilestoneText(_ badge: Badge) -> String {
+        let current = badge.threshold * badge.progress
+        switch badge.kind {
+        case .distance:
+            return String(format: String(localized: "%@ to %@ lifetime %@"),
+                          Format.km(max(0, badge.threshold - current) * 1000),
+                          Format.km(badge.threshold * 1000),
+                          lifetimeScopeName(badge.scope))
+        case .count:
+            let remaining = Int(max(0, badge.threshold - current).rounded(.up))
+            return String(format: String(localized: "%lld %@ to %lld lifetime %@"),
+                          Int64(remaining), countUnit(for: badge.scope),
+                          Int64(badge.threshold), countUnit(for: badge.scope))
+        }
+    }
+
+    private func lifetimeScopeName(_ scope: BadgeScope) -> String {
+        switch scope {
+        case .global: String(localized: "all activities")
+        case .perType(let type): type.localizedName
+        }
+    }
+
+    private func countUnit(for scope: BadgeScope) -> String {
+        switch scope {
+        case .global: String(localized: "workouts")
+        case .perType(.run): String(localized: "runs")
+        case .perType(.walk): String(localized: "walks")
+        case .perType(.bike): String(localized: "rides")
         }
     }
 
@@ -410,28 +460,5 @@ struct TodayView: View {
 extension Array {
     subscript(safe index: Int) -> Element? {
         indices.contains(index) ? self[index] : nil
-    }
-}
-
-struct CelebrationBurst: View {
-    @State private var scale: CGFloat = 0.4
-    @State private var opacity: Double = 0.9
-
-    var body: some View {
-        Circle()
-            .fill(RadialGradient(colors: [Color.rLime.opacity(0.5), .clear],
-                                 center: .center,
-                                 startRadius: 10,
-                                 endRadius: 240))
-            .scaleEffect(scale)
-            .opacity(opacity)
-            .allowsHitTesting(false)
-            .onAppear {
-                withAnimation(.easeOut(duration: 1.4)) {
-                    scale = 2.4
-                    opacity = 0
-                }
-                Haptics.goalReached()
-            }
     }
 }
