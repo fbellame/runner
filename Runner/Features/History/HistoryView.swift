@@ -17,6 +17,13 @@ struct HistoryView: View {
         workouts.map(ActivityWorkoutSummary.init(workout:))
     }
 
+    private var goalWeeks: [CompletedWeek] {
+        GoalsMath.completedWeeks(
+            ledgers.map { GoalLedgerDay(date: $0.date, isGold: $0.isGold,
+                                        weeklyTarget: $0.weeklyTargetAtThatTime) },
+            calendar: .current)
+    }
+
     var body: some View {
         NavigationStack {
             content
@@ -56,7 +63,7 @@ struct HistoryView: View {
                 lifetimeTotalsSection(totals)
                 activityTypesSection(totals)
                 recordsSection(summaries: summaries)
-                trophyRoomEntryCard(summaries: summaries)
+                trophyRoomEntryCard(summaries: summaries, goalWeeks: goalWeeks)
                 monthlyWrappedEntryCard(summaries: summaries)
                 workoutsSection
                 Spacer(minLength: 90)
@@ -321,13 +328,14 @@ struct HistoryView: View {
         }
     }
 
-    private func trophyRoomEntryCard(summaries: [ActivityWorkoutSummary]) -> some View {
-        let badges = TrophyMath.allBadges(summaries)
+    private func trophyRoomEntryCard(summaries: [ActivityWorkoutSummary],
+                                     goalWeeks: [CompletedWeek]) -> some View {
+        let badges = TrophyMath.allBadges(summaries) + TrophyMath.weeklyBadges(goalWeeks, calendar: .current)
         let earnedCount = badges.filter(\.earned).count
         let next = TrophyMath.nextMilestone(summaries)
 
         return NavigationLink {
-            TrophyRoomView(summaries: summaries)
+            TrophyRoomView(summaries: summaries, goalWeeks: goalWeeks)
         } label: {
             SurfaceCard {
                 HStack(spacing: 12) {

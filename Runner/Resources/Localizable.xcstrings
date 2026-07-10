@@ -431,6 +431,16 @@
         }
       }
     },
+    "%lld more weeks to %lld-week streak": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Encore %1$lld semaines avant la série de %2$lld semaines"
+          }
+        }
+      }
+    },
     "%lld sessions": {
       "localizations": {
         "fr": {
@@ -457,6 +467,16 @@
           "stringUnit": {
             "state": "translated",
             "value": "%lld entraînements"
+          }
+        }
+      }
+    },
+    "%lld-week streak": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Série de %lld semaines"
           }
         }
       }
@@ -977,6 +997,16 @@
           "stringUnit": {
             "state": "translated",
             "value": "Km le plus rapide"
+          }
+        }
+      }
+    },
+    "First weekly goal": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Premier objectif hebdo"
           }
         }
       }
@@ -2107,6 +2137,16 @@
           "stringUnit": {
             "state": "translated",
             "value": "Semaine"
+          }
+        }
+      }
+    },
+    "Weekly goals": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Objectifs hebdomadaires"
           }
         }
       }

@@ -2,15 +2,25 @@ import SwiftUI
 
 struct TrophyRoomView: View {
     let summaries: [ActivityWorkoutSummary]
+    let goalWeeks: [CompletedWeek]
     private let seenStore = TrophySeenStore()
 
-    private var badges: [Badge] {
+    private var activityBadges: [Badge] {
         TrophyMath.allBadges(summaries)
+    }
+
+    private var weeklyBadges: [Badge] {
+        TrophyMath.weeklyBadges(goalWeeks, calendar: .current)
+    }
+
+    private var badges: [Badge] {
+        activityBadges + weeklyBadges
     }
 
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 22) {
+                weeklyGoalsSection
                 badgeSection(title: String(localized: "Global"), scope: .global, accent: .rLime)
                 badgeSection(title: ActivityType.run.localizedName, scope: .perType(.run),
                              accent: ActivityType.run.accent)
@@ -29,11 +39,24 @@ struct TrophyRoomView: View {
         }
     }
 
+    private var weeklyGoalsSection: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            MicroLabel(text: String(localized: "Weekly goals"))
+            LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 10), count: 3), spacing: 10) {
+                ForEach(weeklyBadges) { badge in
+                    TrophyBadgeCell(badge: badge,
+                                    accent: .rLime,
+                                    isUnseen: badge.earned && !seenStore.isSeen(badge.id))
+                }
+            }
+        }
+    }
+
     private func badgeSection(title: String, scope: BadgeScope, accent: Color) -> some View {
         VStack(alignment: .leading, spacing: 10) {
             MicroLabel(text: title)
             LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 10), count: 3), spacing: 10) {
-                ForEach(badges.filter { $0.scope == scope }) { badge in
+                ForEach(activityBadges.filter { $0.scope == scope }) { badge in
                     TrophyBadgeCell(badge: badge,
                                     accent: accent,
                                     isUnseen: badge.earned && !seenStore.isSeen(badge.id))
