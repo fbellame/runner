@@ -1081,6 +1081,16 @@
         }
       }
     },
+    "Gold days per week": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Jours en or par semaine"
+          }
+        }
+      }
+    },
     "Green impact": {
       "localizations": {
         "fr": {

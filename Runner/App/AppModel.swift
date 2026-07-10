@@ -16,6 +16,10 @@ final class AppModel {
     /// the didSet clamp, and storedGoal() must never disagree.
     static let goalRange = 50...500
 
+    static let weeklyTargetKey = "weeklyGoldTarget"
+    /// Allowed weekly consistency target — gold days per week.
+    static let weeklyTargetRange = 1...7
+
     let store: DataStore
     let health: HealthStoring
     let sync: SyncCoordinator
@@ -48,9 +52,26 @@ final class AppModel {
         }
     }
 
+    var weeklyGoldTarget: Int {
+        didSet {
+            let clamped = min(max(weeklyGoldTarget, Self.weeklyTargetRange.lowerBound), Self.weeklyTargetRange.upperBound)
+            if clamped != weeklyGoldTarget {
+                weeklyGoldTarget = clamped
+                return
+            }
+            UserDefaults.standard.set(weeklyGoldTarget, forKey: Self.weeklyTargetKey)
+            Task { await sync.syncNow() }
+        }
+    }
+
     static func storedGoal() -> Int {
         let raw = UserDefaults.standard.object(forKey: goalKey) as? Int ?? 100
         return min(max(raw, goalRange.lowerBound), goalRange.upperBound)
+    }
+
+    static func storedWeeklyTarget() -> Int {
+        let raw = UserDefaults.standard.object(forKey: weeklyTargetKey) as? Int ?? 3
+        return min(max(raw, weeklyTargetRange.lowerBound), weeklyTargetRange.upperBound)
     }
 
     init(store: DataStore, health: HealthStoring, recorder: WorkoutRecorder, checkpoints: CheckpointStore) {
@@ -59,6 +80,7 @@ final class AppModel {
         self.recorder = recorder
         self.checkpoints = checkpoints
         self.dailyGoal = Self.storedGoal()
+        self.weeklyGoldTarget = Self.storedWeeklyTarget()
         let profile = ProfileStore(store: store, health: health)
         self.profile = profile
         self.sync = SyncCoordinator(health: health, store: store,

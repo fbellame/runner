@@ -28,6 +28,15 @@ struct SettingsView: View {
                                 .bold()
                         }
                     }
+                    Stepper(value: $model.weeklyGoldTarget, in: AppModel.weeklyTargetRange) {
+                        HStack {
+                            Text(String(localized: "Gold days per week"))
+                            Spacer()
+                            Text("\(model.weeklyGoldTarget)")
+                                .foregroundStyle(Color.rLime)
+                                .bold()
+                        }
+                    }
                 }
 
                 Section(String(localized: "Permissions")) {

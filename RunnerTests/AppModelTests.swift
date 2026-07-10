@@ -78,6 +78,22 @@ struct AppModelTests {
         #expect(checkpoints.load() == nil)           // nothing left to resume
     }
 
+    @Test func storedWeeklyTargetDefaultsAndClamps() {
+        let defaults = UserDefaults.standard
+        defaults.removeObject(forKey: AppModel.weeklyTargetKey)
+        #expect(AppModel.storedWeeklyTarget() == 3)
+
+        defaults.set(99, forKey: AppModel.weeklyTargetKey)
+        #expect(AppModel.storedWeeklyTarget() == 7)
+
+        defaults.set(0, forKey: AppModel.weeklyTargetKey)
+        #expect(AppModel.storedWeeklyTarget() == 1)
+
+        defaults.set(5, forKey: AppModel.weeklyTargetKey)
+        #expect(AppModel.storedWeeklyTarget() == 5)
+        defaults.removeObject(forKey: AppModel.weeklyTargetKey)
+    }
+
     @Test func dayChangeNotificationTriggersSync() async throws {
         let (model, health, _) = try makeModel()
         await model.onLaunch()
