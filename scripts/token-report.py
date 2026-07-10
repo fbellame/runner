@@ -139,10 +139,17 @@ def read_json_lines(paths: Iterable[str]) -> Iterable[tuple[str, dict[str, Any]]
             continue
 
 
-def claude_totals(since: str | None, until: str | None) -> dict[str, dict[str, int]]:
+def derive_claude_glob(project_dir: str) -> str:
+    """Derive the Claude Code transcript glob from a project directory path."""
+    abs_path = os.path.abspath(project_dir)
+    encoded_path = abs_path.replace("/", "-")
+    return f"/Users/farid/.claude/projects/{encoded_path}/*.jsonl"
+
+
+def claude_totals(since: str | None, until: str | None, claude_glob: str = CLAUDE_GLOB) -> dict[str, dict[str, int]]:
     """Keep only the final copy of each streamed/retried Claude assistant message."""
     final_messages: dict[tuple[str, str], tuple[str | None, str, dict[str, int]]] = {}
-    paths = sorted(glob.glob(CLAUDE_GLOB))
+    paths = sorted(glob.glob(claude_glob))
     for path, record in read_json_lines(paths):
         message = record.get("message")
         if record.get("type") != "assistant" or not isinstance(message, dict):
@@ -253,8 +260,8 @@ def serialise_groups(groups: dict[str, dict[str, int]]) -> dict[str, dict[str, A
     }
 
 
-def report_data(since: str | None, until: str | None) -> dict[str, Any]:
-    claude = claude_totals(since, until)
+def report_data(since: str | None, until: str | None, claude_glob: str = CLAUDE_GLOB) -> dict[str, Any]:
+    claude = claude_totals(since, until, claude_glob)
     codex = codex_totals(since, until)
     claude_total = all_totals(claude)
     codex_total = all_totals(codex)
@@ -336,10 +343,12 @@ def main() -> int:
     parser.add_argument("--since", type=parse_day, help="inclusive start date (YYYY-MM-DD); default: all")
     parser.add_argument("--until", type=parse_day, help="inclusive end date (YYYY-MM-DD)")
     parser.add_argument("--json", action="store_true", help="write a machine-readable JSON report")
+    parser.add_argument("--project-dir", default=os.getcwd(), help="project directory (default: current working directory)")
     args = parser.parse_args()
     if args.since and args.until and args.since > args.until:
         parser.error("--since must not be after --until")
-    data = report_data(args.since, args.until)
+    claude_glob = derive_claude_glob(args.project_dir)
+    data = report_data(args.since, args.until, claude_glob)
     if args.json:
         json.dump(data, sys.stdout, indent=2, sort_keys=True)
         print()
