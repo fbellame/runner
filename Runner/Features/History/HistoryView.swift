@@ -56,7 +56,7 @@ struct HistoryView: View {
                 lifetimeTotalsSection(totals)
                 activityTypesSection(totals)
                 recordsSection(summaries: summaries)
-                milestonesSection(totals)
+                trophyRoomEntryCard(summaries: summaries)
                 workoutsSection
                 Spacer(minLength: 90)
             }
@@ -320,57 +320,48 @@ struct HistoryView: View {
         }
     }
 
-    private func milestonesSection(_ totals: LifetimeTotals) -> some View {
-        VStack(alignment: .leading, spacing: 8) {
-            MicroLabel(text: String(localized: "Milestones"))
-            ScrollView(.horizontal, showsIndicators: false) {
-                HStack(spacing: 8) {
-                    ForEach(Array(ActivityStats.milestones(totals).enumerated()), id: \.offset) { _, milestone in
-                        milestoneChip(milestone)
+    private func trophyRoomEntryCard(summaries: [ActivityWorkoutSummary]) -> some View {
+        let badges = TrophyMath.allBadges(summaries)
+        let earnedCount = badges.filter(\.earned).count
+        let next = TrophyMath.nextMilestone(summaries)
+
+        return NavigationLink {
+            TrophyRoomView(summaries: summaries)
+        } label: {
+            SurfaceCard {
+                HStack(spacing: 12) {
+                    Text("🏆")
+                        .font(.system(size: 27))
+                        .frame(width: 42, height: 42)
+                        .background(RoundedRectangle(cornerRadius: 12).fill(Color.rLime.opacity(0.14)))
+                    VStack(alignment: .leading, spacing: 3) {
+                        Text(String(localized: "Trophy Room"))
+                            .font(.system(size: 17, weight: .bold, design: .rounded))
+                            .foregroundStyle(.white)
+                        Text(String(format: String(localized: "%d of %d earned"), earnedCount, badges.count))
+                            .font(.system(size: 13, weight: .semibold))
+                            .foregroundStyle(Color.rTextSecondary)
+                        if let next {
+                            Text(nextBadgeText(next))
+                                .font(.system(size: 12, weight: .semibold))
+                                .foregroundStyle(Color.rTeal)
+                                .lineLimit(1)
+                        }
                     }
+                    Spacer()
+                    Image(systemName: "chevron.right")
+                        .font(.system(size: 13, weight: .bold))
+                        .foregroundStyle(Color.rLime)
                 }
             }
         }
+        .buttonStyle(.plain)
     }
 
-    private func milestoneChip(_ milestone: Milestone) -> some View {
-        VStack(alignment: .leading, spacing: 6) {
-            HStack(spacing: 6) {
-                Text(milestone.earned ? "✓" : "•")
-                    .font(.system(size: 12, weight: .black, design: .rounded))
-                Text(milestoneTitle(milestone))
-                    .font(.system(size: 12, weight: .bold, design: .rounded))
-                    .lineLimit(1)
-            }
-            if !milestone.earned && milestone.progress > 0 {
-                GeometryReader { geo in
-                    ZStack(alignment: .leading) {
-                        Capsule().fill(Color.rBorder)
-                        Capsule()
-                            .fill(Color.rLime)
-                            .frame(width: geo.size.width * milestone.progress)
-                    }
-                }
-                .frame(height: 4)
-            }
-        }
-        .foregroundStyle(milestone.earned ? Color.rLime : .white)
-        .frame(width: 112, height: 48, alignment: .leading)
-        .padding(.horizontal, 12)
-        .padding(.vertical, 8)
-        .background(Capsule().fill(Color.rSurface))
-        .overlay(Capsule().stroke(milestone.earned ? Color.rLime : Color.rBorder,
-                                  lineWidth: 1))
-        .shadow(color: milestone.earned ? Color.rLime.opacity(0.35) : .clear,
-                radius: milestone.earned ? 8 : 0)
-    }
-
-    private func milestoneTitle(_ milestone: Milestone) -> String {
-        switch milestone.kind {
-        case .totalDistance:
-            "\(Int(milestone.threshold)) km"
-        case .workoutCount:
-            String(localized: "\(Int(milestone.threshold)) workouts")
+    private func nextBadgeText(_ badge: Badge) -> String {
+        switch badge.kind {
+        case .distance: String(format: String(localized: "%lld km"), Int64(badge.threshold))
+        case .count: String(format: String(localized: "%lld workouts"), Int64(badge.threshold))
         }
     }
 

@@ -53,7 +53,7 @@ struct LifetimeTotals {
     let perType: [ActivityType: (distanceMeters: Double, workouts: Int)]
 }
 
-struct PersonalRecord {
+struct PersonalRecord: Equatable, Sendable {
     let kind: RecordKind
     let value: Double
     let distanceEstimated: Bool
@@ -70,7 +70,7 @@ struct PersonalRecord {
     }
 }
 
-enum RecordKind: CaseIterable {
+enum RecordKind: CaseIterable, Equatable, Sendable {
     case longestDistance
     case fastestOneKilometer
     case fastestFiveKilometers

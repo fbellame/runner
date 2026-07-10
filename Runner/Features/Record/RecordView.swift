@@ -1,4 +1,5 @@
 import SwiftUI
+import SwiftData
 import MapKit
 import UIKit
 
@@ -12,9 +13,28 @@ struct RecordView: View {
     @State private var finished: RecordedWorkout?
     @State private var saveFailedMessage: String?
     @State private var isSaving = false
+    @Query(sort: \WorkoutRec.start, order: .reverse) private var workouts: [WorkoutRec]
 
     private var recorder: WorkoutRecorder { model.recorder }
     private var isActive: Bool { recorder.state != .idle }
+
+    private var workoutSummaries: [ActivityWorkoutSummary] {
+        workouts.map(ActivityWorkoutSummary.init(workout:))
+    }
+
+    private func candidate(from workout: RecordedWorkout) -> ActivityWorkoutSummary {
+        ActivityWorkoutSummary(id: UUID(),
+                               type: workout.type,
+                               date: workout.start,
+                               distanceMeters: workout.distanceMeters,
+                               distanceEstimated: workout.distanceEstimated,
+                               movingSeconds: workout.movingSeconds,
+                               points: PointsEngine.workoutPoints(type: workout.type,
+                                                                  distanceMeters: workout.distanceMeters),
+                               calories: 0,
+                               splitSeconds: workout.splitSeconds,
+                               hasRoute: !workout.route.isEmpty)
+    }
 
     var body: some View {
         ZStack(alignment: .bottom) {
@@ -47,6 +67,8 @@ struct RecordView: View {
         }
         .sheet(item: $finished) { workout in
             WorkoutSummaryView(workout: workout,
+                               achievements: TrophyMath.achievements(history: workoutSummaries,
+                                                                     candidate: candidate(from: workout)),
                                isSaving: isSaving,
                                onSave: { Task { await save(workout) } },
                                onDiscard: {
