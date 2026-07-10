@@ -8,9 +8,11 @@ struct TodayView: View {
     @Query(sort: \DayLedger.date, order: .reverse) private var ledgers: [DayLedger]
     @Query(sort: \WorkoutRec.start, order: .reverse) private var workouts: [WorkoutRec]
     @State private var celebrate = false
+    @State private var selectedWrapped: MonthWrapped?
     // Decoded once when today's workouts change, not twice per body pass.
     @State private var latestRoute: [RoutePoint] = []
     @State private var trendMode = 0   // 0 = points, 1 = calories
+    private let wrappedSeenStore = WrappedSeenStore()
 
     private var today: DayLedger? {
         ledgers.first { Calendar.current.isDateInToday($0.date) }
@@ -46,6 +48,7 @@ struct TodayView: View {
                     addWeightCard
                 }
                 weeklyRecapCard
+                wrappedBanner
                 trendCard
                 if !latestRoute.isEmpty {
                     miniMap
@@ -76,6 +79,9 @@ struct TodayView: View {
             .padding(.top, 8)
         }
         .background(Color.rBackground)
+        .fullScreenCover(item: $selectedWrapped) { wrapped in
+            WrappedStoryView(wrapped: wrapped)
+        }
         .onAppear(perform: rebuildLatestRoute)
         .onChange(of: workouts.map(\.id)) { _, _ in rebuildLatestRoute() }
         .overlay {
@@ -143,6 +149,61 @@ struct TodayView: View {
 
     private var workoutSummaries: [ActivityWorkoutSummary] {
         workouts.map(ActivityWorkoutSummary.init(workout:))
+    }
+
+    private var latestClosedWrapped: MonthWrapped? {
+        guard let month = WrappedMath.availableMonths(workoutSummaries,
+                                                      asOf: .now,
+                                                      calendar: .current).first else {
+            return nil
+        }
+        return WrappedMath.monthWrapped(workoutSummaries, month: month, calendar: .current)
+    }
+
+    @ViewBuilder
+    private var wrappedBanner: some View {
+        if let wrapped = latestClosedWrapped, !wrappedSeenStore.isSeen(wrapped.month) {
+            HStack(spacing: 10) {
+                Button {
+                    wrappedSeenStore.markSeen(wrapped.month)
+                    selectedWrapped = wrapped
+                } label: {
+                    HStack(spacing: 10) {
+                        Text("✨")
+                            .font(.system(size: 23))
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text(String(format: String(localized: "Your %@ Wrapped is ready"),
+                                        wrapped.month.startDate(calendar: .current)
+                                            .formatted(.dateTime.month(.wide))))
+                                .font(.system(size: 15, weight: .bold, design: .rounded))
+                                .foregroundStyle(.white)
+                            Text(String(localized: "Tap to relive your month"))
+                                .font(.system(size: 12, weight: .semibold))
+                                .foregroundStyle(Color.rTextSecondary)
+                        }
+                        Spacer()
+                        Image(systemName: "chevron.right")
+                            .font(.system(size: 12, weight: .bold))
+                            .foregroundStyle(Color.rLime)
+                    }
+                }
+                .buttonStyle(.plain)
+
+                Button {
+                    wrappedSeenStore.markSeen(wrapped.month)
+                } label: {
+                    Image(systemName: "xmark")
+                        .font(.system(size: 11, weight: .bold))
+                        .foregroundStyle(Color.rTextSecondary)
+                        .frame(width: 28, height: 28)
+                        .background(Circle().fill(Color.white.opacity(0.06)))
+                }
+                .accessibilityLabel(String(localized: "Dismiss"))
+            }
+            .padding(14)
+            .background(RoundedRectangle(cornerRadius: 16).fill(Color.rSurface))
+            .overlay(RoundedRectangle(cornerRadius: 16).stroke(Color.rPurple.opacity(0.7), lineWidth: 1))
+        }
     }
 
     private func nextMilestoneTicker(_ badge: Badge) -> some View {

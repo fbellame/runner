@@ -57,6 +57,7 @@ struct HistoryView: View {
                 activityTypesSection(totals)
                 recordsSection(summaries: summaries)
                 trophyRoomEntryCard(summaries: summaries)
+                monthlyWrappedEntryCard(summaries: summaries)
                 workoutsSection
                 Spacer(minLength: 90)
             }
@@ -363,6 +364,34 @@ struct HistoryView: View {
         case .distance: String(format: String(localized: "%lld km"), Int64(badge.threshold))
         case .count: String(format: String(localized: "%lld workouts"), Int64(badge.threshold))
         }
+    }
+
+    private func monthlyWrappedEntryCard(summaries: [ActivityWorkoutSummary]) -> some View {
+        NavigationLink {
+            WrappedArchiveView(summaries: summaries)
+        } label: {
+            SurfaceCard {
+                HStack(spacing: 12) {
+                    Text("✨")
+                        .font(.system(size: 27))
+                        .frame(width: 42, height: 42)
+                        .background(RoundedRectangle(cornerRadius: 12).fill(Color.rPurple.opacity(0.16)))
+                    VStack(alignment: .leading, spacing: 3) {
+                        Text(String(localized: "Monthly Wrapped"))
+                            .font(.system(size: 17, weight: .bold, design: .rounded))
+                            .foregroundStyle(.white)
+                        Text(String(localized: "Your monthly stories"))
+                            .font(.system(size: 13, weight: .semibold))
+                            .foregroundStyle(Color.rTextSecondary)
+                    }
+                    Spacer()
+                    Image(systemName: "chevron.right")
+                        .font(.system(size: 13, weight: .bold))
+                        .foregroundStyle(Color.rLime)
+                }
+            }
+        }
+        .buttonStyle(.plain)
     }
 
     private var workoutsSection: some View {

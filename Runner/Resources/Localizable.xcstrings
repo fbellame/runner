@@ -1,6 +1,296 @@
 {
   "sourceLanguage": "en",
   "strings": {
+    "%lld new badges": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%lld nouveaux badges"
+          }
+        }
+      }
+    },
+    "%lld new personal records": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%lld nouveaux records personnels"
+          }
+        }
+      }
+    },
+    "%lld workouts across %lld active days": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%1$lld séances sur %2$lld jours actifs"
+          }
+        }
+      }
+    },
+    "Active days": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Jours actifs"
+          }
+        }
+      }
+    },
+    "Active time": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Temps actif"
+          }
+        }
+      }
+    },
+    "Badges unlocked": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Badges débloqués"
+          }
+        }
+      }
+    },
+    "Best average pace": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Meilleure allure moyenne"
+          }
+        }
+      }
+    },
+    "Best streak": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Meilleure série"
+          }
+        }
+      }
+    },
+    "Close": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Fermer"
+          }
+        }
+      }
+    },
+    "Consistency": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Régularité"
+          }
+        }
+      }
+    },
+    "Day by day": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Jour après jour"
+          }
+        }
+      }
+    },
+    "Dismiss": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ignorer"
+          }
+        }
+      }
+    },
+    "Fastest 1 km": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "1 km le plus rapide"
+          }
+        }
+      }
+    },
+    "Fastest 5 km": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "5 km les plus rapides"
+          }
+        }
+      }
+    },
+    "Highlights": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Temps forts"
+          }
+        }
+      }
+    },
+    "Impact": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Impact"
+          }
+        }
+      }
+    },
+    "Longest distance": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Plus longue distance"
+          }
+        }
+      }
+    },
+    "Monthly Wrapped": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Bilan mensuel"
+          }
+        }
+      }
+    },
+    "Tap to relive your month": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Touchez pour revivre votre mois"
+          }
+        }
+      }
+    },
+    "That was your month": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Votre mois en bref"
+          }
+        }
+      }
+    },
+    "View your Wrapped": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Voir votre bilan"
+          }
+        }
+      }
+    },
+    "vs last month": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "vs le mois dernier"
+          }
+        }
+      }
+    },
+    "Wrapped": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "BILAN"
+          }
+        }
+      }
+    },
+    "Your %@ Wrapped is ready": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Votre bilan de %@ est prêt"
+          }
+        }
+      }
+    },
+    "Your month": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Votre mois"
+          }
+        }
+      }
+    },
+    "Your month in motion": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Votre mois en mouvement"
+          }
+        }
+      }
+    },
+    "Your monthly stories": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Vos histoires mensuelles"
+          }
+        }
+      }
+    },
+    "Your monthly stories will appear here after your first complete month.": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Vos histoires mensuelles apparaîtront ici après votre premier mois complet."
+          }
+        }
+      }
+    },
+    "Your longest efforts": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Vos efforts les plus longs"
+          }
+        }
+      }
+    },
     "%@ h": {
       "localizations": {
         "fr": {
