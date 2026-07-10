@@ -29,7 +29,7 @@ enum WeeklyRecapMath {
                       workouts: [ActivityWorkoutSummary],
                       now: Date,
                       calendar: Calendar) -> WeeklyRecap {
-        let currentStart = mondayStart(for: now, calendar: calendar)
+        let currentStart = WeekMath.mondayStart(for: now, calendar: calendar)
         let today0 = calendar.startOfDay(for: now)
         let previousStart = calendar.date(byAdding: .day, value: -7, to: currentStart)!
         let previousToday0 = calendar.date(byAdding: .day, value: -7, to: today0)!
@@ -85,12 +85,5 @@ enum WeeklyRecapMath {
                            sessions: sessions,
                            goldDays: goldDays,
                            bestRun: bestRun)
-    }
-
-    private static func mondayStart(for date: Date, calendar: Calendar) -> Date {
-        let day = calendar.startOfDay(for: date)
-        let weekday = calendar.component(.weekday, from: day)
-        let daysSinceMonday = (weekday + 5) % 7
-        return calendar.date(byAdding: .day, value: -daysSinceMonday, to: day)!
     }
 }

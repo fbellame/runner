@@ -14,9 +14,7 @@ enum HistoryMath {
             (calendar.startOfDay(for: $0.date), $0)
         })
 
-        let weekday = calendar.component(.weekday, from: todayStart)
-        let daysSinceMonday = (weekday + 5) % 7
-        let currentMonday = calendar.date(byAdding: .day, value: -daysSinceMonday, to: todayStart)!
+        let currentMonday = WeekMath.mondayStart(for: todayStart, calendar: calendar)
         let firstMonday = calendar.date(byAdding: .day,
                                         value: -7 * (weekCount - 1),
                                         to: currentMonday)!

@@ -68,7 +68,7 @@ enum InsightsMath {
                              calendar: Calendar) -> [WeeklyInsightPoint] {
         guard weeks > 0 else { return [] }
 
-        let endWeekStart = mondayStart(for: endingAt, calendar: calendar)
+        let endWeekStart = WeekMath.mondayStart(for: endingAt, calendar: calendar)
         let firstWeekStart = calendar.date(byAdding: .weekOfYear,
                                            value: -(weeks - 1),
                                            to: endWeekStart)!
@@ -82,7 +82,7 @@ enum InsightsMath {
         })
 
         for summary in summaries where summary.type == type {
-            let weekStart = mondayStart(for: summary.date, calendar: calendar)
+            let weekStart = WeekMath.mondayStart(for: summary.date, calendar: calendar)
             guard validWeekStarts.contains(weekStart) else { continue }
 
             buckets[weekStart, default: WeekBucket()].distanceMeters += summary.distanceMeters
@@ -192,7 +192,7 @@ enum InsightsMath {
     private static func periodRanges(weeksPerPeriod: Int, endingAt: Date,
                                      calendar: Calendar)
     -> (current: (start: Date, end: Date), previous: (start: Date, end: Date)) {
-        let endWeekStart = mondayStart(for: endingAt, calendar: calendar)
+        let endWeekStart = WeekMath.mondayStart(for: endingAt, calendar: calendar)
         let currentStart = calendar.date(byAdding: .weekOfYear,
                                          value: -(weeksPerPeriod - 1),
                                          to: endWeekStart)!
@@ -232,13 +232,6 @@ enum InsightsMath {
 
         let movingSeconds = paced.reduce(0) { $0 + $1.movingSeconds }
         return movingSeconds / (distanceMeters / 1000.0)
-    }
-
-    private static func mondayStart(for date: Date, calendar: Calendar) -> Date {
-        let day = calendar.startOfDay(for: date)
-        let weekday = calendar.component(.weekday, from: day)
-        let daysSinceMonday = (weekday + 5) % 7
-        return calendar.date(byAdding: .day, value: -daysSinceMonday, to: day)!
     }
 
     private struct WeekBucket {

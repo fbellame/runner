@@ -106,7 +106,7 @@ enum ActivityStats {
 
         var weeklyMeters: [Date: Double] = [:]
         for summary in scoped {
-            let start = mondayStart(for: summary.date, calendar: calendar)
+            let start = WeekMath.mondayStart(for: summary.date, calendar: calendar)
             weeklyMeters[start, default: 0] += summary.distanceMeters
         }
 
@@ -246,10 +246,4 @@ enum ActivityStats {
         }
     }
 
-    private static func mondayStart(for date: Date, calendar: Calendar) -> Date {
-        let day = calendar.startOfDay(for: date)
-        let weekday = calendar.component(.weekday, from: day)
-        let daysSinceMonday = (weekday + 5) % 7
-        return calendar.date(byAdding: .day, value: -daysSinceMonday, to: day)!
-    }
 }
