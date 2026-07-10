@@ -62,7 +62,8 @@ final class DataStore {
                                          totalPoints: day.breakdown.total,
                                          goalAtThatTime: day.goal,
                                          isGold: day.isGold,
-                                         streakAfter: day.streakAfter)
+                                         streakAfter: day.streakAfter,
+                                         weeklyTargetAtThatTime: day.weeklyTarget)
                 context.insert(inserted)
                 byDay[key] = inserted // dedupe repeated keys within the same batch
                 row = inserted
@@ -194,6 +195,24 @@ final class DataStore {
             let day = Calendar.current.startOfDay(for: date)
             guard day < todayStart else { return currentGoal } // today forward: live goal
             return stored[day] ?? currentGoal
+        }
+    }
+
+    func weeklyTargetProvider(currentTarget: Int, from: Date? = nil) -> (Date) -> Int {
+        // Mirrors goalProvider: past days return their frozen snapshot,
+        // today and forward return the live target.
+        let rows: [DayLedger]
+        if let from {
+            rows = (try? ledgers(from: from, through: .now)) ?? []
+        } else {
+            rows = (try? context.fetch(FetchDescriptor<DayLedger>())) ?? []
+        }
+        let stored = Dictionary(uniqueKeysWithValues: rows.map { ($0.date, $0.weeklyTargetAtThatTime) })
+        let todayStart = Calendar.current.startOfDay(for: .now)
+        return { date in
+            let day = Calendar.current.startOfDay(for: date)
+            guard day < todayStart else { return currentTarget }
+            return stored[day] ?? currentTarget
         }
     }
 }

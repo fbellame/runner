@@ -85,6 +85,7 @@ final class AppModel {
         self.profile = profile
         self.sync = SyncCoordinator(health: health, store: store,
                                     currentGoal: { Self.storedGoal() },
+                                    currentWeeklyTarget: { Self.storedWeeklyTarget() },
                                     metricsProvider: { profile.currentMetrics() })
     }
 

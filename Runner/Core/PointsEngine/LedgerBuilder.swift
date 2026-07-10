@@ -11,6 +11,7 @@ struct LedgerDay: Equatable, Sendable {
     let steps: Int
     let breakdown: PointsBreakdown
     let goal: Int
+    let weeklyTarget: Int
     let isGold: Bool
     let streakAfter: Int
 }
@@ -18,6 +19,7 @@ struct LedgerDay: Equatable, Sendable {
 enum LedgerBuilder {
     static func build(days: [DayActivity],
                       goalProvider: (Date) -> Int,
+                      weeklyTargetProvider: (Date) -> Int,
                       initialStreak: Int) -> [LedgerDay] {
         var streak = initialStreak
         var out: [LedgerDay] = []
@@ -30,7 +32,8 @@ enum LedgerBuilder {
             let isGold = breakdown.total >= goal
             streak = isGold ? streak + 1 : 0
             out.append(LedgerDay(date: day.date, steps: day.steps, breakdown: breakdown,
-                                 goal: goal, isGold: isGold, streakAfter: streak))
+                                 goal: goal, weeklyTarget: weeklyTargetProvider(day.date),
+                                 isGold: isGold, streakAfter: streak))
         }
         return out
     }

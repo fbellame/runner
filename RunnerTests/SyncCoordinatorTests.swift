@@ -25,6 +25,7 @@ struct SyncCoordinatorTests {
         let store = try DataStore(inMemory: true)
         let defaults = defaults ?? freshDefaults()
         let sync = SyncCoordinator(health: health, store: store, currentGoal: { goal },
+                                   currentWeeklyTarget: { 3 },
                                    metricsProvider: { metrics }, defaults: defaults)
         return (sync, health, store)
     }
@@ -282,7 +283,7 @@ struct SyncCoordinatorTests {
         try store.upsert([LedgerDay(date: day(-1), steps: 8_000,
                                     breakdown: PointsBreakdown(stepPoints: 80, workoutPoints: 0,
                                                                multiplier: 1.0, total: 80),
-                                    goal: 70, isGold: true, streakAfter: 1)])
+                                    goal: 70, weeklyTarget: 3, isGold: true, streakAfter: 1)])
         health.stepsByDay = [day(-1): 8_000, day(0): 8_000]
         await sync.syncNow()
         let yesterday = try store.ledger(on: day(-1))
