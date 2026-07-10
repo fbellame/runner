@@ -28,3 +28,4 @@ Runner.xcodeproj/
 
 # XcodeGen-generated project (regenerate with `xcodegen generate`)
 Runner.xcodeproj/
+__pycache__/
