@@ -3,6 +3,8 @@ import Foundation
 enum BadgeKind: String, Sendable {
     case distance
     case count
+    case weeklyGoal
+    case weeklyStreak
 }
 
 enum BadgeScope: Hashable, Sendable {
@@ -167,6 +169,62 @@ enum TrophyMath {
             }
     }
 
+    private static let weeklyStreakThresholds = [4.0, 12]
+
+    /// Weekly consistency badges, derived from GoalsMath.completedWeeks over all
+    /// history — past qualifying weeks mint retroactively, like the Trophy Room backfill.
+    static func weeklyBadges(_ weeks: [CompletedWeek], calendar: Calendar) -> [Badge] {
+        let sorted = weeks.sorted { $0.weekStart < $1.weekStart }
+
+        var longest = 0
+        var run = 0
+        var previous: Date?
+        var streakEarnedAt: [Double: Date] = [:]
+        for week in sorted {
+            if let previous, calendar.date(byAdding: .day, value: 7, to: previous) == week.weekStart {
+                run += 1
+            } else {
+                run = 1
+            }
+            previous = week.weekStart
+            longest = max(longest, run)
+            for threshold in weeklyStreakThresholds
+            where run == Int(threshold) && streakEarnedAt[threshold] == nil {
+                streakEarnedAt[threshold] = week.completedOn
+            }
+        }
+
+        let firstID = badgeID(kind: .weeklyGoal, scope: .global, threshold: 1)
+        var badges = [Badge(id: firstID,
+                            kind: .weeklyGoal,
+                            scope: .global,
+                            threshold: 1,
+                            earned: !sorted.isEmpty,
+                            progress: sorted.isEmpty ? 0 : 1,
+                            earnedAt: sorted.first?.completedOn)]
+
+        let nextUnearned = weeklyStreakThresholds.first { Double(longest) < $0 }
+        badges += weeklyStreakThresholds.map { threshold in
+            let earned = Double(longest) >= threshold
+            let progress: Double
+            if earned {
+                progress = 1
+            } else if threshold == nextUnearned {
+                progress = min(max(Double(longest) / threshold, 0), 1)
+            } else {
+                progress = 0
+            }
+            return Badge(id: badgeID(kind: .weeklyStreak, scope: .global, threshold: threshold),
+                         kind: .weeklyStreak,
+                         scope: .global,
+                         threshold: threshold,
+                         earned: earned,
+                         progress: progress,
+                         earnedAt: streakEarnedAt[threshold])
+        }
+        return badges
+    }
+
     private static var allLadders: [Ladder] {
         [
             Ladder(kind: .distance, scope: .global, thresholds: distanceThresholds),
@@ -192,6 +250,7 @@ enum TrophyMath {
         switch kind {
         case .distance: totals.distance
         case .count: totals.count
+        case .weeklyGoal, .weeklyStreak: fatalError("weekly badges computed separately from completedWeeks")
         }
     }
 

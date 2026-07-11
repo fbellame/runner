@@ -26,6 +26,15 @@ struct TodayView: View {
         ledgers.first { !Calendar.current.isDateInToday($0.date) }?.streakAfter ?? 0
     }
 
+    private var weeklyStatus: WeeklyGoalStatus {
+        GoalsMath.currentWeek(
+            ledgers.map { GoalLedgerDay(date: $0.date, isGold: $0.isGold,
+                                        weeklyTarget: $0.weeklyTargetAtThatTime) },
+            currentTarget: model.weeklyGoldTarget,
+            asOf: .now,
+            calendar: .current)
+    }
+
     private func rebuildLatestRoute() {
         guard let data = todayWorkouts.first(where: { $0.routeData != nil })?.routeData else {
             latestRoute = []
@@ -48,6 +57,7 @@ struct TodayView: View {
                     addWeightCard
                 }
                 weeklyRecapCard
+                distanceGoalsRollup
                 wrappedBanner
                 trendCard
                 if !latestRoute.isEmpty {
@@ -98,6 +108,15 @@ struct TodayView: View {
                 }
             }
         }
+        .onChange(of: weeklyStatus.isMet) { was, isNow in
+            if !was && isNow && !celebrate {
+                celebrate = true
+                Task {
+                    try? await Task.sleep(for: .seconds(1.6))
+                    celebrate = false
+                }
+            }
+        }
         .refreshable {
             await model.sync.syncNow()
         }
@@ -141,6 +160,7 @@ struct TodayView: View {
             Text(String(localized: "Goal: \(model.dailyGoal) pts"))
                 .font(.caption)
                 .foregroundStyle(Color.rTextSecondary)
+            WeeklyGoalRow(status: weeklyStatus)
             if let milestone = TrophyMath.nextMilestone(workoutSummaries) {
                 nextMilestoneTicker(milestone)
             }
@@ -149,6 +169,29 @@ struct TodayView: View {
 
     private var workoutSummaries: [ActivityWorkoutSummary] {
         workouts.map(ActivityWorkoutSummary.init(workout:))
+    }
+
+    private var weeklyDistanceProgress: [ActivityDistanceGoalProgress] {
+        GoalsMath.currentWeekDistance(workoutSummaries,
+                                      goals: model.weeklyDistanceGoals,
+                                      asOf: .now,
+                                      calendar: .current)
+    }
+
+    @ViewBuilder
+    private var distanceGoalsRollup: some View {
+        if !weeklyDistanceProgress.isEmpty {
+            SurfaceCard {
+                VStack(alignment: .leading, spacing: 12) {
+                    MicroLabel(text: String(localized: "Weekly distance goals"))
+                    HStack(alignment: .top, spacing: 10) {
+                        ForEach(weeklyDistanceProgress, id: \.type) { progress in
+                            WeeklyDistanceGoalMiniRing(progress: progress)
+                        }
+                    }
+                }
+            }
+        }
     }
 
     private var latestClosedWrapped: MonthWrapped? {
@@ -230,6 +273,12 @@ struct TodayView: View {
             return String(format: String(localized: "%lld %@ to %lld lifetime %@"),
                           Int64(remaining), countUnit(for: badge.scope),
                           Int64(badge.threshold), countUnit(for: badge.scope))
+        case .weeklyGoal:
+            return String(localized: "First weekly goal")
+        case .weeklyStreak:
+            let remaining = Int(max(0, badge.threshold - current).rounded(.up))
+            return String(format: String(localized: "%lld more weeks to %lld-week streak"),
+                          Int64(remaining), Int64(badge.threshold))
         }
     }
 

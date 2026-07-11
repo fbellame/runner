@@ -6,13 +6,15 @@ import Foundation
 struct DataStoreTests {
     private func makeStore() throws -> DataStore { try DataStore(inMemory: true) }
 
-    private func ledgerDay(_ offset: Int, total: Int, goal: Int = 100) -> LedgerDay {
+    private func ledgerDay(_ offset: Int, total: Int, goal: Int = 100,
+                           weeklyTarget: Int = 3) -> LedgerDay {
         let cal = Calendar.current
         let date = cal.date(byAdding: .day, value: offset, to: cal.startOfDay(for: .now))!
         return LedgerDay(date: date, steps: total * 100,
                          breakdown: PointsBreakdown(stepPoints: total, workoutPoints: 0,
                                                     multiplier: 1.0, total: total),
-                         goal: goal, isGold: total >= goal, streakAfter: total >= goal ? 1 : 0)
+                         goal: goal, weeklyTarget: weeklyTarget,
+                         isGold: total >= goal, streakAfter: total >= goal ? 1 : 0)
     }
 
     @Test func upsertIsIdempotentPerDay() throws {
@@ -45,6 +47,28 @@ struct DataStoreTests {
         #expect(provider(cal.startOfDay(for: .now)) == 150)
     }
 
+    @Test func weeklyTargetProviderUsesStoredTargetForPastDaysOnly() throws {
+        let store = try makeStore()
+        try store.upsert([ledgerDay(-1, total: 80, weeklyTarget: 2),
+                          ledgerDay(0, total: 90, weeklyTarget: 2)])
+        let provider = store.weeklyTargetProvider(currentTarget: 5)
+        let cal = Calendar.current
+        // Past day: frozen snapshot.
+        #expect(provider(cal.date(byAdding: .day, value: -1, to: cal.startOfDay(for: .now))!) == 2)
+        // Today has a stored ledger, but a target edit must apply to today forward:
+        #expect(provider(cal.startOfDay(for: .now)) == 5)
+        // Unledgered past day falls back to the current target.
+        #expect(provider(cal.date(byAdding: .day, value: -30, to: cal.startOfDay(for: .now))!) == 5)
+    }
+
+    @Test func dayLedgerDefaultsWeeklyTargetTo3() {
+        // Guards the inline default that makes the SwiftData column lightweight-migratable.
+        let row = DayLedger(date: .now, steps: 0, stepPoints: 0, workoutPoints: 0,
+                            multiplier: 1, totalPoints: 0, goalAtThatTime: 100,
+                            isGold: false, streakAfter: 0)
+        #expect(row.weeklyTargetAtThatTime == 3)
+    }
+
     @Test func workoutUpsertAndPendingSync() throws {
         let store = try makeStore()
         let id = UUID()
@@ -73,7 +97,7 @@ struct DataStoreTests {
         let day = LedgerDay(date: noon, steps: 6_000,
                             breakdown: PointsBreakdown(stepPoints: 60, workoutPoints: 0,
                                                        multiplier: 1.0, total: 60),
-                            goal: 100, isGold: false, streakAfter: 0)
+                            goal: 100, weeklyTarget: 3, isGold: false, streakAfter: 0)
         try store.upsert([day])
         #expect(try store.ledger(on: .now)?.totalPoints == 60)   // found via startOfDay key
         try store.upsert([ledgerDay(0, total: 90)])              // same calendar day, midnight date
@@ -109,7 +133,7 @@ struct DataStoreTests {
         let date = Calendar.current.startOfDay(for: .now)
         let day = LedgerDay(date: date, steps: 5000,
                             breakdown: PointsEngine.breakdown(steps: 5000, workouts: [], streakBefore: 0),
-                            goal: 100, isGold: false, streakAfter: 0)
+                            goal: 100, weeklyTarget: 3, isGold: false, streakAfter: 0)
         try store.upsert([day], derived: [date: DayDerived(activeCalories: 210, distanceMeters: 4200, activeSeconds: 1800)])
         let row = try store.ledger(on: date)
         #expect(row?.activeCalories == 210)

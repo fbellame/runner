@@ -13,7 +13,8 @@ struct LedgerBuilderTests {
     @Test func streakGrowsAndMultiplierLagsOneDay() {
         // 3 days, all 12,000 steps = 120 pts base, goal 100.
         let days = [day(0, steps: 12_000), day(1, steps: 12_000), day(2, steps: 12_000)]
-        let out = LedgerBuilder.build(days: days, goalProvider: { _ in 100 }, initialStreak: 0)
+        let out = LedgerBuilder.build(days: days, goalProvider: { _ in 100 },
+                                      weeklyTargetProvider: { _ in 3 }, initialStreak: 0)
         #expect(out.count == 3)
         // Day 0: multiplier ×1.0 (no prior streak), total 120, gold, streakAfter 1
         #expect(out[0].breakdown.multiplier == 1.0)
@@ -30,7 +31,8 @@ struct LedgerBuilderTests {
 
     @Test func missedDayResetsStreak() {
         let days = [day(0, steps: 12_000), day(1, steps: 3_000), day(2, steps: 12_000)]
-        let out = LedgerBuilder.build(days: days, goalProvider: { _ in 100 }, initialStreak: 5)
+        let out = LedgerBuilder.build(days: days, goalProvider: { _ in 100 },
+                                      weeklyTargetProvider: { _ in 3 }, initialStreak: 5)
         // Day 0 enters with streak 5 → ×1.25, total 150, streakAfter 6
         #expect(abs(out[0].breakdown.multiplier - 1.25) < 0.0001)
         #expect(out[0].streakAfter == 6)
@@ -44,7 +46,8 @@ struct LedgerBuilderTests {
 
     @Test func workoutsCountTowardGold() {
         let days = [day(0, steps: 2_000, workouts: [WorkoutSummary(type: .run, distanceMeters: 6_000)])]
-        let out = LedgerBuilder.build(days: days, goalProvider: { _ in 100 }, initialStreak: 0)
+        let out = LedgerBuilder.build(days: days, goalProvider: { _ in 100 },
+                                      weeklyTargetProvider: { _ in 3 }, initialStreak: 0)
         // 20 + 90 = 110 → gold
         #expect(out[0].breakdown.total == 110)
         #expect(out[0].isGold)
@@ -57,12 +60,24 @@ struct LedgerBuilderTests {
                                       goalProvider: { d in
                                           Calendar.current.dateComponents([.day], from: days[0].date, to: d).day == 0 ? goals[0] : goals[1]
                                       },
+                                      weeklyTargetProvider: { _ in 3 },
                                       initialStreak: 0)
         #expect(out[0].goal == 70 && out[0].isGold)     // 80 ≥ 70
         #expect(out[1].goal == 90 && out[1].isGold == false) // 84 (80×1.05=84) < 90
     }
 
     @Test func emptyInput() {
-        #expect(LedgerBuilder.build(days: [], goalProvider: { _ in 100 }, initialStreak: 3).isEmpty)
+        #expect(LedgerBuilder.build(days: [], goalProvider: { _ in 100 },
+                                    weeklyTargetProvider: { _ in 3 }, initialStreak: 3).isEmpty)
+    }
+
+    @Test func snapshotsWeeklyTargetPerDay() {
+        let days = [DayActivity(date: .now, steps: 0, workouts: [])]
+        let out = LedgerBuilder.build(days: days,
+                                      goalProvider: { _ in 100 },
+                                      weeklyTargetProvider: { _ in 4 },
+                                      initialStreak: 0)
+        #expect(out.count == 1)
+        #expect(out[0].weeklyTarget == 4)
     }
 }

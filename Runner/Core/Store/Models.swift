@@ -18,10 +18,15 @@ final class DayLedger {
     var activeCalories: Double = 0
     var distanceMeters: Double = 0
     var activeSeconds: Double = 0
+    // v1.9: weekly consistency target (gold days/week) in effect that day.
+    // Inline default backfills the column on lightweight migration of pre-v1.9
+    // stores, mirroring activeCalories/distanceMeters/activeSeconds.
+    var weeklyTargetAtThatTime: Int = 3
 
     init(date: Date, steps: Int, stepPoints: Int, workoutPoints: Int, multiplier: Double,
          totalPoints: Int, goalAtThatTime: Int, isGold: Bool, streakAfter: Int,
-         activeCalories: Double = 0, distanceMeters: Double = 0, activeSeconds: Double = 0) {
+         activeCalories: Double = 0, distanceMeters: Double = 0, activeSeconds: Double = 0,
+         weeklyTargetAtThatTime: Int = 3) {
         self.date = date
         self.steps = steps
         self.stepPoints = stepPoints
@@ -34,6 +39,7 @@ final class DayLedger {
         self.activeCalories = activeCalories
         self.distanceMeters = distanceMeters
         self.activeSeconds = activeSeconds
+        self.weeklyTargetAtThatTime = weeklyTargetAtThatTime
     }
 
     func apply(_ day: LedgerDay) {
@@ -45,6 +51,7 @@ final class DayLedger {
         goalAtThatTime = day.goal
         isGold = day.isGold
         streakAfter = day.streakAfter
+        weeklyTargetAtThatTime = day.weeklyTarget
     }
 }
 

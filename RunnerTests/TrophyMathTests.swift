@@ -194,4 +194,42 @@ struct TrophyMathTests {
         }
         #expect(TrophyMath.nextMilestone(complete) == nil)
     }
+
+    private func week(_ y: Int, _ m: Int, _ d: Int) -> CompletedWeek {
+        // d must be a Monday; completedOn = Wednesday of that week.
+        let cal = self.cal
+        let start = cal.startOfDay(for: date(y, m, d))
+        return CompletedWeek(weekStart: start,
+                             completedOn: cal.date(byAdding: .day, value: 2, to: start)!)
+    }
+
+    @Test func weeklyBadgesEmptyStateAllUnearned() {
+        let badges = TrophyMath.weeklyBadges([], calendar: cal)
+        #expect(badges.count == 3)
+        #expect(badges.allSatisfy { !$0.earned })
+        #expect(badges.map(\.id) == ["weeklyGoal.global.1", "weeklyStreak.global.4", "weeklyStreak.global.12"])
+    }
+
+    @Test func firstWeeklyGoalMintsWithEarnedDate() {
+        let w = week(2026, 6, 22)
+        let badges = TrophyMath.weeklyBadges([w], calendar: cal)
+        let first = badges.first { $0.id == "weeklyGoal.global.1" }!
+        #expect(first.earned)
+        #expect(first.earnedAt == w.completedOn)
+    }
+
+    @Test func fourWeekStreakNeedsConsecutiveMondays() {
+        // Mondays 2026: Jun 1, Jun 8, Jun 15, Jun 22 — consecutive.
+        let run = [week(2026, 6, 1), week(2026, 6, 8), week(2026, 6, 15), week(2026, 6, 22)]
+        let badges = TrophyMath.weeklyBadges(run, calendar: cal)
+        let streak4 = badges.first { $0.id == "weeklyStreak.global.4" }!
+        #expect(streak4.earned)
+        #expect(streak4.earnedAt == run[3].completedOn)
+
+        // A gap (missing Jun 15) resets the run — only 2-in-a-row max.
+        let gapped = [week(2026, 6, 1), week(2026, 6, 8), week(2026, 6, 22), week(2026, 6, 29)]
+        let broken = TrophyMath.weeklyBadges(gapped, calendar: cal)
+        #expect(broken.first { $0.id == "weeklyStreak.global.4" }!.earned == false)
+        #expect(broken.first { $0.id == "weeklyStreak.global.4" }!.progress == 0.5)
+    }
 }

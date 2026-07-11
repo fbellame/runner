@@ -133,7 +133,7 @@ enum HubMath {
             return ConsistencyStats(longestWeekStreak: 0, currentWeekStreak: 0, daysSinceLast: nil)
         }
 
-        let activeWeeks = Set(scoped.map { mondayStart(for: $0.date, calendar: calendar) })
+        let activeWeeks = Set(scoped.map { WeekMath.mondayStart(for: $0.date, calendar: calendar) })
 
         var longest = 0
         for week in activeWeeks {
@@ -151,7 +151,7 @@ enum HubMath {
             longest = max(longest, length)
         }
 
-        let currentWeek = mondayStart(for: asOf, calendar: calendar)
+        let currentWeek = WeekMath.mondayStart(for: asOf, calendar: calendar)
         // You haven't failed the current week until it's over: an inactive
         // current week falls back to a streak ending last week.
         var streakEnd: Date?
@@ -206,10 +206,4 @@ enum HubMath {
         calendar.dateInterval(of: .month, for: date)!.start
     }
 
-    private static func mondayStart(for date: Date, calendar: Calendar) -> Date {
-        let day = calendar.startOfDay(for: date)
-        let weekday = calendar.component(.weekday, from: day)
-        let daysSinceMonday = (weekday + 5) % 7
-        return calendar.date(byAdding: .day, value: -daysSinceMonday, to: day)!
-    }
 }

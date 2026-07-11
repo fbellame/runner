@@ -123,6 +123,8 @@ struct WorkoutSummaryView: View {
         switch badge.kind {
         case .distance: amount = String(format: String(localized: "%lld km"), Int64(badge.threshold))
         case .count: amount = String(format: String(localized: "%lld workouts"), Int64(badge.threshold))
+        case .weeklyGoal: return String(localized: "First weekly goal")
+        case .weeklyStreak: return String(format: String(localized: "%lld-week streak"), Int64(badge.threshold))
         }
         return String(format: String(localized: "%@ lifetime %@"), amount, badgeScopeName(badge.scope))
     }

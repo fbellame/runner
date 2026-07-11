@@ -3,9 +3,11 @@ import SwiftData
 import Charts
 
 struct ActivityDetailView: View {
+    @Environment(AppModel.self) private var model
     let type: ActivityType
     @Query(sort: \WorkoutRec.start, order: .reverse) private var workouts: [WorkoutRec]
     @State private var chartRange = 7
+    @State private var showsGoalEditor = false
 
     init(type: ActivityType) {
         self.type = type
@@ -24,10 +26,11 @@ struct ActivityDetailView: View {
         let stats = ActivityStats.typeStats(summaries, type: type, calendar: .current)
         let records = ActivityStats.typeRecords(summaries, type: type)
         let workoutByID = Dictionary(uniqueKeysWithValues: typeWorkouts.map { ($0.id, $0) })
+        let goalProgress = currentGoalProgress(summaries)
 
         ScrollView {
             VStack(alignment: .leading, spacing: 16) {
-                header(stats: stats)
+                header(stats: stats, goalProgress: goalProgress)
                 totalsGrid(stats: stats)
                 paceGrid(stats: stats)
                 distanceChart(stats: stats)
@@ -40,9 +43,16 @@ struct ActivityDetailView: View {
         .background(Color.rBackground)
         .navigationTitle(type.localizedName)
         .navigationBarTitleDisplayMode(.inline)
+        .sheet(isPresented: $showsGoalEditor) {
+            WeeklyDistanceGoalSheet(type: type,
+                                    currentGoal: model.weeklyDistanceGoal(for: type)) { value in
+                model.setWeeklyDistanceGoal(value, for: type)
+            }
+        }
     }
 
-    private func header(stats: TypeStats) -> some View {
+    private func header(stats: TypeStats,
+                        goalProgress: ActivityDistanceGoalProgress?) -> some View {
         SurfaceCard {
             HStack(spacing: 12) {
                 Text(type.emoji)
@@ -56,8 +66,46 @@ struct ActivityDetailView: View {
                         .foregroundStyle(Color.rTextSecondary)
                 }
                 Spacer()
+                Button {
+                    showsGoalEditor = true
+                } label: {
+                    if let goalProgress {
+                        VStack(spacing: 5) {
+                            WeeklyDistanceGoalRing(
+                                fraction: goalProgress.fraction,
+                                accent: type.accent,
+                                centerText: "\(Int((goalProgress.fraction * 100).rounded()))%")
+                            Text(DistanceGoalFormat.progress(goalProgress))
+                                .font(.system(size: 10, weight: .semibold, design: .rounded))
+                                .foregroundStyle(type.accent)
+                                .lineLimit(1)
+                        }
+                    } else {
+                        VStack(spacing: 6) {
+                            Image(systemName: "plus.circle")
+                                .font(.system(size: 24, weight: .semibold))
+                            Text(String(localized: "Set weekly goal"))
+                                .font(.system(size: 10, weight: .semibold))
+                                .multilineTextAlignment(.center)
+                        }
+                        .foregroundStyle(type.accent)
+                        .frame(width: 78)
+                    }
+                }
+                .buttonStyle(.plain)
+                .accessibilityLabel(String(localized: goalProgress == nil
+                    ? "Set weekly goal" : "Edit weekly goal"))
             }
         }
+    }
+
+    private func currentGoalProgress(_ summaries: [ActivityWorkoutSummary])
+    -> ActivityDistanceGoalProgress? {
+        guard let goal = model.weeklyDistanceGoal(for: type) else { return nil }
+        return GoalsMath.currentWeekDistance(summaries,
+                                             goals: [type: goal],
+                                             asOf: .now,
+                                             calendar: .current).first
     }
 
     private func totalsGrid(stats: TypeStats) -> some View {

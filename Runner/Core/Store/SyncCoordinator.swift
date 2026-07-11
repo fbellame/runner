@@ -13,6 +13,7 @@ final class SyncCoordinator {
     private let health: HealthStoring
     private let store: DataStore
     private let currentGoal: () -> Int
+    private let currentWeeklyTarget: () -> Int
     private let metricsProvider: () -> BodyMetrics
     private let defaults: UserDefaults
 
@@ -22,10 +23,12 @@ final class SyncCoordinator {
     private var isSavingRecorded = false
 
     init(health: HealthStoring, store: DataStore, currentGoal: @escaping () -> Int,
+         currentWeeklyTarget: @escaping () -> Int,
          metricsProvider: @escaping () -> BodyMetrics, defaults: UserDefaults = .standard) {
         self.health = health
         self.store = store
         self.currentGoal = currentGoal
+        self.currentWeeklyTarget = currentWeeklyTarget
         self.metricsProvider = metricsProvider
         self.defaults = defaults
     }
@@ -194,6 +197,8 @@ final class SyncCoordinator {
             let ledgers = LedgerBuilder.build(days: days,
                                               goalProvider: store.goalProvider(currentGoal: currentGoal(),
                                                                                from: windowStart),
+                                              weeklyTargetProvider: store.weeklyTargetProvider(currentTarget: currentWeeklyTarget(),
+                                                                                               from: windowStart),
                                               initialStreak: initialStreak)
             try store.upsert(ledgers, derived: derived)
             // Only "spend" the one-shot backfill once it has actually run against real

@@ -78,6 +78,49 @@ struct AppModelTests {
         #expect(checkpoints.load() == nil)           // nothing left to resume
     }
 
+    @Test func storedWeeklyTargetDefaultsAndClamps() {
+        let defaults = UserDefaults.standard
+        defaults.removeObject(forKey: AppModel.weeklyTargetKey)
+        #expect(AppModel.storedWeeklyTarget() == 3)
+
+        defaults.set(99, forKey: AppModel.weeklyTargetKey)
+        #expect(AppModel.storedWeeklyTarget() == 7)
+
+        defaults.set(0, forKey: AppModel.weeklyTargetKey)
+        #expect(AppModel.storedWeeklyTarget() == 1)
+
+        defaults.set(5, forKey: AppModel.weeklyTargetKey)
+        #expect(AppModel.storedWeeklyTarget() == 5)
+        defaults.removeObject(forKey: AppModel.weeklyTargetKey)
+    }
+
+    @Test func weeklyDistanceGoalsAreOptionalAndPersistPerActivity() throws {
+        let defaults = UserDefaults.standard
+        for type in ActivityType.allCases {
+            defaults.removeObject(forKey: AppModel.weeklyDistanceGoalKey(for: type))
+            #expect(AppModel.storedWeeklyDistanceGoal(for: type) == nil)
+        }
+
+        let (model, _, _) = try makeModel()
+        model.setWeeklyDistanceGoal(15, for: .run)
+        model.setWeeklyDistanceGoal(42.5, for: .bike)
+
+        #expect(model.weeklyDistanceGoal(for: .run) == 15)
+        #expect(model.weeklyDistanceGoal(for: .walk) == nil)
+        #expect(model.weeklyDistanceGoal(for: .bike) == 42.5)
+        #expect(AppModel.storedWeeklyDistanceGoal(for: .run) == 15)
+        #expect(AppModel.storedWeeklyDistanceGoal(for: .bike) == 42.5)
+
+        model.setWeeklyDistanceGoal(nil, for: .run)
+        model.setWeeklyDistanceGoal(0, for: .bike)
+        #expect(model.weeklyDistanceGoal(for: .run) == nil)
+        #expect(model.weeklyDistanceGoal(for: .bike) == nil)
+
+        for type in ActivityType.allCases {
+            defaults.removeObject(forKey: AppModel.weeklyDistanceGoalKey(for: type))
+        }
+    }
+
     @Test func dayChangeNotificationTriggersSync() async throws {
         let (model, health, _) = try makeModel()
         await model.onLaunch()
