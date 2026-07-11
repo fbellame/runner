@@ -18,6 +18,14 @@ struct GoalsMathTests {
         GoalLedgerDay(date: date(y, m, d), isGold: gold, weeklyTarget: target)
     }
 
+    private func workout(_ type: ActivityType, _ y: Int, _ m: Int, _ d: Int,
+                         kilometers: Double, hour: Int = 12) -> ActivityWorkoutSummary {
+        ActivityWorkoutSummary(id: UUID(), type: type, date: date(y, m, d, hour: hour),
+                               distanceMeters: kilometers * 1_000,
+                               movingSeconds: 1_800, points: 10, calories: 0,
+                               splitSeconds: [], hasRoute: false)
+    }
+
     // Reference week: Monday 2026-07-06 ... Sunday 2026-07-12.
 
     @Test func currentWeekCountsGoldDaysAndDots() {
@@ -85,5 +93,43 @@ struct GoalsMathTests {
         let weeks = GoalsMath.completedWeeks(days, calendar: cal)
         #expect(weeks.map(\.weekStart) == [cal.startOfDay(for: date(2026, 6, 22)),
                                            cal.startOfDay(for: date(2026, 7, 6))])
+    }
+
+    @Test func currentWeekDistanceSumsOnlyThisWeekThroughAsOfAndOnlySetGoals() {
+        let summaries = [
+            workout(.run, 2026, 7, 5, kilometers: 99),  // previous week
+            workout(.run, 2026, 7, 6, kilometers: 4),
+            workout(.run, 2026, 7, 8, kilometers: 6),
+            workout(.run, 2026, 7, 11, kilometers: 10), // future relative to asOf
+            workout(.walk, 2026, 7, 7, kilometers: 0),  // distance-less contributes zero
+            workout(.bike, 2026, 7, 7, kilometers: 20)  // no goal, omitted
+        ]
+
+        let progress = GoalsMath.currentWeekDistance(
+            summaries,
+            goals: [.run: 12, .walk: 5],
+            asOf: date(2026, 7, 9),
+            calendar: cal)
+
+        #expect(progress.map(\.type) == [.run, .walk])
+        #expect(progress[0].distanceMeters == 10_000)
+        #expect(progress[0].goalKilometers == 12)
+        #expect(progress[0].fraction == 10.0 / 12.0)
+        #expect(progress[1].distanceMeters == 0)
+        #expect(progress[1].fraction == 0)
+    }
+
+    @Test func currentWeekDistanceCapsRingFractionAndIgnoresInvalidGoals() {
+        let summaries = [workout(.bike, 2026, 7, 6, kilometers: 60)]
+        let progress = GoalsMath.currentWeekDistance(
+            summaries,
+            goals: [.run: 0, .walk: -.infinity, .bike: 50],
+            asOf: date(2026, 7, 10),
+            calendar: cal)
+
+        #expect(progress.count == 1)
+        #expect(progress[0].type == .bike)
+        #expect(progress[0].distanceMeters == 60_000)
+        #expect(progress[0].fraction == 1)
     }
 }

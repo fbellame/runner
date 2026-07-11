@@ -20,6 +20,10 @@ final class AppModel {
     /// Allowed weekly consistency target — gold days per week.
     static let weeklyTargetRange = 1...7
 
+    static func weeklyDistanceGoalKey(for type: ActivityType) -> String {
+        "weeklyDistanceGoal.\(type.rawValue)"
+    }
+
     let store: DataStore
     let health: HealthStoring
     let sync: SyncCoordinator
@@ -64,6 +68,8 @@ final class AppModel {
         }
     }
 
+    private(set) var weeklyDistanceGoals: [ActivityType: Double]
+
     static func storedGoal() -> Int {
         let raw = UserDefaults.standard.object(forKey: goalKey) as? Int ?? 100
         return min(max(raw, goalRange.lowerBound), goalRange.upperBound)
@@ -74,6 +80,28 @@ final class AppModel {
         return min(max(raw, weeklyTargetRange.lowerBound), weeklyTargetRange.upperBound)
     }
 
+    static func storedWeeklyDistanceGoal(for type: ActivityType) -> Double? {
+        let key = weeklyDistanceGoalKey(for: type)
+        guard UserDefaults.standard.object(forKey: key) != nil else { return nil }
+        let value = UserDefaults.standard.double(forKey: key)
+        return value.isFinite && value > 0 ? value : nil
+    }
+
+    func weeklyDistanceGoal(for type: ActivityType) -> Double? {
+        weeklyDistanceGoals[type]
+    }
+
+    func setWeeklyDistanceGoal(_ kilometers: Double?, for type: ActivityType) {
+        let key = Self.weeklyDistanceGoalKey(for: type)
+        guard let kilometers, kilometers.isFinite, kilometers > 0 else {
+            weeklyDistanceGoals.removeValue(forKey: type)
+            UserDefaults.standard.removeObject(forKey: key)
+            return
+        }
+        weeklyDistanceGoals[type] = kilometers
+        UserDefaults.standard.set(kilometers, forKey: key)
+    }
+
     init(store: DataStore, health: HealthStoring, recorder: WorkoutRecorder, checkpoints: CheckpointStore) {
         self.store = store
         self.health = health
@@ -81,6 +109,10 @@ final class AppModel {
         self.checkpoints = checkpoints
         self.dailyGoal = Self.storedGoal()
         self.weeklyGoldTarget = Self.storedWeeklyTarget()
+        self.weeklyDistanceGoals = Dictionary(uniqueKeysWithValues:
+            ActivityType.allCases.compactMap { type in
+                Self.storedWeeklyDistanceGoal(for: type).map { (type, $0) }
+            })
         let profile = ProfileStore(store: store, health: health)
         self.profile = profile
         self.sync = SyncCoordinator(health: health, store: store,

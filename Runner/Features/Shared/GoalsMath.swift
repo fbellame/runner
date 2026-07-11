@@ -31,7 +31,36 @@ struct CompletedWeek: Equatable, Sendable {
     let completedOn: Date
 }
 
+struct ActivityDistanceGoalProgress: Equatable, Sendable {
+    let type: ActivityType
+    let distanceMeters: Double
+    let goalKilometers: Double
+    /// Ring fill, capped to 0...1 while distanceMeters remains the uncapped value.
+    let fraction: Double
+}
+
 enum GoalsMath {
+    static func currentWeekDistance(_ summaries: [ActivityWorkoutSummary],
+                                    goals: [ActivityType: Double],
+                                    asOf: Date,
+                                    calendar: Calendar) -> [ActivityDistanceGoalProgress] {
+        let weekStart = WeekMath.mondayStart(for: asOf, calendar: calendar)
+        let scoped = summaries.filter { $0.date >= weekStart && $0.date <= asOf }
+
+        return ActivityType.allCases.compactMap { type in
+            guard let goalKilometers = goals[type],
+                  goalKilometers.isFinite, goalKilometers > 0 else { return nil }
+            let distanceMeters = scoped
+                .filter { $0.type == type }
+                .reduce(0) { $0 + max($1.distanceMeters, 0) }
+            let fraction = min(max(distanceMeters / (goalKilometers * 1_000), 0), 1)
+            return ActivityDistanceGoalProgress(type: type,
+                                                distanceMeters: distanceMeters,
+                                                goalKilometers: goalKilometers,
+                                                fraction: fraction)
+        }
+    }
+
     static func currentWeek(_ days: [GoalLedgerDay],
                             currentTarget: Int,
                             asOf: Date,

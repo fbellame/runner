@@ -57,6 +57,7 @@ struct TodayView: View {
                     addWeightCard
                 }
                 weeklyRecapCard
+                distanceGoalsRollup
                 wrappedBanner
                 trendCard
                 if !latestRoute.isEmpty {
@@ -168,6 +169,29 @@ struct TodayView: View {
 
     private var workoutSummaries: [ActivityWorkoutSummary] {
         workouts.map(ActivityWorkoutSummary.init(workout:))
+    }
+
+    private var weeklyDistanceProgress: [ActivityDistanceGoalProgress] {
+        GoalsMath.currentWeekDistance(workoutSummaries,
+                                      goals: model.weeklyDistanceGoals,
+                                      asOf: .now,
+                                      calendar: .current)
+    }
+
+    @ViewBuilder
+    private var distanceGoalsRollup: some View {
+        if !weeklyDistanceProgress.isEmpty {
+            SurfaceCard {
+                VStack(alignment: .leading, spacing: 12) {
+                    MicroLabel(text: String(localized: "Weekly distance goals"))
+                    HStack(alignment: .top, spacing: 10) {
+                        ForEach(weeklyDistanceProgress, id: \.type) { progress in
+                            WeeklyDistanceGoalMiniRing(progress: progress)
+                        }
+                    }
+                }
+            }
+        }
     }
 
     private var latestClosedWrapped: MonthWrapped? {
