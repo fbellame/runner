@@ -361,6 +361,16 @@
         }
       }
     },
+    "%d of %d this week": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%d sur %d cette semaine"
+          }
+        }
+      }
+    },
     "%d sessions (vs %d) · %@ (vs %@)": {
       "localizations": {
         "fr": {

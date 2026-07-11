@@ -26,6 +26,15 @@ struct TodayView: View {
         ledgers.first { !Calendar.current.isDateInToday($0.date) }?.streakAfter ?? 0
     }
 
+    private var weeklyStatus: WeeklyGoalStatus {
+        GoalsMath.currentWeek(
+            ledgers.map { GoalLedgerDay(date: $0.date, isGold: $0.isGold,
+                                        weeklyTarget: $0.weeklyTargetAtThatTime) },
+            currentTarget: model.weeklyGoldTarget,
+            asOf: .now,
+            calendar: .current)
+    }
+
     private func rebuildLatestRoute() {
         guard let data = todayWorkouts.first(where: { $0.routeData != nil })?.routeData else {
             latestRoute = []
@@ -98,6 +107,15 @@ struct TodayView: View {
                 }
             }
         }
+        .onChange(of: weeklyStatus.isMet) { was, isNow in
+            if !was && isNow && !celebrate {
+                celebrate = true
+                Task {
+                    try? await Task.sleep(for: .seconds(1.6))
+                    celebrate = false
+                }
+            }
+        }
         .refreshable {
             await model.sync.syncNow()
         }
@@ -141,6 +159,7 @@ struct TodayView: View {
             Text(String(localized: "Goal: \(model.dailyGoal) pts"))
                 .font(.caption)
                 .foregroundStyle(Color.rTextSecondary)
+            WeeklyGoalRow(status: weeklyStatus)
             if let milestone = TrophyMath.nextMilestone(workoutSummaries) {
                 nextMilestoneTicker(milestone)
             }
