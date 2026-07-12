@@ -205,5 +205,4 @@ enum HubMath {
     private static func monthStart(for date: Date, calendar: Calendar) -> Date {
         calendar.dateInterval(of: .month, for: date)!.start
     }
-
 }

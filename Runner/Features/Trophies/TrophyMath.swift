@@ -250,7 +250,8 @@ enum TrophyMath {
         switch kind {
         case .distance: totals.distance
         case .count: totals.count
-        case .weeklyGoal, .weeklyStreak: fatalError("weekly badges computed separately from completedWeeks")
+        // Weekly badges are computed by weeklyBadges(_:calendar:), never via ladders.
+        case .weeklyGoal, .weeklyStreak: 0
         }
     }
 

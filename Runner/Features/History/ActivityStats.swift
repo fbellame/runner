@@ -245,5 +245,4 @@ enum ActivityStats {
                              progress: progress)
         }
     }
-
 }
