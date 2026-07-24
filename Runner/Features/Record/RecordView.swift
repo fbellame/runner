@@ -72,7 +72,7 @@ struct RecordView: View {
                                isSaving: isSaving,
                                onSave: { Task { await save(workout) } },
                                onDiscard: {
-                                   model.checkpoints.clear()
+                                   recorder.discard()
                                    finished = nil
                                    dismiss()
                                })
@@ -283,14 +283,13 @@ struct RecordView: View {
         // IN-APP save path only. Confirms out loud that the run was actually
         // captured — otherwise the last thing a hands-free user hears is
         // whatever the recorder announced before finishing, which may be the
-        // opposite of what just happened (e.g. "Resumed").
-        //
-        // ⚠️ TASK 8 lands `recorder.completeSave()` on THIS exact line and its
-        // body already announces `.runSaved` — implemented verbatim that yields
-        // "Run saved. Run saved." `completeSave()` must call `announceSaved()`
-        // instead of announcing directly. Task 12's Lock-Screen intent save is a
+        // opposite of what just happened (e.g. "Resumed"). `completeSave()`
+        // (Task 8) also ends the Live Activity here, using the final stats
+        // `finish()` captured; it speaks through the existing `announceSaved()`
+        // rather than announcing a second time, so this line does not say
+        // "Run saved. Run saved." Task 12's Lock-Screen intent save is a
         // separate call site that needs its own cue, but exactly once.
-        model.recorder.announceSaved()
+        model.recorder.completeSave()
         finished = nil
         if let failure {
             saveFailedMessage = failure

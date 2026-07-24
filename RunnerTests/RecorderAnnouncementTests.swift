@@ -138,11 +138,13 @@ struct RecorderAnnouncementTests {
         #expect(spy.events == [])
     }
 
-    /// Covers the in-app save path's `.runSaved` confirmation (`RecordView.save`
-    /// calls `WorkoutRecorder.announceSaved()` after clearing the checkpoint).
-    /// Without an audible "Run saved", the last cue a hands-free user hears on a
-    /// real run — stop, stand still (Paused), unzip pocket while walking
-    /// (Resumed), slide to finish — is the opposite of what happened, with no
+    /// Covers the `.runSaved` confirmation itself. `RecordView.save` no longer
+    /// calls this directly — it calls `completeSave()` (Task 8), which routes
+    /// through `announceSaved()` exactly once so the in-app path never says
+    /// "Run saved. Run saved." (see `LiveActivityWiringTests`). Without an
+    /// audible "Run saved", the last cue a hands-free user hears on a real run
+    /// — stop, stand still (Paused), unzip pocket while walking (Resumed),
+    /// slide to finish — is the opposite of what happened, with no
     /// confirmation the run was captured at all.
     @Test func announceSavedSpeaksRunSavedExactlyOnce() {
         let spy = AnnouncementSpy()

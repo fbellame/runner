@@ -32,6 +32,13 @@ struct AutoWalkCoordinatorTests {
         }
     }
 
+    private final class LiveActivitySpy: LiveActivityPresenting {
+        var beginCount = 0
+        func begin(_ snapshot: RunActivitySnapshot) { beginCount += 1 }
+        func update(_ snapshot: RunActivitySnapshot) {}
+        func end(_ snapshot: RunActivitySnapshot) {}
+    }
+
     private struct Harness {
         let coordinator: AutoWalkCoordinator
         let motion: FakeMotionActivityProvider
@@ -286,11 +293,13 @@ struct AutoWalkCoordinatorTests {
             .appendingPathComponent("autowalk-silent-\(UUID().uuidString)")
         let checkpoints = CheckpointStore(directory: directory)
         let announcements = AnnouncementSpy()
+        let liveActivity = LiveActivitySpy()
         let recorder = WorkoutRecorder(
             provider: location,
             checkpoints: checkpoints,
             clock: { self.now },
-            announcer: announcements
+            announcer: announcements,
+            liveActivity: liveActivity
         )
         let coordinator = AutoWalkCoordinator(
             motion: motion,
@@ -327,5 +336,6 @@ struct AutoWalkCoordinatorTests {
         #expect(recorder.state == .recording)    // genuine auto-resume fired
 
         #expect(announcements.events.isEmpty)
+        #expect(liveActivity.beginCount == 0)
     }
 }

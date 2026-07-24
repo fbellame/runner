@@ -156,7 +156,8 @@ final class AppModel {
                              health: HealthStore(),
                              recorder: WorkoutRecorder(provider: SystemLocationProvider(),
                                                        checkpoints: checkpoints,
-                                                       announcer: RunAnnouncer()),
+                                                       announcer: RunAnnouncer(),
+                                                       liveActivity: LiveActivityController()),
                              checkpoints: checkpoints)
         model.storeFailureMessage = storeFailure
         model.enableAutoWalk(motion: SystemMotionActivityProvider())

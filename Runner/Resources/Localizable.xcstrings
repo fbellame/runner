@@ -1721,6 +1721,16 @@
         }
       }
     },
+    "Precise Location is off": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "La localisation précise est désactivée"
+          }
+        }
+      }
+    },
     "Precise Location is off — distance and route can't be recorded.": {
       "localizations": {
         "fr": {

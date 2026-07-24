@@ -101,6 +101,13 @@ final class WorkoutRecorder: LocationProvidingDelegate {
     // by `AppModel.live()` (via `@testable import`) to catch a regression where
     // production wiring silently falls back to `SilentAnnouncer()` again.
     let announcer: any Announcing
+    private let liveActivity: any LiveActivityPresenting
+    /// The last snapshot published to the Live Activity as `.finished`, kept
+    /// around so `completeSave()` (in-app save) and `discard()` (in-app
+    /// discard from the summary sheet) each have the real final stats to end
+    /// the activity with — `finish()` has already reset the recorder's own
+    /// fields by the time either of those fires.
+    private var lastFinishedSnapshot: RunActivitySnapshot?
     private var didAnnounceLocationDenied = false
     /// Bumped on every `start()`. Captured by the armed-timeout task so it can
     /// verify, after resuming from sleep, that it still belongs to the session
@@ -113,18 +120,56 @@ final class WorkoutRecorder: LocationProvidingDelegate {
          checkpointInterval: TimeInterval = 30,
          armedTimeout: Duration = .seconds(600),
          clock: @escaping () -> Date = { Date() },
-         announcer: any Announcing = SilentAnnouncer()) {
+         announcer: any Announcing = SilentAnnouncer(),
+         liveActivity: any LiveActivityPresenting = SilentLiveActivityPresenter()) {
         self.provider = provider
         self.checkpoints = checkpoints
         self.checkpointInterval = checkpointInterval
         self.armedTimeout = armedTimeout
         self.clock = clock
         self.announcer = announcer
+        self.liveActivity = liveActivity
         provider.delegate = self
     }
 
     func requestPermission() {
         provider.requestWhenInUseAuthorization()
+    }
+
+    /// The status a Live Activity should show right now, derived from the
+    /// recorder's own state — never stored separately, so it can never drift
+    /// from what the recorder actually believes.
+    private var liveActivityStatus: RunActivityStatus {
+        if authorizationDenied { return .error }
+        if isArmed { return .ready }
+        switch state {
+        case .recording: return .recording
+        case .autoPaused, .manuallyPaused: return .paused
+        case .idle: return .finished
+        }
+    }
+
+    private func liveSnapshot(status: RunActivityStatus? = nil) -> RunActivitySnapshot {
+        RunActivitySnapshot(
+            status: status ?? liveActivityStatus,
+            startedAt: startedAt ?? clock(),
+            movingSeconds: movingSeconds,
+            distanceMeters: distanceMeters,
+            paceSecondsPerKm: paceSecondsPerKm,
+            reducedAccuracy: reducedAccuracy,
+            message: authorizationDenied
+                ? String(localized: "Location access is required")
+                : reducedAccuracy
+                    ? String(localized: "Precise Location is off")
+                    : nil
+        )
+    }
+
+    /// Task 8 connects manual runs only: auto-started sessions (silent by
+    /// design — see `AutoWalkCoordinator`) and non-`.run` activities never
+    /// get a Live Activity, regardless of `isArmed`/`state`.
+    private var presentsLiveActivity: Bool {
+        activity == .run && !autoStarted
     }
 
     /// `backdatedTo` starts the workout when the activity really began — before the
@@ -179,6 +224,9 @@ final class WorkoutRecorder: LocationProvidingDelegate {
             provider.requestTemporaryFullAccuracy(purposeKey: Self.fullAccuracyPurposeKey)
         }
         provider.startUpdates()
+        if presentsLiveActivity {
+            liveActivity.begin(liveSnapshot())
+        }
         if isArmed {
             let timeout = armedTimeout
             armedTimeoutTask = Task { [weak self] in
@@ -226,6 +274,9 @@ final class WorkoutRecorder: LocationProvidingDelegate {
         state = .manuallyPaused
         saveCheckpoint(at: clock())
         if wasRecording, !autoStarted { announcer.announce(.paused) }
+        if presentsLiveActivity {
+            liveActivity.update(liveSnapshot())
+        }
     }
 
     // No symmetric double-announce risk here: this is reachable ONLY from
@@ -243,6 +294,9 @@ final class WorkoutRecorder: LocationProvidingDelegate {
         timeAnchor = clock()
         state = .recording
         if !autoStarted { announcer.announce(.resumed) }
+        if presentsLiveActivity {
+            liveActivity.update(liveSnapshot())
+        }
     }
 
     /// `endingAt` supplies the true end when the caller knows it — an auto-stop
@@ -282,11 +336,34 @@ final class WorkoutRecorder: LocationProvidingDelegate {
         // Keep a final checkpoint: the workout lives only in memory until the user
         // saves or discards the summary, so a kill here must stay recoverable.
         saveCheckpoint(at: clock())
+        if presentsLiveActivity {
+            // Publish `.finished` now (before `reset()` zeroes the stats this
+            // reads), but don't end the activity yet — the lock screen should
+            // keep showing the final numbers until the summary sheet is
+            // actually saved or discarded, not vanish the instant the user
+            // slides to finish.
+            let snapshot = liveSnapshot(status: .finished)
+            lastFinishedSnapshot = snapshot
+            liveActivity.update(snapshot)
+        }
         reset()
         return workout
     }
 
+    /// In-app discard, from the summary sheet's "Discard" button. `finish()`
+    /// has already reset the recorder by the time this runs, so a captured
+    /// `lastFinishedSnapshot` — carrying the real final stats — takes
+    /// priority over a freshly-computed (and by now zeroed-out) snapshot.
+    /// The `presentsLiveActivity` fallback exists for a hypothetical future
+    /// call site that discards a still-active session directly, without
+    /// going through `finish()` first.
     func discard() {
+        if let lastFinishedSnapshot {
+            liveActivity.end(lastFinishedSnapshot)
+        } else if presentsLiveActivity {
+            liveActivity.end(liveSnapshot(status: .finished))
+        }
+        lastFinishedSnapshot = nil
         provider.stopUpdates()
         checkpoints.clear()
         reset()
@@ -294,19 +371,33 @@ final class WorkoutRecorder: LocationProvidingDelegate {
 
     /// Confirms a save out loud — the one cue that answers the core question of
     /// this phase for a user who cannot see the screen: "did it record at all?"
-    /// IN-APP SAVE PATH ONLY: called from `RecordView.save(_:)`.
     ///
-    /// ⚠️ TASK 8 COLLIDES WITH THIS. The plan adds `completeSave()`, whose body
-    /// begins `announcer.announce(.runSaved)`, and tells the implementer to call
-    /// it from `RecordView.save(_:)` *after* `model.checkpoints.clear()` — the
-    /// exact line `announceSaved()` already occupies. Implemented verbatim, the
-    /// in-app path says "Run saved. Run saved." Task 8's `completeSave()` must
-    /// call `announceSaved()` rather than announce directly.
-    ///
-    /// Task 12's intent-driven save (finishing from the Lock Screen) is a
-    /// genuinely separate call site and needs its own cue — but exactly once.
+    /// RESOLVED TASK 8 COLLISION: this used to be called directly from
+    /// `RecordView.save(_:)`. Task 8 added `completeSave()`, which also needs
+    /// to end the Live Activity on save — and its natural call site is the
+    /// exact line `announceSaved()` already occupied. Rather than have both
+    /// announce (which would say "Run saved. Run saved."), `completeSave()`
+    /// below calls this method instead of announcing directly, and
+    /// `RecordView.save(_:)` now calls `completeSave()` in place of
+    /// `announceSaved()`. This method stays `internal` (not folded into
+    /// `completeSave()`) because Task 12's intent-driven save (finishing from
+    /// the Lock Screen) is a genuinely separate call site that needs its own
+    /// "Run saved" cue but has no Live Activity snapshot of its own to end.
     func announceSaved() {
         announcer.announce(.runSaved)
+    }
+
+    /// IN-APP SAVE PATH ONLY: called from `RecordView.save(_:)`, replacing
+    /// the `announceSaved()` call that used to sit there (see its doc comment
+    /// above). Speaks "Run saved" exactly once via `announceSaved()`, then
+    /// ends the Live Activity using the stats `finish()` captured — the
+    /// recorder itself has already been reset by this point, so there is no
+    /// live state left to build a snapshot from.
+    func completeSave() {
+        guard let snapshot = lastFinishedSnapshot else { return }
+        announceSaved()
+        liveActivity.end(snapshot)
+        lastFinishedSnapshot = nil
     }
 
     /// Both armed exit paths (finish()'s `isArmed` early-return, and the armed
@@ -316,7 +407,15 @@ final class WorkoutRecorder: LocationProvidingDelegate {
     /// while armed) — so any checkpoint on disk at this point belongs to a PRIOR
     /// session (e.g. one whose summary sheet was swiped away). Clearing it here
     /// would destroy that unrelated recovery copy for no reason.
+    ///
+    /// An armed session that reaches here (timed out, or slid-to-finish while
+    /// still armed) never ran `finish()`, so it never captured a
+    /// `lastFinishedSnapshot` — end the Live Activity from a freshly-built
+    /// `.finished` snapshot instead, same as `discard()`'s fallback branch.
     private func discardArmedSession() {
+        if presentsLiveActivity {
+            liveActivity.end(liveSnapshot(status: .finished))
+        }
         provider.stopUpdates()
         reset()
     }
@@ -356,6 +455,14 @@ final class WorkoutRecorder: LocationProvidingDelegate {
         if authorizationDenied, state != .idle, !autoStarted, !didAnnounceLocationDenied {
             didAnnounceLocationDenied = true
             announcer.announce(.locationDenied)
+        }
+        // `state != .idle` matters here specifically: `presentsLiveActivity`
+        // alone is also true before any session has ever started (the
+        // recorder's `activity`/`autoStarted` defaults happen to satisfy it),
+        // and this delegate callback can fire from the initial permission
+        // prompt at launch, long before `start()`.
+        if presentsLiveActivity, state != .idle {
+            liveActivity.update(liveSnapshot())
         }
     }
 
@@ -415,6 +522,9 @@ final class WorkoutRecorder: LocationProvidingDelegate {
                 announcer.announce(.paused)
             }
             state = paused ? .autoPaused : .recording
+            if presentsLiveActivity {
+                liveActivity.update(liveSnapshot())
+            }
         }
 
         // 4. Accept or reject the sample.
@@ -449,6 +559,10 @@ final class WorkoutRecorder: LocationProvidingDelegate {
             if lastCheckpointAt == nil ||
                 location.timestamp.timeIntervalSince(lastCheckpointAt!) >= checkpointInterval {
                 saveCheckpoint(at: location.timestamp)
+            }
+
+            if presentsLiveActivity {
+                liveActivity.update(liveSnapshot())
             }
         }
 
