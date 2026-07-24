@@ -82,4 +82,34 @@ struct ArmedWorkoutRecorderTests {
         #expect(recorder.startedAt == firstRebase)
         #expect(recorder.startedAt == base.addingTimeInterval(3))
     }
+
+    @Test func manualPauseIsANoOpWhileArmedAndRebaseStillHappensOnFirstMovement() {
+        let recorder = makeRecorder()
+        recorder.start(activity: .run, armed: true)
+
+        // Pausing a run that hasn't started moving yet must not do anything —
+        // otherwise resumeManually() could re-enter .recording without ever
+        // clearing isArmed, leaving a stale one-shot rebase to misfire later.
+        recorder.pauseManually()
+        #expect(recorder.state == .autoPaused)
+        #expect(recorder.isArmed)
+
+        recorder.didUpdate(locations: [
+            location(x: 0, seconds: 10, speed: 2),
+            location(x: 4, seconds: 12, speed: 2)
+        ])
+
+        #expect(recorder.state == .autoPaused)
+        #expect(recorder.isArmed)
+        #expect(recorder.movingSeconds == 0)
+
+        recorder.didUpdate(locations: [
+            location(x: 8, seconds: 13, speed: 2)
+        ])
+
+        #expect(recorder.state == .recording)
+        #expect(!recorder.isArmed)
+        #expect(recorder.startedAt == base.addingTimeInterval(13))
+        #expect(recorder.movingSeconds == 0)
+    }
 }

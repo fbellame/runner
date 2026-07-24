@@ -141,8 +141,13 @@ final class WorkoutRecorder: LocationProvidingDelegate {
         provider.startUpdates()
     }
 
+    /// Pausing a run that has not actually started is meaningless: while armed,
+    /// `.autoPaused` means "clock still frozen, no movement seen yet," not "the
+    /// user paused a live run." Refusing the pause here keeps `resumeManually()`
+    /// unreachable from the armed state, so it can never re-enter `.recording`
+    /// without going through the one-shot `isArmed` rebase in `ingest`.
     func pauseManually() {
-        guard state == .recording || state == .autoPaused else { return }
+        guard !isArmed, state == .recording || state == .autoPaused else { return }
         if state == .recording { advanceTimer(to: clock()) }
         state = .manuallyPaused
         saveCheckpoint(at: clock())
