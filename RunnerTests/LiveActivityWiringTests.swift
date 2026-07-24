@@ -41,17 +41,63 @@ struct LiveActivityWiringTests {
         recorder.start(activity: .run, armed: true)
         #expect(live.began.map(\.status) == [.ready])
 
+        // Three samples, not two: the armed→recording transition itself
+        // consumes the first `resumeAfter` (3 s) of continuous movement (see
+        // `AutoPauseDetector`), and the sample that crosses that threshold
+        // becomes the filter's first *kept* point with nothing to diff
+        // against yet — a real, non-zero distance needs a further sample
+        // after the detector has already unpaused.
         recorder.didUpdate(locations: [
             location(x: 0, seconds: 0, speed: 2),
-            location(x: 5, seconds: 3, speed: 2)
+            location(x: 5, seconds: 3, speed: 2),
+            location(x: 10, seconds: 6, speed: 2)
         ])
         #expect(live.updated.contains { $0.status == .recording })
+        let observedDistance = recorder.distanceMeters
+        #expect(observedDistance > 0)
 
         _ = try #require(recorder.finish(endingAt: recorder.lastMovingAt))
         #expect(live.ended.isEmpty)
 
         recorder.completeSave()
         #expect(live.ended.map(\.status) == [.finished])
+        // Not just the status: the ended snapshot must carry the REAL final
+        // stats the recorder observed, not a freshly-computed (and by then
+        // zeroed-by-reset()) one.
+        #expect(live.ended.last?.distanceMeters == observedDistance)
+    }
+
+    /// Covers the `discard()` precedence fix (Task 8 deviation 1): by the
+    /// time `RecordView`'s discard closure runs, `finish()` has already
+    /// called `reset()`, which zeroes `distanceMeters`/`movingSeconds`/etc.
+    /// A `discard()` that (re-)computed a fresh snapshot instead of using
+    /// the captured `lastFinishedSnapshot` would end the activity with all
+    /// stats at zero — indistinguishable from correct if this test only
+    /// checked `.status`, since a freshly-computed post-reset snapshot is
+    /// ALSO `.finished`. Asserting the real distance is what makes it
+    /// load-bearing.
+    @Test func discardEndsActivityWithRealFinalStats() throws {
+        let live = LiveActivitySpy()
+        let recorder = WorkoutRecorder(
+            provider: FakeLocationProvider(),
+            clock: { base },
+            liveActivity: live
+        )
+
+        recorder.start(activity: .run)
+        recorder.didUpdate(locations: [
+            location(x: 0, seconds: 0, speed: 2),
+            location(x: 5, seconds: 3, speed: 2)
+        ])
+        let observedDistance = recorder.distanceMeters
+        #expect(observedDistance > 0)
+
+        _ = try #require(recorder.finish(endingAt: recorder.lastMovingAt))
+        recorder.discard()
+
+        let ended = try #require(live.ended.last)
+        #expect(ended.status == .finished)
+        #expect(ended.distanceMeters == observedDistance)
     }
 
     @Test func manualWalkDoesNotOpenALiveActivity() {

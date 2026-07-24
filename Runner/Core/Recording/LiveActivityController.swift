@@ -1,40 +1,18 @@
 import Foundation
+import ActivityKit
+
 // ActivityKit predates Swift 6 concurrency annotations: `Activity<Attributes>`
-// is a plain class with no `Sendable` conformance, and its `update`/`end` are
-// nonisolated `async` methods. `@preconcurrency` tells the compiler to trust
-// this framework's (unannotated) types across actor boundaries rather than
-// enforce full region-based Sendable checking against them — without it,
-// `SWIFT_STRICT_CONCURRENCY: complete` refuses to compile any call into
-// ActivityKit from this `@MainActor` type.
-@preconcurrency import ActivityKit
-
-// Retroactive `ActivityAttributes` conformance for `RunAttributes`, added here
-// (rather than in Task 7's `RunAttributes.swift`) so that file — and therefore
-// the test target — never has to `import ActivityKit`. This is the one file
-// allowed to talk to the real framework.
-extension RunAttributes: ActivityAttributes {
-    struct ContentState: Codable, Hashable, Sendable {
-        let snapshot: RunActivitySnapshot
-    }
-}
-
-// `Codable` can only be synthesized by the compiler from an extension that
-// lives in the same file as the type it extends — `RunAttributes` itself is
-// declared in `RunAttributes.swift`, so that synthesis doesn't reach here.
-// Implemented by hand instead of moving/duplicating the type.
-extension RunAttributes: Codable {
-    private enum CodingKeys: String, CodingKey { case sessionID }
-
-    init(from decoder: Decoder) throws {
-        let container = try decoder.container(keyedBy: CodingKeys.self)
-        self.init(sessionID: try container.decode(UUID.self, forKey: .sessionID))
-    }
-
-    func encode(to encoder: Encoder) throws {
-        var container = encoder.container(keyedBy: CodingKeys.self)
-        try container.encode(sessionID, forKey: .sessionID)
-    }
-}
+// is a plain class with no `Sendable` conformance in this SDK. Rather than
+// `@preconcurrency import ActivityKit` — which would exempt the framework's
+// ENTIRE surface (including `activityStateUpdates`/`activityUpdates`/
+// `pushTokenUpdates`, `AsyncSequence`s that genuinely do cross isolation
+// domains and that a future task consuming one in this file would then get
+// zero compiler help with) — assert only the one thing that is actually
+// true: an `Activity` is safe to hand across the `Task { }` hops below,
+// because every ActivityKit call this controller makes on it is itself
+// `@MainActor`-safe to originate from and nothing here mutates shared state
+// off the main actor.
+extension Activity: @retroactive @unchecked Sendable {}
 
 /// The real `LiveActivityPresenting` implementation: owns the single
 /// `Activity<RunAttributes>` for the run currently on screen and talks to
@@ -55,6 +33,50 @@ final class LiveActivityController: LiveActivityPresenting {
     func begin(_ snapshot: RunActivitySnapshot) {
         guard ActivityAuthorizationInfo().areActivitiesEnabled,
               activity == nil else { return }
+
+        // ActivityKit activities outlive this process. If the app was
+        // killed mid-run (jetsam, force-quit, or a crash while the summary
+        // sheet was still open), no `end` ever ran — the OS is still
+        // showing that (now-stale) Live Activity on the lock screen even
+        // though a fresh process's `activity` here is `nil`. Requesting a
+        // new one unconditionally would put TWO Live Activities for the
+        // same run on the lock screen (one frozen pre-crash, one live), and
+        // finishing/saving would only ever end the new one. Adopt an
+        // existing activity instead of blindly requesting a new one.
+        //
+        // Adoption (rather than ending every stray and requesting fresh) is
+        // chosen deliberately: ending an activity and immediately requesting
+        // a new one is visibly a dismiss-then-reappear on the lock screen
+        // the user cannot see happen (phone is zipped away) but WILL see
+        // when they eventually look — the entry would appear to have reset.
+        // Adopting keeps the existing lock-screen entry in place and simply
+        // refreshes its content, which is the more honest continuation of
+        // "the run that was already showing here."
+        let existing = Activity<RunAttributes>.activities
+        if let adopted = existing.first {
+            activity = adopted
+            // More than one stray can exist after repeated crash/relaunch
+            // cycles (each prior `begin()` in a since-dead process could
+            // have adopted or requested one). Only the first is kept; any
+            // others are dead weight on the lock screen and are ended.
+            for stray in existing.dropFirst() {
+                Task { await stray.end(nil, dismissalPolicy: .immediate) }
+            }
+            // The adopted activity's content is whatever it last showed
+            // before the crash — push the current snapshot right away so
+            // the lock screen stops showing stale pre-crash numbers instead
+            // of waiting for the next naturally-throttled `update()` call.
+            Task {
+                await adopted.update(ActivityContent(
+                    state: RunAttributes.ContentState(snapshot: snapshot),
+                    staleDate: nil
+                ))
+            }
+            previous = snapshot
+            lastUpdateAt = clock()
+            return
+        }
+
         let content = ActivityContent(
             state: RunAttributes.ContentState(snapshot: snapshot),
             staleDate: nil

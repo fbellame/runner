@@ -69,6 +69,14 @@ final class WorkoutRecorder: LocationProvidingDelegate {
 
     /// Must match a key in Info.plist's NSLocationTemporaryUsageDescriptionDictionary.
     static let fullAccuracyPurposeKey = "PreciseWorkout"
+    /// Hoisted out of `liveSnapshot()`: that method runs on every accepted GPS
+    /// sample and again on every auto-pause detector tick — up to twice per
+    /// sample — and `reducedAccuracy` being true is a persistent per-session
+    /// condition, not a one-off. Re-resolving these localized strings from
+    /// scratch on every tick would put string-table lookups on the GPS hot
+    /// path Phase 2 took explicit care to keep clear of blocking work.
+    private static let locationAccessRequiredMessage = String(localized: "Location access is required")
+    private static let reducedAccuracyMessage = String(localized: "Precise Location is off")
 
     var livePoints: Int { PointsEngine.livePoints(type: activity, distanceMeters: distanceMeters) }
     var paceSecondsPerKm: Double? {
@@ -158,18 +166,25 @@ final class WorkoutRecorder: LocationProvidingDelegate {
             paceSecondsPerKm: paceSecondsPerKm,
             reducedAccuracy: reducedAccuracy,
             message: authorizationDenied
-                ? String(localized: "Location access is required")
+                ? Self.locationAccessRequiredMessage
                 : reducedAccuracy
-                    ? String(localized: "Precise Location is off")
+                    ? Self.reducedAccuracyMessage
                     : nil
         )
     }
 
     /// Task 8 connects manual runs only: auto-started sessions (silent by
     /// design — see `AutoWalkCoordinator`) and non-`.run` activities never
-    /// get a Live Activity, regardless of `isArmed`/`state`.
+    /// get a Live Activity, regardless of `isArmed`/`state`. The `state !=
+    /// .idle` clause matters on its own: `activity` defaults to `.run` and
+    /// `autoStarted` defaults to `false`, so without it this property reads
+    /// `true` before any session has ever started (e.g. the initial location
+    /// permission prompt at launch, long before `start()`). `start()` always
+    /// assigns `state` (to `.autoPaused` or `.recording`) before its own
+    /// `if presentsLiveActivity { liveActivity.begin(...) }` check, so this
+    /// clause does not block a session from ever opening its Live Activity.
     private var presentsLiveActivity: Bool {
-        activity == .run && !autoStarted
+        state != .idle && activity == .run && !autoStarted
     }
 
     /// `backdatedTo` starts the workout when the activity really began — before the
@@ -356,7 +371,13 @@ final class WorkoutRecorder: LocationProvidingDelegate {
     /// priority over a freshly-computed (and by now zeroed-out) snapshot.
     /// The `presentsLiveActivity` fallback exists for a hypothetical future
     /// call site that discards a still-active session directly, without
-    /// going through `finish()` first.
+    /// going through `finish()` first. This order is now also structurally
+    /// reinforced by `presentsLiveActivity`'s own `state != .idle` clause:
+    /// after `reset()`, `state == .idle` makes `presentsLiveActivity` false,
+    /// so the two branches can no longer both read true for the same call —
+    /// this doc comment's ordering rationale is kept explicit anyway, since
+    /// that clause lives on a different property for an unrelated reason
+    /// (Minor 6) and nothing enforces the two staying in sync.
     func discard() {
         if let lastFinishedSnapshot {
             liveActivity.end(lastFinishedSnapshot)
@@ -456,12 +477,10 @@ final class WorkoutRecorder: LocationProvidingDelegate {
             didAnnounceLocationDenied = true
             announcer.announce(.locationDenied)
         }
-        // `state != .idle` matters here specifically: `presentsLiveActivity`
-        // alone is also true before any session has ever started (the
-        // recorder's `activity`/`autoStarted` defaults happen to satisfy it),
-        // and this delegate callback can fire from the initial permission
-        // prompt at launch, long before `start()`.
-        if presentsLiveActivity, state != .idle {
+        // `presentsLiveActivity` itself now folds in `state != .idle` (see
+        // its doc comment), so the redundant local check that used to live
+        // here is gone.
+        if presentsLiveActivity {
             liveActivity.update(liveSnapshot())
         }
     }
