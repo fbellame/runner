@@ -79,6 +79,7 @@ final class WorkoutRecorder: LocationProvidingDelegate {
     private let provider: LocationProviding
     private let checkpoints: CheckpointStore
     private let checkpointInterval: TimeInterval
+    private let armedTimeout: Duration
     private let clock: () -> Date
     private var lastKeptLocation: CLLocation?
     private var autoPause: AutoPauseDetector?
@@ -86,14 +87,17 @@ final class WorkoutRecorder: LocationProvidingDelegate {
     private var lastSplitMovingSeconds: Double = 0
     private var timeAnchor: Date?
     private var pendingGap = false
+    private var armedTimeoutTask: Task<Void, Never>?
 
     init(provider: LocationProviding,
          checkpoints: CheckpointStore = CheckpointStore(),
          checkpointInterval: TimeInterval = 30,
+         armedTimeout: Duration = .seconds(600),
          clock: @escaping () -> Date = { Date() }) {
         self.provider = provider
         self.checkpoints = checkpoints
         self.checkpointInterval = checkpointInterval
+        self.armedTimeout = armedTimeout
         self.clock = clock
         provider.delegate = self
     }
@@ -143,6 +147,19 @@ final class WorkoutRecorder: LocationProvidingDelegate {
             provider.requestTemporaryFullAccuracy(purposeKey: Self.fullAccuracyPurposeKey)
         }
         provider.startUpdates()
+        // A new session must never inherit a previous one's pending timeout —
+        // cancel unconditionally before deciding whether to arm a fresh one.
+        armedTimeoutTask?.cancel()
+        if isArmed {
+            let timeout = armedTimeout
+            armedTimeoutTask = Task { [weak self] in
+                try? await Task.sleep(for: timeout)
+                // Re-check after the suspension: isArmed may have changed while
+                // asleep (movement started, or the session was finished/discarded/reset).
+                guard !Task.isCancelled, let self, self.isArmed else { return }
+                self.discard()
+            }
+        }
     }
 
     /// Pausing a run that has not actually started is meaningless: while armed,
@@ -204,6 +221,8 @@ final class WorkoutRecorder: LocationProvidingDelegate {
     }
 
     private func reset() {
+        armedTimeoutTask?.cancel()
+        armedTimeoutTask = nil
         state = .idle
         startedAt = nil
         movingSeconds = 0
@@ -275,6 +294,8 @@ final class WorkoutRecorder: LocationProvidingDelegate {
                 if isArmed {
                     startedAt = location.timestamp
                     isArmed = false
+                    armedTimeoutTask?.cancel()
+                    armedTimeoutTask = nil
                 }
             }
             state = paused ? .autoPaused : .recording
