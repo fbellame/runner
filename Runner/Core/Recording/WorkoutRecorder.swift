@@ -97,6 +97,8 @@ final class WorkoutRecorder: LocationProvidingDelegate {
     private var timeAnchor: Date?
     private var pendingGap = false
     private var armedTimeoutTask: Task<Void, Never>?
+    private let announcer: any Announcing
+    private var didAnnounceLocationDenied = false
     /// Bumped on every `start()`. Captured by the armed-timeout task so it can
     /// verify, after resuming from sleep, that it still belongs to the session
     /// currently in flight — a structural check independent of where/whether
@@ -107,12 +109,14 @@ final class WorkoutRecorder: LocationProvidingDelegate {
          checkpoints: CheckpointStore = CheckpointStore(),
          checkpointInterval: TimeInterval = 30,
          armedTimeout: Duration = .seconds(600),
-         clock: @escaping () -> Date = { Date() }) {
+         clock: @escaping () -> Date = { Date() },
+         announcer: any Announcing = SilentAnnouncer()) {
         self.provider = provider
         self.checkpoints = checkpoints
         self.checkpointInterval = checkpointInterval
         self.armedTimeout = armedTimeout
         self.clock = clock
+        self.announcer = announcer
         provider.delegate = self
     }
 
@@ -139,6 +143,7 @@ final class WorkoutRecorder: LocationProvidingDelegate {
         self.activity = activity
         self.autoStarted = autoStarted
         self.isArmed = armed && checkpoint == nil && walkBeganAt == nil
+        didAnnounceLocationDenied = false
         let now = clock()
         gpsBeganAt = walkBeganAt == nil ? nil : now
         if let checkpoint {
@@ -188,6 +193,7 @@ final class WorkoutRecorder: LocationProvidingDelegate {
                 // otherwise fail silently.
                 guard !Task.isCancelled, let self,
                       self.isArmed, self.sessionToken == session else { return }
+                self.announcer.announce(.runCancelled)
                 self.discardArmedSession()
             }
         }
@@ -203,6 +209,7 @@ final class WorkoutRecorder: LocationProvidingDelegate {
         if state == .recording { advanceTimer(to: clock()) }
         state = .manuallyPaused
         saveCheckpoint(at: clock())
+        if !autoStarted { announcer.announce(.paused) }
     }
 
     func resumeManually() {
@@ -212,6 +219,7 @@ final class WorkoutRecorder: LocationProvidingDelegate {
         pendingGap = !route.isEmpty // fresh segment; gap marker will show honestly
         timeAnchor = clock()
         state = .recording
+        if !autoStarted { announcer.announce(.resumed) }
     }
 
     /// `endingAt` supplies the true end when the caller knows it — an auto-stop
@@ -293,6 +301,7 @@ final class WorkoutRecorder: LocationProvidingDelegate {
         gpsBeganAt = nil
         isArmed = false
         lastMovingAt = nil
+        didAnnounceLocationDenied = false
     }
 
     // MARK: LocationProvidingDelegate
@@ -304,6 +313,10 @@ final class WorkoutRecorder: LocationProvidingDelegate {
     func didChangeAuthorization(_ status: CLAuthorizationStatus) {
         authorizationDenied = (status == .denied || status == .restricted)
         reducedAccuracy = provider.accuracyAuthorization == .reducedAccuracy
+        if authorizationDenied, state != .idle, !autoStarted, !didAnnounceLocationDenied {
+            didAnnounceLocationDenied = true
+            announcer.announce(.locationDenied)
+        }
     }
 
     func didFail(_ error: Error) {
@@ -348,12 +361,18 @@ final class WorkoutRecorder: LocationProvidingDelegate {
             autoPause = detector
             if wasAutoPaused && !paused {
                 timeAnchor = location.timestamp
+                let wasArmed = isArmed
                 if isArmed {
                     startedAt = location.timestamp
                     isArmed = false
                     armedTimeoutTask?.cancel()
                     armedTimeoutTask = nil
                 }
+                if !autoStarted {
+                    announcer.announce(wasArmed ? .runStarted : .resumed)
+                }
+            } else if !wasAutoPaused && paused && !autoStarted {
+                announcer.announce(.paused)
             }
             state = paused ? .autoPaused : .recording
         }

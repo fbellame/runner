@@ -25,6 +25,13 @@ struct AutoWalkCoordinatorTests {
 
     private final class Saved { var workouts: [RecordedWorkout] = [] }
 
+    private final class AnnouncementSpy: Announcing {
+        var events: [RunAnnouncement] = []
+        func announce(_ event: RunAnnouncement) {
+            events.append(event)
+        }
+    }
+
     private struct Harness {
         let coordinator: AutoWalkCoordinator
         let motion: FakeMotionActivityProvider
@@ -270,5 +277,35 @@ struct AutoWalkCoordinatorTests {
         #expect(h.recorder.state == .idle)
         #expect(!h.motion.started)
         #expect(h.motion.authorizationRequests == 0)
+    }
+
+    @Test func autoWalkStaysSilent() async {
+        let motion = FakeMotionActivityProvider()
+        let location = FakeLocationProvider()
+        let directory = FileManager.default.temporaryDirectory
+            .appendingPathComponent("autowalk-silent-\(UUID().uuidString)")
+        let checkpoints = CheckpointStore(directory: directory)
+        let announcements = AnnouncementSpy()
+        let recorder = WorkoutRecorder(
+            provider: location,
+            checkpoints: checkpoints,
+            clock: { self.now },
+            announcer: announcements
+        )
+        let coordinator = AutoWalkCoordinator(
+            motion: motion,
+            recorder: recorder,
+            health: FakeHealthStore(),
+            checkpoints: checkpoints,
+            clock: { self.now },
+            canAutoStart: { true },
+            save: { _ in }
+        )
+
+        await coordinator.ingest(walking(-300))
+        await coordinator.ingest(walking(0))
+
+        #expect(recorder.state == .recording)
+        #expect(announcements.events.isEmpty)
     }
 }
