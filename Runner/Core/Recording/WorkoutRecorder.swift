@@ -88,6 +88,11 @@ final class WorkoutRecorder: LocationProvidingDelegate {
     private var timeAnchor: Date?
     private var pendingGap = false
     private var armedTimeoutTask: Task<Void, Never>?
+    /// Bumped on every `start()`. Captured by the armed-timeout task so it can
+    /// verify, after resuming from sleep, that it still belongs to the session
+    /// currently in flight — a structural check independent of where/whether
+    /// `armedTimeoutTask?.cancel()` happened to run before it woke up.
+    private var sessionToken = 0
 
     init(provider: LocationProviding,
          checkpoints: CheckpointStore = CheckpointStore(),
@@ -112,6 +117,16 @@ final class WorkoutRecorder: LocationProvidingDelegate {
     func start(activity: ActivityType, resumeFrom checkpoint: SessionCheckpoint? = nil,
                backdatedTo walkBeganAt: Date? = nil, autoStarted: Bool = false,
                armed: Bool = false) {
+        // Cancel any pending armed-timeout FIRST, before any other state changes:
+        // a new session must never share a window — however brief — where its
+        // own `isArmed`/state is live while the previous session's timer is
+        // still armed to fire. Every session also gets a fresh token; the
+        // timeout task checks both after it wakes.
+        armedTimeoutTask?.cancel()
+        armedTimeoutTask = nil
+        sessionToken += 1
+        let session = sessionToken
+
         self.activity = activity
         self.autoStarted = autoStarted
         self.isArmed = armed && checkpoint == nil && walkBeganAt == nil
@@ -147,16 +162,19 @@ final class WorkoutRecorder: LocationProvidingDelegate {
             provider.requestTemporaryFullAccuracy(purposeKey: Self.fullAccuracyPurposeKey)
         }
         provider.startUpdates()
-        // A new session must never inherit a previous one's pending timeout —
-        // cancel unconditionally before deciding whether to arm a fresh one.
-        armedTimeoutTask?.cancel()
         if isArmed {
             let timeout = armedTimeout
             armedTimeoutTask = Task { [weak self] in
                 try? await Task.sleep(for: timeout)
-                // Re-check after the suspension: isArmed may have changed while
-                // asleep (movement started, or the session was finished/discarded/reset).
-                guard !Task.isCancelled, let self, self.isArmed else { return }
+                // Re-check after the suspension, not only before: isArmed may
+                // have changed while asleep (movement started, or the session
+                // was finished/discarded/reset). The session-token comparison
+                // is the structural half of that check — it holds even if a
+                // future `await` lands between this session's state changes
+                // and the top-of-start() cancel, because a stale continuation
+                // can never match a session token that has since moved on.
+                guard !Task.isCancelled, let self,
+                      self.isArmed, self.sessionToken == session else { return }
                 self.discard()
             }
         }
@@ -187,6 +205,11 @@ final class WorkoutRecorder: LocationProvidingDelegate {
     /// fires five minutes after the walking actually stopped, and that stationary
     /// tail must not be baked into the workout.
     func finish(endingAt end: Date? = nil) -> RecordedWorkout? {
+        // A session that has already been reset (e.g. the armed timeout fired
+        // in the same MainActor turn a slide-to-finish landed) has no real
+        // span to report; building a workout here would offer the user a
+        // bogus 0.00 km summary with start == end.
+        guard state != .idle else { return nil }
         guard !isArmed else {
             discard()
             return nil
