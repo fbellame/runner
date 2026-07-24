@@ -29,13 +29,24 @@ final class LiveActivityController: LiveActivityPresenting {
     private var lastUpdateAt: Date?
     private let clock: () -> Date
 
+    // Fix wave 3: when non-matching strays exist, `begin()` must end them
+    // ALL before calling `Activity.request` (see the stray-clearing branch
+    // below), which means `begin()` can now return before `activity` is
+    // set. That gap opens two races (re-entrancy, and `end()`/`discard()`
+    // racing the deferred request) — see `LiveActivityRequestGate`'s doc
+    // comment for the full analysis. The state itself is pulled out into
+    // that separate, ActivityKit-free type (same precedent as
+    // `LiveActivityOrphanSelector`) so it's unit-testable on its own.
+    private var requestGate = LiveActivityRequestGate()
+
     init(clock: @escaping () -> Date = { Date() }) {
         self.clock = clock
     }
 
     func begin(_ snapshot: RunActivitySnapshot) {
         guard ActivityAuthorizationInfo().areActivitiesEnabled,
-              activity == nil else { return }
+              activity == nil,
+              !requestGate.isInFlight else { return }
 
         // ActivityKit activities outlive this process. If the app was
         // killed mid-run (jetsam, force-quit, or a crash while the summary
@@ -72,16 +83,16 @@ final class LiveActivityController: LiveActivityPresenting {
             incoming: snapshot.startedAt
         )
 
-        // Any non-matching stray is dead weight on the lock screen (or, in
-        // the non-matching case, belongs to a different run entirely) and
-        // is ended. More than one stray can exist after repeated
-        // crash/relaunch cycles.
-        for index in decision.endIndices {
-            let box = SendableActivityBox(activity: existing[index])
-            Task { await box.activity.end(nil, dismissalPolicy: .immediate) }
-        }
-
         if let adoptIndex = decision.adoptIndex {
+            // Adoption path: unchanged from before fix wave 3. No `request`
+            // is involved, so there is no ordering requirement between
+            // ending the extras and refreshing the adopted activity's
+            // content — both are pushed as independent, fire-and-forget
+            // tasks, exactly as today.
+            for index in decision.endIndices {
+                let box = SendableActivityBox(activity: existing[index])
+                Task { await box.activity.end(nil, dismissalPolicy: .immediate) }
+            }
             let adopted = existing[adoptIndex]
             activity = adopted
             // The adopted activity's content is whatever it last showed
@@ -100,15 +111,62 @@ final class LiveActivityController: LiveActivityPresenting {
             return
         }
 
+        guard !decision.endIndices.isEmpty else {
+            // No strays and no match: request synchronously, exactly as
+            // before fix wave 3 — but only commit bookkeeping if the
+            // request actually succeeded, so a rejected request never
+            // leaves `activity`/`previous`/`lastUpdateAt` pointing at an
+            // activity that does not exist.
+            let content = ActivityContent(
+                state: RunAttributes.ContentState(snapshot: snapshot),
+                staleDate: nil
+            )
+            guard let requested = try? Activity.request(
+                attributes: RunAttributes(sessionID: UUID()),
+                content: content,
+                pushType: nil
+            ) else { return }
+            activity = requested
+            previous = snapshot
+            lastUpdateAt = clock()
+            return
+        }
+
+        // Strays exist and none match: ActivityKit enforces a limit on
+        // concurrent activities, so requesting while every stray is still
+        // live risks a silent rejection. End them all first — sequentially,
+        // awaited, inside ONE controller-scoped task — and only then
+        // request and commit bookkeeping. `begin()` itself stays
+        // synchronous (WorkoutRecorder's hot path must never suspend); see
+        // `LiveActivityRequestGate` for how the two races this deferral
+        // opens are closed.
+        let strays = decision.endIndices.map { SendableActivityBox(activity: existing[$0]) }
+        let token = requestGate.start()
+        Task { [weak self] in
+            for stray in strays {
+                await stray.activity.end(nil, dismissalPolicy: .immediate)
+            }
+            await self?.finishDeferredRequest(snapshot: snapshot, token: token)
+        }
+    }
+
+    /// Completes the deferred half of `begin()`'s stray-clearing branch:
+    /// requests a fresh activity and commits bookkeeping, but only if
+    /// `requestGate.shouldProceed(token)` confirms nothing invalidated this
+    /// attempt (a newer `begin()` or an `end()`) while the strays were
+    /// being ended.
+    private func finishDeferredRequest(snapshot: RunActivitySnapshot, token: Int) async {
+        guard requestGate.shouldProceed(token) else { return }
         let content = ActivityContent(
             state: RunAttributes.ContentState(snapshot: snapshot),
             staleDate: nil
         )
-        activity = try? Activity.request(
+        guard let requested = try? Activity.request(
             attributes: RunAttributes(sessionID: UUID()),
             content: content,
             pushType: nil
-        )
+        ) else { return }
+        activity = requested
         previous = snapshot
         lastUpdateAt = clock()
     }
@@ -134,6 +192,14 @@ final class LiveActivityController: LiveActivityPresenting {
     }
 
     func end(_ snapshot: RunActivitySnapshot) {
+        // If a `begin()` stray-clearing task is between "strays ended" and
+        // "request landed", this run is finishing (or being discarded)
+        // before that request lands. Invalidate it so `finishDeferredRequest`
+        // bails out WITHOUT calling `Activity.request` at all when it
+        // resumes — no activity is ever created for an already-finished
+        // session, so there is nothing to leak as an orphan. Harmless
+        // no-op when nothing is in flight.
+        requestGate.invalidate()
         guard let activity else { return }
         self.activity = nil
         previous = nil
