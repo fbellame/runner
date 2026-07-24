@@ -169,10 +169,14 @@ final class WorkoutRecorder: LocationProvidingDelegate {
                 // Re-check after the suspension, not only before: isArmed may
                 // have changed while asleep (movement started, or the session
                 // was finished/discarded/reset). The session-token comparison
-                // is the structural half of that check — it holds even if a
-                // future `await` lands between this session's state changes
-                // and the top-of-start() cancel, because a stale continuation
-                // can never match a session token that has since moved on.
+                // is an independent identity check, not load-bearing today —
+                // the cancel at the very top of start() already guarantees
+                // Task.isCancelled for any stale task by the time a new
+                // session exists, so no black-box test can force this
+                // comparison to be the deciding factor. It exists so the
+                // invariant survives a future edit that removes, relocates,
+                // or bypasses that cancel — a class of change that would
+                // otherwise fail silently.
                 guard !Task.isCancelled, let self,
                       self.isArmed, self.sessionToken == session else { return }
                 self.discard()

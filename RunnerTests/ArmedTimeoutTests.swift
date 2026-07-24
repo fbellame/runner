@@ -82,11 +82,25 @@ struct ArmedTimeoutTests {
 
     /// Covers the failure mode a stale armed-timeout task could cause: a
     /// timer belonging to an already-discarded session (A) must never reach
-    /// into a session started afterwards (B), even once real time has passed
-    /// A's original deadline. Session A is armed and discarded immediately;
-    /// after a real gap well past A's timeout, session B is armed on the same
-    /// recorder and must stay alive through a window safely inside its own
-    /// (independent, freshly-started) timeout.
+    /// into a LATER session (B) that is still armed when A's original
+    /// deadline lands. That ordering — A's deadline landing INSIDE B's armed
+    /// window, not after B has already ended or before B has begun — is the
+    /// only ordering where a leaked timer would actually do damage, so B is
+    /// armed at t≈100 (before A's t≈200 deadline) and the assertion window
+    /// runs to t≈250, comfortably inside B's own independent deadline of
+    /// t≈300.
+    ///
+    /// Verified (see the task report) that this test does NOT independently
+    /// exercise the top-of-`start()` cancel: `discard()` already cancels
+    /// session A's task via `reset()`'s own cancel before B's `start()` ever
+    /// runs, so removing only the top-of-`start()` cancel does not fail this
+    /// test — `reset()`'s cancel alone already covers this discard-then-
+    /// later-start ordering. The same is true of the session-token
+    /// comparison in isolation, for the same reason. The test only fails
+    /// once every independent protection (both cancel sites and the token)
+    /// is removed at the same time; it exists to catch a genuine regression
+    /// in the cross-session invariant as a whole, not to pin down which
+    /// single mechanism is responsible for holding it today.
     @Test func pendingTimeoutFromDiscardedSessionDoesNotCancelNewArmedSession() async {
         let provider = FakeLocationProvider()
         let directory = FileManager.default.temporaryDirectory
@@ -94,28 +108,28 @@ struct ArmedTimeoutTests {
         let recorder = WorkoutRecorder(
             provider: provider,
             checkpoints: CheckpointStore(directory: directory),
-            armedTimeout: .milliseconds(30)
+            armedTimeout: .milliseconds(200)
         )
 
-        // Session A: armed, then discarded before its own timer can fire.
+        // Session A: armed, then discarded at t≈0. A's timer, if it leaked,
+        // would fire at t≈200.
         recorder.start(activity: .run, armed: true)
         recorder.discard()
 
-        // Let real time pass well beyond what A's timer deadline would have
-        // been, so a leaked/uncancelled task for A has every opportunity to
-        // misfire here, before B even exists.
-        try? await Task.sleep(for: .milliseconds(60))
+        try? await Task.sleep(for: .milliseconds(100))
 
-        // Session B starts only now. A properly-isolated implementation must
-        // not let A's stale timer discard B.
+        // Session B armed at t≈100, so B's own deadline is t≈300. A's
+        // deadline (t≈200) now falls INSIDE B's armed window — the real
+        // scenario a leaked timer would threaten.
         recorder.start(activity: .run, armed: true)
 
-        // Poll through a window comfortably inside B's own 30 ms deadline.
-        let deadline = ContinuousClock.now + .milliseconds(15)
+        // Poll from t≈100 to t≈250: spans A's t≈200 deadline while staying
+        // 50 ms clear of B's own t≈300 deadline.
+        let deadline = ContinuousClock.now + .milliseconds(150)
         while ContinuousClock.now < deadline {
             #expect(recorder.state == .autoPaused)
             #expect(recorder.isArmed)
-            try? await Task.sleep(for: .milliseconds(5))
+            try? await Task.sleep(for: .milliseconds(10))
         }
     }
 }
