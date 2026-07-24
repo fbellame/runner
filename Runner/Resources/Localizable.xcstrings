@@ -1391,6 +1391,16 @@
         }
       }
     },
+    "Location access is required": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "L’accès à la localisation est requis"
+          }
+        }
+      }
+    },
     "Longest": {
       "localizations": {
         "fr": {
@@ -1671,6 +1681,16 @@
         }
       }
     },
+    "Paused": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "En pause"
+          }
+        }
+      }
+    },
     "Permissions": {
       "localizations": {
         "fr": {
@@ -1841,6 +1861,16 @@
         }
       }
     },
+    "Resumed": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Reprise"
+          }
+        }
+      }
+    },
     "Review your profile": {
       "localizations": {
         "fr": {
@@ -1887,6 +1917,36 @@
           "stringUnit": {
             "state": "translated",
             "value": "Course"
+          }
+        }
+      }
+    },
+    "Run cancelled": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Course annulée"
+          }
+        }
+      }
+    },
+    "Run saved": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Course enregistrée"
+          }
+        }
+      }
+    },
+    "Run started": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Course commencée"
           }
         }
       }

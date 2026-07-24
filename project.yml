@@ -41,7 +41,7 @@ targets:
         NSLocationTemporaryUsageDescriptionDictionary:
           PreciseWorkout: "Precise location is needed to measure your distance and draw your route while recording a workout."
         NSMotionUsageDescription: "Runner uses motion activity to notice when you have been walking for a while, so it can record the walk for you."
-        UIBackgroundModes: [location]
+        UIBackgroundModes: [location, audio]
         ITSAppUsesNonExemptEncryption: false
   RunnerTests:
     type: bundle.unit-test
