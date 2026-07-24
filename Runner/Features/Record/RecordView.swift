@@ -283,10 +283,13 @@ struct RecordView: View {
         // IN-APP save path only. Confirms out loud that the run was actually
         // captured — otherwise the last thing a hands-free user hears is
         // whatever the recorder announced before finishing, which may be the
-        // opposite of what just happened (e.g. "Resumed"). Task 12 will add the
-        // Lock-Screen intent save path as a separate call site; it must call
-        // `announceSaved()` too, but must NOT also fire it here, or the cue
-        // will double-announce on the in-app path.
+        // opposite of what just happened (e.g. "Resumed").
+        //
+        // ⚠️ TASK 8 lands `recorder.completeSave()` on THIS exact line and its
+        // body already announces `.runSaved` — implemented verbatim that yields
+        // "Run saved. Run saved." `completeSave()` must call `announceSaved()`
+        // instead of announcing directly. Task 12's Lock-Screen intent save is a
+        // separate call site that needs its own cue, but exactly once.
         model.recorder.announceSaved()
         finished = nil
         if let failure {

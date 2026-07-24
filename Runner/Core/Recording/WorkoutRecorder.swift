@@ -294,11 +294,17 @@ final class WorkoutRecorder: LocationProvidingDelegate {
 
     /// Confirms a save out loud — the one cue that answers the core question of
     /// this phase for a user who cannot see the screen: "did it record at all?"
-    /// IN-APP SAVE PATH ONLY: called from `RecordView.save(_:)`. Task 12 will add
-    /// the intent-driven save path used when finishing from the Lock Screen; that
-    /// is a different call site and must call this too, but exactly once per
-    /// save — do not also announce `.runSaved` from wherever Task 12's save path
-    /// lives if it already routes through here, or the cue will double-fire.
+    /// IN-APP SAVE PATH ONLY: called from `RecordView.save(_:)`.
+    ///
+    /// ⚠️ TASK 8 COLLIDES WITH THIS. The plan adds `completeSave()`, whose body
+    /// begins `announcer.announce(.runSaved)`, and tells the implementer to call
+    /// it from `RecordView.save(_:)` *after* `model.checkpoints.clear()` — the
+    /// exact line `announceSaved()` already occupies. Implemented verbatim, the
+    /// in-app path says "Run saved. Run saved." Task 8's `completeSave()` must
+    /// call `announceSaved()` rather than announce directly.
+    ///
+    /// Task 12's intent-driven save (finishing from the Lock Screen) is a
+    /// genuinely separate call site and needs its own cue — but exactly once.
     func announceSaved() {
         announcer.announce(.runSaved)
     }

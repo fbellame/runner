@@ -49,7 +49,17 @@ struct SystemAudioSession: AudioSessionControlling {
     }
 
     func activate() {
-        try? AVAudioSession.sharedInstance().setActive(true)
+        let session = AVAudioSession.sharedInstance()
+        // Re-set the category only if something else took it. A mediaserverd
+        // reset silently reverts the session to `.soloAmbient`, and setting the
+        // category once at init would leave every later cue mute and un-ducking
+        // for the rest of the app run. Reading `category` is a cached property
+        // read, not the route re-evaluation that `setCategory` forces, so this
+        // keeps the per-cue path cheap while staying self-healing.
+        if session.category != .playback {
+            try? session.setCategory(.playback, mode: .spokenAudio, options: [.duckOthers])
+        }
+        try? session.setActive(true)
     }
 
     func deactivate() {
