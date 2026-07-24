@@ -209,7 +209,7 @@ struct RecordView: View {
                 } label: {
                     Image(systemName: recorder.state == .manuallyPaused ? "play.fill" : "pause.fill")
                         .font(.system(size: 20, weight: .bold))
-                        .foregroundStyle(.white)
+                        .foregroundStyle(recorder.isArmed ? Color.rTextSecondary : .white)
                         .frame(width: 56, height: 56)
                         .background(Circle().fill(Color.rSurface))
                         .overlay(Circle().stroke(Color.rBorder, lineWidth: 1))

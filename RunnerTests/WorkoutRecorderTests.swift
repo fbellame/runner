@@ -189,6 +189,22 @@ struct WorkoutRecorderTests {
         #expect(cp.load() == nil)
     }
 
+    /// Regression: `end` can be a GPS-derived timestamp (e.g. lastMovingAt)
+    /// delivered out of order relative to a rebased `startedAt`, since
+    /// SystemLocationProvider hops every delegate callback through an
+    /// unstructured Task with no FIFO guarantee. An unclamped `end < start`
+    /// would reach HKQuantitySample(start:end:), which raises an uncatchable
+    /// ObjC exception — a permanent launch crash loop via retryPendingSaves.
+    @Test func finishClampsEndBeforeStartToStart() {
+        let (rec, _, _) = makeRecorder()
+        rec.start(activity: .run)
+        let startedAt = rec.startedAt!
+        let earlierEnd = startedAt.addingTimeInterval(-100)
+        let workout = rec.finish(endingAt: earlierEnd)
+        #expect(workout?.start == startedAt)
+        #expect(workout?.end == startedAt)
+    }
+
     @Test func resumeFromCheckpointRestoresProgress() {
         let (rec, _, _) = makeRecorder()
         let checkpoint = SessionCheckpoint(activity: .run, startedAt: base,

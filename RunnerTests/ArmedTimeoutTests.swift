@@ -40,6 +40,39 @@ struct ArmedTimeoutTests {
         #expect(checkpoints.load() == nil)
     }
 
+    /// Regression: an armed session never writes a checkpoint of its own —
+    /// `saveCheckpoint` is reachable only from `ingest`'s step 7 (requires
+    /// `state == .recording`) and from `pauseManually` (refused while armed).
+    /// So a checkpoint on disk when the armed timeout fires can only belong to
+    /// an UNRELATED prior session — e.g. one whose summary sheet was swiped
+    /// away, leaving the post-`finish()` checkpoint as its only recovery copy.
+    /// The armed timeout must not wipe it.
+    @Test func armedTimeoutDoesNotDestroyAnUnrelatedCheckpoint() async {
+        let provider = FakeLocationProvider()
+        let directory = FileManager.default.temporaryDirectory
+            .appendingPathComponent("armed-timeout-checkpoint-\(UUID().uuidString)")
+        let checkpoints = CheckpointStore(directory: directory)
+        let priorCheckpoint = SessionCheckpoint(activity: .run, startedAt: Date(),
+                                                movingSeconds: 600, distanceMeters: 1500,
+                                                route: [], splitSeconds: [], savedAt: Date())
+        try? checkpoints.save(priorCheckpoint)
+
+        let recorder = WorkoutRecorder(
+            provider: provider,
+            checkpoints: checkpoints,
+            armedTimeout: .milliseconds(20)
+        )
+
+        recorder.start(activity: .run, armed: true)
+        await waitUntil { recorder.state == .idle }
+
+        #expect(recorder.state == .idle)
+        let survivor = checkpoints.load()
+        #expect(survivor?.activity == .run)
+        #expect(survivor?.movingSeconds == 600)
+        #expect(survivor?.distanceMeters == 1500)
+    }
+
     @Test func timeoutDoesNotCancelAfterMovementStarts() async {
         let provider = FakeLocationProvider()
         let directory = FileManager.default.temporaryDirectory

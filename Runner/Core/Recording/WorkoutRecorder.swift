@@ -82,6 +82,15 @@ final class WorkoutRecorder: LocationProvidingDelegate {
     private let armedTimeout: Duration
     private let clock: () -> Date
     private var lastKeptLocation: CLLocation?
+    /// A speed-reference location maintained ONLY until real recording begins
+    /// (i.e. only while `lastKeptLocation == nil`). While armed, step 4 returns
+    /// early for every sample so `lastKeptLocation` never populates — without
+    /// this, the computed-speed fallback in step 2 is permanently 0 and an
+    /// armed session can only un-freeze via raw sensor speed, which CoreLocation
+    /// reports as -1 (unavailable) for a phone in a pocket. Once `lastKeptLocation`
+    /// becomes non-nil this is never consulted again, so existing computed-speed
+    /// behaviour after recording starts is completely unchanged.
+    private var lastSpeedReference: CLLocation?
     private var autoPause: AutoPauseDetector?
     private var lastCheckpointAt: Date?
     private var lastSplitMovingSeconds: Double = 0
@@ -179,7 +188,7 @@ final class WorkoutRecorder: LocationProvidingDelegate {
                 // otherwise fail silently.
                 guard !Task.isCancelled, let self,
                       self.isArmed, self.sessionToken == session else { return }
-                self.discard()
+                self.discardArmedSession()
             }
         }
     }
@@ -215,13 +224,18 @@ final class WorkoutRecorder: LocationProvidingDelegate {
         // bogus 0.00 km summary with start == end.
         guard state != .idle else { return nil }
         guard !isArmed else {
-            discard()
+            discardArmedSession()
             return nil
         }
         provider.stopUpdates()
         if state == .recording { advanceTimer(to: end ?? clock()) }
         let start = startedAt ?? clock()
-        let finishedAt = end ?? clock()
+        // `end` may be a GPS-derived timestamp (recorder.lastMovingAt) delivered out
+        // of order relative to a rebased `startedAt` — SystemLocationProvider hops
+        // every delegate callback through an unstructured Task, which is not
+        // FIFO-guaranteed. Without this clamp, end < start would reach HealthKit's
+        // HKQuantitySample(start:end:), which raises an uncatchable ObjC exception.
+        let finishedAt = max(start, end ?? clock())
         // A backdated start seeds moving time from the walk's beginning; if the
         // walk had already ended by the time we noticed, that seed overshoots the
         // workout's own span. Moving time can never exceed elapsed time.
@@ -247,6 +261,18 @@ final class WorkoutRecorder: LocationProvidingDelegate {
         reset()
     }
 
+    /// Both armed exit paths (finish()'s `isArmed` early-return, and the armed
+    /// timeout) route here instead of `discard()`. An armed session never writes
+    /// a checkpoint of its own — `saveCheckpoint` is reachable only from step 7 of
+    /// `ingest` (requires `state == .recording`) and from `pauseManually` (refused
+    /// while armed) — so any checkpoint on disk at this point belongs to a PRIOR
+    /// session (e.g. one whose summary sheet was swiped away). Clearing it here
+    /// would destroy that unrelated recovery copy for no reason.
+    private func discardArmedSession() {
+        provider.stopUpdates()
+        reset()
+    }
+
     private func reset() {
         armedTimeoutTask?.cancel()
         armedTimeoutTask = nil
@@ -257,6 +283,7 @@ final class WorkoutRecorder: LocationProvidingDelegate {
         route = []
         splitSeconds = []
         lastKeptLocation = nil
+        lastSpeedReference = nil
         lastCheckpointAt = nil
         autoPause = nil
         lastSplitMovingSeconds = 0
@@ -305,6 +332,9 @@ final class WorkoutRecorder: LocationProvidingDelegate {
         if let last = lastKeptLocation {
             let dt = location.timestamp.timeIntervalSince(last.timestamp)
             computedSpeed = dt > 0 ? location.distance(from: last) / dt : 0
+        } else if let reference = lastSpeedReference {
+            let dt = location.timestamp.timeIntervalSince(reference.timestamp)
+            computedSpeed = dt > 0 ? location.distance(from: reference) / dt : 0
         } else {
             computedSpeed = 0
         }
@@ -332,34 +362,42 @@ final class WorkoutRecorder: LocationProvidingDelegate {
         let decision = LocationFilter.evaluate(candidate: location,
                                                lastKept: lastKeptLocation,
                                                now: Date())
-        guard decision.accepted, state == .recording else { return }
-        lastMovingAt = location.timestamp
+        if decision.accepted, state == .recording {
+            lastMovingAt = location.timestamp
 
-        // 5. Distance (not across gaps); a resume after pause/relaunch marks the
-        //    first point as a gap so the map never draws a line the user didn't move.
-        let afterGap = decision.afterGap || pendingGap
-        if let last = lastKeptLocation, !afterGap {
-            distanceMeters += location.distance(from: last)
+            // 5. Distance (not across gaps); a resume after pause/relaunch marks the
+            //    first point as a gap so the map never draws a line the user didn't move.
+            let afterGap = decision.afterGap || pendingGap
+            if let last = lastKeptLocation, !afterGap {
+                distanceMeters += location.distance(from: last)
+            }
+            route.append(RoutePoint(lat: location.coordinate.latitude,
+                                    lon: location.coordinate.longitude,
+                                    t: location.timestamp,
+                                    afterGap: afterGap))
+            pendingGap = false
+            lastKeptLocation = location
+
+            // 6. Km splits.
+            let completedKm = Int(distanceMeters / 1000.0)
+            while splitSeconds.count < completedKm {
+                splitSeconds.append(movingSeconds - lastSplitMovingSeconds)
+                lastSplitMovingSeconds = movingSeconds
+                onKmSplit?(splitSeconds.count)
+            }
+
+            // 7. Periodic checkpoint.
+            if lastCheckpointAt == nil ||
+                location.timestamp.timeIntervalSince(lastCheckpointAt!) >= checkpointInterval {
+                saveCheckpoint(at: location.timestamp)
+            }
         }
-        route.append(RoutePoint(lat: location.coordinate.latitude,
-                                lon: location.coordinate.longitude,
-                                t: location.timestamp,
-                                afterGap: afterGap))
-        pendingGap = false
-        lastKeptLocation = location
 
-        // 6. Km splits.
-        let completedKm = Int(distanceMeters / 1000.0)
-        while splitSeconds.count < completedKm {
-            splitSeconds.append(movingSeconds - lastSplitMovingSeconds)
-            lastSplitMovingSeconds = movingSeconds
-            onKmSplit?(splitSeconds.count)
-        }
-
-        // 7. Periodic checkpoint.
-        if lastCheckpointAt == nil ||
-            location.timestamp.timeIntervalSince(lastCheckpointAt!) >= checkpointInterval {
-            saveCheckpoint(at: location.timestamp)
+        // 8. Speed reference for step 2's fallback: kept alive only until real
+        //    recording starts (see property doc). This is the one path reachable
+        //    while armed, since step 4 never sets lastKeptLocation in that state.
+        if lastKeptLocation == nil {
+            lastSpeedReference = location
         }
     }
 

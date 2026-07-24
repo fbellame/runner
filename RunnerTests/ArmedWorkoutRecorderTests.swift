@@ -112,4 +112,41 @@ struct ArmedWorkoutRecorderTests {
         #expect(recorder.startedAt == base.addingTimeInterval(13))
         #expect(recorder.movingSeconds == 0)
     }
+
+    /// Regression for the armed-fallback bug: `lastKeptLocation` is only ever
+    /// assigned once real recording starts (state == .recording), which never
+    /// happens while armed — every armed sample is dropped by step 4. So the
+    /// computed-speed fallback in step 2 stayed permanently 0 unless a
+    /// speed-reference location survives the armed state on its own. Here
+    /// EVERY sample carries `speed: -1` (CoreLocation's "unavailable" sentinel
+    /// — e.g. a phone in a zipped pocket), so un-freezing can only happen via
+    /// that computed fallback, never via raw sensor speed.
+    @Test func armedSessionUnfreezesFromComputedSpeedWhenSensorSpeedIsUnavailable() {
+        let recorder = makeRecorder()
+        recorder.start(activity: .run, armed: true)
+        #expect(recorder.state == .autoPaused)
+
+        // First sample only establishes the speed reference — no prior point
+        // exists yet, so its own computed speed is necessarily 0.
+        recorder.didUpdate(locations: [location(x: 0, seconds: 0, speed: -1)])
+        #expect(recorder.state == .autoPaused)
+
+        // Real displacement (4 m every 2 s ⇒ 2 m/s, well above the 0.5 m/s
+        // walk/run threshold) computed purely from timestamps/coordinates,
+        // with sensor speed unavailable on every sample.
+        recorder.didUpdate(locations: [
+            location(x: 4, seconds: 2, speed: -1),
+            location(x: 8, seconds: 4, speed: -1)
+        ])
+        #expect(recorder.state == .autoPaused) // only 2 s continuously above threshold so far
+
+        recorder.didUpdate(locations: [
+            location(x: 12, seconds: 6, speed: -1)
+        ])
+
+        #expect(recorder.state == .recording)
+        #expect(!recorder.isArmed)
+        #expect(recorder.startedAt == base.addingTimeInterval(6))
+        #expect(recorder.movingSeconds == 0)
+    }
 }
