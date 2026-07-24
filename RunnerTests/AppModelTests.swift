@@ -38,6 +38,21 @@ struct AppModelTests {
         #expect(model.storeFailureMessage == "disk full")
     }
 
+    /// Regression for the whole Phase 2 spoken-cues feature being silently wired
+    /// off: `WorkoutRecorder.init`'s `announcer:` parameter defaults to
+    /// `SilentAnnouncer()`, and `AppModel.live()` is the ONLY production
+    /// construction site. If that call site ever drops (or loses) its explicit
+    /// `announcer: RunAnnouncer()` argument, every cue Phase 2 computes goes
+    /// nowhere and the user hears nothing. This exercises the real production
+    /// path — not a fake — so it fails exactly when that wiring regresses.
+    /// `AppModel.live()` only constructs its HealthKit/SwiftData/CoreLocation
+    /// dependencies here; it never requests authorization or starts updates,
+    /// so this is safe to run in a unit test.
+    @Test func liveRecorderUsesARealAnnouncerNotSilence() {
+        let model = AppModel.live()
+        #expect(!(model.recorder.announcer is SilentAnnouncer))
+    }
+
     @Test func launchDetectsCheckpoint() async throws {
         let (model, _, checkpoints) = try makeModel()
         try checkpoints.save(SessionCheckpoint(activity: .run,

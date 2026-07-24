@@ -35,10 +35,21 @@ protocol AudioSessionControlling: Sendable {
 }
 
 struct SystemAudioSession: AudioSessionControlling {
-    func activate() {
+    // The category/mode/options never change for the lifetime of the app, but
+    // `setCategory` forces a full audio-route re-evaluation. Previously this
+    // ran synchronously on every `activate()` call — i.e. on every GPS sample
+    // that triggered a cue, on the @MainActor — and could hitch the HUD by
+    // ~100 ms bringing a Bluetooth route up from idle. Setting it once here,
+    // at construction (this type is instantiated exactly once per app run —
+    // see `RunAnnouncer.init`), means `activate()` only ever does the
+    // unavoidable per-utterance `setActive`.
+    init() {
         let session = AVAudioSession.sharedInstance()
         try? session.setCategory(.playback, mode: .spokenAudio, options: [.duckOthers])
-        try? session.setActive(true)
+    }
+
+    func activate() {
+        try? AVAudioSession.sharedInstance().setActive(true)
     }
 
     func deactivate() {

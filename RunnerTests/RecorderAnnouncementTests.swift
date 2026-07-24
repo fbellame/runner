@@ -115,4 +115,42 @@ struct RecorderAnnouncementTests {
 
         #expect(spy.events == [.runCancelled])
     }
+
+    /// Regression for the one announcement site that lacked the `!autoStarted`
+    /// guard every other cue has. In production this path is unreachable for
+    /// auto-walks only because of a cross-file invariant (AutoWalkCoordinator
+    /// always passes a non-nil `backdatedTo`, which forces `isArmed` false, so
+    /// no timeout task is ever created). This test bypasses that invariant by
+    /// calling the recorder's own public API directly — exactly the kind of
+    /// direct construction a future call site could do — to prove the
+    /// guarantee is now enforced locally rather than depending on a second file.
+    @Test func armedTimeoutNeverAnnouncesForAnAutoStartedSessionEvenIfArmedDirectly() async {
+        let spy = AnnouncementSpy()
+        let recorder = WorkoutRecorder(
+            provider: FakeLocationProvider(),
+            armedTimeout: .milliseconds(20),
+            announcer: spy
+        )
+        recorder.start(activity: .run, autoStarted: true, armed: true)
+
+        try? await Task.sleep(for: .milliseconds(60))
+
+        #expect(spy.events == [])
+    }
+
+    /// Covers the in-app save path's `.runSaved` confirmation (`RecordView.save`
+    /// calls `WorkoutRecorder.announceSaved()` after clearing the checkpoint).
+    /// Without an audible "Run saved", the last cue a hands-free user hears on a
+    /// real run — stop, stand still (Paused), unzip pocket while walking
+    /// (Resumed), slide to finish — is the opposite of what happened, with no
+    /// confirmation the run was captured at all.
+    @Test func announceSavedSpeaksRunSavedExactlyOnce() {
+        let spy = AnnouncementSpy()
+        let recorder = WorkoutRecorder(provider: FakeLocationProvider(), announcer: spy)
+        recorder.start(activity: .run)
+
+        recorder.announceSaved()
+
+        #expect(spy.events == [.runSaved])
+    }
 }

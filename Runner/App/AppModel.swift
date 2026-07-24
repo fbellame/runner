@@ -155,7 +155,8 @@ final class AppModel {
         let model = AppModel(store: store,
                              health: HealthStore(),
                              recorder: WorkoutRecorder(provider: SystemLocationProvider(),
-                                                       checkpoints: checkpoints),
+                                                       checkpoints: checkpoints,
+                                                       announcer: RunAnnouncer()),
                              checkpoints: checkpoints)
         model.storeFailureMessage = storeFailure
         model.enableAutoWalk(motion: SystemMotionActivityProvider())

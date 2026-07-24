@@ -97,7 +97,10 @@ final class WorkoutRecorder: LocationProvidingDelegate {
     private var timeAnchor: Date?
     private var pendingGap = false
     private var armedTimeoutTask: Task<Void, Never>?
-    private let announcer: any Announcing
+    // Not `private`: AppModelTests needs to inspect the real announcer wired up
+    // by `AppModel.live()` (via `@testable import`) to catch a regression where
+    // production wiring silently falls back to `SilentAnnouncer()` again.
+    let announcer: any Announcing
     private var didAnnounceLocationDenied = false
     /// Bumped on every `start()`. Captured by the armed-timeout task so it can
     /// verify, after resuming from sleep, that it still belongs to the session
@@ -193,7 +196,15 @@ final class WorkoutRecorder: LocationProvidingDelegate {
                 // otherwise fail silently.
                 guard !Task.isCancelled, let self,
                       self.isArmed, self.sessionToken == session else { return }
-                self.announcer.announce(.runCancelled)
+                // Unreachable for auto-walks today only via a cross-file invariant:
+                // AutoWalkCoordinator always passes a non-nil `backdatedTo`, which
+                // forces `isArmed` false, so no timeout task is ever created for an
+                // auto-started session. Guard locally too, for uniformity with every
+                // other announcement site, so the silence AutoWalkCoordinator relies
+                // on doesn't depend on that invariant holding elsewhere.
+                if !self.autoStarted {
+                    self.announcer.announce(.runCancelled)
+                }
                 self.discardArmedSession()
             }
         }
@@ -279,6 +290,17 @@ final class WorkoutRecorder: LocationProvidingDelegate {
         provider.stopUpdates()
         checkpoints.clear()
         reset()
+    }
+
+    /// Confirms a save out loud — the one cue that answers the core question of
+    /// this phase for a user who cannot see the screen: "did it record at all?"
+    /// IN-APP SAVE PATH ONLY: called from `RecordView.save(_:)`. Task 12 will add
+    /// the intent-driven save path used when finishing from the Lock Screen; that
+    /// is a different call site and must call this too, but exactly once per
+    /// save — do not also announce `.runSaved` from wherever Task 12's save path
+    /// lives if it already routes through here, or the cue will double-fire.
+    func announceSaved() {
+        announcer.announce(.runSaved)
     }
 
     /// Both armed exit paths (finish()'s `isArmed` early-return, and the armed

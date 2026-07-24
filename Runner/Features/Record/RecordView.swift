@@ -280,6 +280,14 @@ struct RecordView: View {
         // One shared save path (local-first, then HealthKit) lives on the coordinator.
         let failure = await model.sync.saveRecorded(workout)
         model.checkpoints.clear()
+        // IN-APP save path only. Confirms out loud that the run was actually
+        // captured — otherwise the last thing a hands-free user hears is
+        // whatever the recorder announced before finishing, which may be the
+        // opposite of what just happened (e.g. "Resumed"). Task 12 will add the
+        // Lock-Screen intent save path as a separate call site; it must call
+        // `announceSaved()` too, but must NOT also fire it here, or the cue
+        // will double-announce on the in-app path.
+        model.recorder.announceSaved()
         finished = nil
         if let failure {
             saveFailedMessage = failure
