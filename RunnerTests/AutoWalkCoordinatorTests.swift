@@ -16,11 +16,11 @@ struct AutoWalkCoordinatorTests {
         MotionSample(isWalking: false, isUnknown: false, isLowConfidence: false, at: t(s))
     }
 
-    private func loc(x: Double, t offset: TimeInterval) -> CLLocation {
+    private func loc(x: Double, t offset: TimeInterval, speed: Double = 1.4) -> CLLocation {
         let lon = -73.6 + x / (111_320.0 * cos(45.5 * .pi / 180))
         return CLLocation(coordinate: CLLocationCoordinate2D(latitude: 45.5, longitude: lon),
                           altitude: 30, horizontalAccuracy: 5, verticalAccuracy: 10,
-                          course: 90, speed: 1.4, timestamp: t(offset))
+                          course: 90, speed: speed, timestamp: t(offset))
     }
 
     private final class Saved { var workouts: [RecordedWorkout] = [] }
@@ -304,8 +304,28 @@ struct AutoWalkCoordinatorTests {
 
         await coordinator.ingest(walking(-300))
         await coordinator.ingest(walking(0))
-
         #expect(recorder.state == .recording)
+        #expect(recorder.autoStarted)
+
+        // Drive a genuine stop-then-resume through the recorder's OWN
+        // AutoPauseDetector during the live auto-walk session — not
+        // AutoWalkCoordinator's separate 5-minute stop detection — to actually
+        // exercise the two `!autoStarted`-guarded announcement branches inside
+        // `ingest` (the auto-pause branch and the auto-resume/`wasArmed` branch).
+        // Below the walk threshold (0.5 m/s) for the full 10 s `pauseAfter` window
+        // trips a genuine auto-pause; back above it for the 3 s `resumeAfter`
+        // window trips a genuine auto-resume. The intermediate `recorder.state`
+        // assertions prove these branches actually ran — not merely that nothing
+        // threw — because `.autoPaused`/`.recording` are set only as a side effect
+        // of the exact same code paths that guard the announcements.
+        recorder.didUpdate(locations: [loc(x: 0, t: 0, speed: 1.4)])
+        recorder.didUpdate(locations: [loc(x: 1, t: 1, speed: 0.1)])
+        recorder.didUpdate(locations: [loc(x: 1, t: 11, speed: 0.1)])
+        #expect(recorder.state == .autoPaused)   // genuine auto-pause fired
+        recorder.didUpdate(locations: [loc(x: 1, t: 12, speed: 1.4)])
+        recorder.didUpdate(locations: [loc(x: 2, t: 15, speed: 1.4)])
+        #expect(recorder.state == .recording)    // genuine auto-resume fired
+
         #expect(announcements.events.isEmpty)
     }
 }

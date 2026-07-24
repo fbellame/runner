@@ -73,6 +73,35 @@ struct RecorderAnnouncementTests {
         #expect(spy.events == [.locationDenied])
     }
 
+    /// Regression for the still-enabled manual pause button during `.autoPaused`:
+    /// `RecordView` only disables the pause control while `isArmed`, so a user can
+    /// (and, at a red light, will) tap pause after the recorder has already
+    /// auto-paused and already announced `.paused` for that same real-world stop.
+    /// That tap must not speak a second "Paused".
+    @Test func manualPauseWhileAlreadyAutoPausedDoesNotDoubleAnnounce() {
+        let spy = AnnouncementSpy()
+        let recorder = WorkoutRecorder(
+            provider: FakeLocationProvider(),
+            announcer: spy
+        )
+
+        recorder.start(activity: .run)
+        recorder.didUpdate(locations: [
+            location(x: 0, seconds: 0, speed: 2),   // moving
+            location(x: 0, seconds: 1, speed: 0.1), // slows — starts the 10 s window
+            location(x: 0, seconds: 11, speed: 0.1) // ≥10 s below threshold → auto-pause
+        ])
+        #expect(recorder.state == .autoPaused)
+        #expect(spy.events == [.paused])            // the auto-pause already spoke once
+
+        recorder.pauseManually()                    // still-enabled button, same real stop
+        #expect(recorder.state == .manuallyPaused)
+        #expect(spy.events == [.paused])             // NOT [.paused, .paused]
+
+        recorder.resumeManually()
+        #expect(spy.events == [.paused, .resumed])
+    }
+
     @Test func armedTimeoutAnnouncesCancellationOnce() async {
         let spy = AnnouncementSpy()
         let recorder = WorkoutRecorder(

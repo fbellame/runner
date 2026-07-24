@@ -206,12 +206,24 @@ final class WorkoutRecorder: LocationProvidingDelegate {
     /// without going through the one-shot `isArmed` rebase in `ingest`.
     func pauseManually() {
         guard !isArmed, state == .recording || state == .autoPaused else { return }
-        if state == .recording { advanceTimer(to: clock()) }
+        // If the session was already `.autoPaused`, `ingest`'s auto-pause branch has
+        // already announced `.paused` for this same real-world stop — the user tapping
+        // the (still-enabled) pause button here is not a second stop, and must not
+        // speak a second "Paused". Capture the prior state before mutating it.
+        let wasRecording = state == .recording
+        if wasRecording { advanceTimer(to: clock()) }
         state = .manuallyPaused
         saveCheckpoint(at: clock())
-        if !autoStarted { announcer.announce(.paused) }
+        if wasRecording, !autoStarted { announcer.announce(.paused) }
     }
 
+    // No symmetric double-announce risk here: this is reachable ONLY from
+    // `.manuallyPaused` (the guard below), and the only path into `.manuallyPaused`
+    // is `pauseManually`, so there is exactly one `resumeManually` per pause. Unlike
+    // `pauseManually`, it always announces — even when the prior stop was originally
+    // an auto-pause — because the tap itself is the user's own explicit "resume"
+    // action and deserves its own confirmation, distinct from whatever announced
+    // (or didn't) the stop that preceded it.
     func resumeManually() {
         guard state == .manuallyPaused else { return }
         autoPause = AutoPauseDetector(activity: activity)
