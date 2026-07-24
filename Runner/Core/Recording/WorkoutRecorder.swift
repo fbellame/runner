@@ -59,6 +59,10 @@ final class WorkoutRecorder: LocationProvidingDelegate {
     /// When backdated, the instant GPS actually began — the window before it has
     /// duration but no route, and its distance must come from Health.
     private(set) var gpsBeganAt: Date?
+    /// True only until the first armed auto-pause-to-recording transition.
+    /// This is the one-shot guard that prevents later auto-pause cycles from
+    /// rebasing `startedAt`.
+    private(set) var isArmed = false
 
     /// Must match a key in Info.plist's NSLocationTemporaryUsageDescriptionDictionary.
     static let fullAccuracyPurposeKey = "PreciseWorkout"
@@ -99,9 +103,11 @@ final class WorkoutRecorder: LocationProvidingDelegate {
     /// app noticed and before GPS was running. The elapsed interval is credited as
     /// moving time up front, so duration is honest from the very first sample.
     func start(activity: ActivityType, resumeFrom checkpoint: SessionCheckpoint? = nil,
-               backdatedTo walkBeganAt: Date? = nil, autoStarted: Bool = false) {
+               backdatedTo walkBeganAt: Date? = nil, autoStarted: Bool = false,
+               armed: Bool = false) {
         self.activity = activity
         self.autoStarted = autoStarted
+        self.isArmed = armed && checkpoint == nil && walkBeganAt == nil
         let now = clock()
         gpsBeganAt = walkBeganAt == nil ? nil : now
         if let checkpoint {
@@ -123,9 +129,9 @@ final class WorkoutRecorder: LocationProvidingDelegate {
         }
         lastKeptLocation = nil
         lastCheckpointAt = nil
-        autoPause = AutoPauseDetector(activity: activity)
+        autoPause = AutoPauseDetector(activity: activity, startPaused: self.isArmed)
         timeAnchor = clock()
-        state = .recording
+        state = self.isArmed ? .autoPaused : .recording
         // Approximate location (~km accuracy) fails the filter's 30 m gate, so the
         // session would silently record nothing: ask for precise, and flag the UI.
         reducedAccuracy = provider.accuracyAuthorization == .reducedAccuracy
@@ -199,6 +205,7 @@ final class WorkoutRecorder: LocationProvidingDelegate {
         pendingGap = false
         autoStarted = false
         gpsBeganAt = nil
+        isArmed = false
     }
 
     // MARK: LocationProvidingDelegate
@@ -249,7 +256,13 @@ final class WorkoutRecorder: LocationProvidingDelegate {
             let wasAutoPaused = state == .autoPaused
             let paused = detector.update(speed: speed, at: location.timestamp)
             autoPause = detector
-            if wasAutoPaused && !paused { timeAnchor = location.timestamp }
+            if wasAutoPaused && !paused {
+                timeAnchor = location.timestamp
+                if isArmed {
+                    startedAt = location.timestamp
+                    isArmed = false
+                }
+            }
             state = paused ? .autoPaused : .recording
         }
 
