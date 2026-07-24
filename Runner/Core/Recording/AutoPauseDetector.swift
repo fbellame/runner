@@ -5,11 +5,12 @@ struct AutoPauseDetector {
     let pauseAfter: TimeInterval
     let resumeAfter: TimeInterval = 3
 
-    private(set) var isPaused = false
+    private(set) var isPaused: Bool
     private var belowSince: Date?
     private var aboveSince: Date?
 
-    init(activity: ActivityType) {
+    init(activity: ActivityType, startPaused: Bool = false) {
+        self.isPaused = startPaused
         switch activity {
         case .run, .walk:
             pauseSpeedThreshold = 0.5
