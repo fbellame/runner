@@ -63,6 +63,9 @@ final class WorkoutRecorder: LocationProvidingDelegate {
     /// This is the one-shot guard that prevents later auto-pause cycles from
     /// rebasing `startedAt`.
     private(set) var isArmed = false
+    /// The timestamp of the last accepted recording sample — the true end of
+    /// activity, distinct from whenever `finish` happens to be called.
+    private(set) var lastMovingAt: Date?
 
     /// Must match a key in Info.plist's NSLocationTemporaryUsageDescriptionDictionary.
     static let fullAccuracyPurposeKey = "PreciseWorkout"
@@ -127,6 +130,7 @@ final class WorkoutRecorder: LocationProvidingDelegate {
             lastSplitMovingSeconds = movingSeconds
             pendingGap = false
         }
+        lastMovingAt = checkpoint?.route.last?.t
         lastKeptLocation = nil
         lastCheckpointAt = nil
         autoPause = AutoPauseDetector(activity: activity, startPaused: self.isArmed)
@@ -165,7 +169,11 @@ final class WorkoutRecorder: LocationProvidingDelegate {
     /// `endingAt` supplies the true end when the caller knows it — an auto-stop
     /// fires five minutes after the walking actually stopped, and that stationary
     /// tail must not be baked into the workout.
-    func finish(endingAt end: Date? = nil) -> RecordedWorkout {
+    func finish(endingAt end: Date? = nil) -> RecordedWorkout? {
+        guard !isArmed else {
+            discard()
+            return nil
+        }
         provider.stopUpdates()
         if state == .recording { advanceTimer(to: end ?? clock()) }
         let start = startedAt ?? clock()
@@ -211,6 +219,7 @@ final class WorkoutRecorder: LocationProvidingDelegate {
         autoStarted = false
         gpsBeganAt = nil
         isArmed = false
+        lastMovingAt = nil
     }
 
     // MARK: LocationProvidingDelegate
@@ -276,6 +285,7 @@ final class WorkoutRecorder: LocationProvidingDelegate {
                                                lastKept: lastKeptLocation,
                                                now: Date())
         guard decision.accepted, state == .recording else { return }
+        lastMovingAt = location.timestamp
 
         // 5. Distance (not across gaps); a resume after pause/relaunch marks the
         //    first point as a gap so the map never draws a line the user didn't move.

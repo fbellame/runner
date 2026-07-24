@@ -144,7 +144,7 @@ struct RecordView: View {
             }
 
             Button {
-                recorder.start(activity: selectedActivity)
+                recorder.start(activity: selectedActivity, armed: true)
             } label: {
                 Text(String(localized: "GO"))
                     .font(.system(size: 24, weight: .black, design: .rounded))
@@ -173,7 +173,14 @@ struct RecordView: View {
             if recorder.reducedAccuracy {
                 reducedAccuracyBanner
             }
-            if recorder.state == .autoPaused {
+            if recorder.isArmed {
+                Label(String(localized: "Ready — start moving"), systemImage: "figure.run")
+                    .font(.system(size: 13, weight: .bold))
+                    .foregroundStyle(Color.rLime)
+                    .padding(.horizontal, 12)
+                    .padding(.vertical, 6)
+                    .background(Capsule().fill(Color.rLime.opacity(0.15)))
+            } else if recorder.state == .autoPaused {
                 Label(String(localized: "Auto-paused"), systemImage: "pause.circle.fill")
                     .font(.system(size: 13, weight: .bold))
                     .foregroundStyle(Color.rOrange)
@@ -208,9 +215,10 @@ struct RecordView: View {
                         .overlay(Circle().stroke(Color.rBorder, lineWidth: 1))
                 }
                 .buttonStyle(.plain)
+                .disabled(recorder.isArmed)
 
                 SlideToFinish {
-                    finished = recorder.finish()
+                    finished = recorder.finish(endingAt: recorder.lastMovingAt)
                 }
             }
         }

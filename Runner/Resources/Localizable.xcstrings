@@ -1771,6 +1771,16 @@
         }
       }
     },
+    "Ready — start moving": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Prêt — commencez à bouger"
+          }
+        }
+      }
+    },
     "Recent sessions": {
       "localizations": {
         "fr": {

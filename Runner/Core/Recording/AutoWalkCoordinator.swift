@@ -119,7 +119,10 @@ final class AutoWalkCoordinator {
         let gpsBeganAt = recorder.gpsBeganAt
         let walkBeganAt = recorder.startedAt
         // The stationary tail that triggered this stop is not part of the walk.
-        var workout = recorder.finish(endingAt: lastWalkingAt)
+        guard var workout = recorder.finish(endingAt: lastWalkingAt) else {
+            recorder.discard()
+            return
+        }
 
         // The minutes before detection have duration but no route: GPS was not yet
         // running. Health saw the steps, so take the distance from there.

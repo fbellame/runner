@@ -171,15 +171,15 @@ struct WorkoutRecorderTests {
     @Test func checkpointsPeriodicallyAndFinishKeepsCheckpoint() throws {
         let (rec, provider, cp) = makeRecorder(interval: 5)
         rec.start(activity: .walk)
-        for i in 0...3 { rec.didUpdate(locations: [loc(x: Double(i) * 10, t: Double(i) * 2)]) }
-        #expect(cp.load() != nil)                     // ≥5 s elapsed → checkpointed
+        for i in 0...3 {
+            rec.didUpdate(locations: [loc(x: Double(i) * 10, t: Double(i) * 2)])
+        }
+        #expect(cp.load() != nil)
         let saved = try #require(cp.load())
         #expect(saved.activity == .walk)
         #expect(saved.distanceMeters > 0)
-        let done = rec.finish()
+        let done = try #require(rec.finish())
         #expect(provider.stopped)
-        // The checkpoint survives finish(): the workout is only in memory until the
-        // user saves or discards the summary, so a kill here must stay recoverable.
         let final = try #require(cp.load())
         #expect(abs(final.distanceMeters - done.distanceMeters) < 0.01)
         #expect(rec.state == .idle)
