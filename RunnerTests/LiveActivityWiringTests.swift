@@ -187,6 +187,52 @@ struct LiveActivityWiringTests {
         #expect(saved.distanceMeters == observedDistance)
     }
 
+    /// Covers the ARMED branch of `cancelAfterAuthorizationDenial()` (the
+    /// `guard !isArmed else { discardArmedSession(); return }` early exit,
+    /// sibling to the non-armed path covered above): an armed session has
+    /// never accepted a GPS sample, so falling through to `saveCheckpoint`
+    /// would overwrite a PRIOR session's legitimate on-disk recovery copy
+    /// with a bogus zero-distance checkpoint. Seeds a prior checkpoint with
+    /// recognizable non-zero values, arms a fresh session, cancels after
+    /// authorization denial while still armed, and asserts the on-disk
+    /// checkpoint is untouched — not zeroed, not overwritten.
+    @Test func cancelAfterAuthorizationDenialWhileArmedPreservesPriorCheckpoint() throws {
+        let live = LiveActivitySpy()
+        let dir = FileManager.default.temporaryDirectory
+            .appendingPathComponent("cancel-denied-armed-\(UUID().uuidString)")
+        let checkpoints = CheckpointStore(directory: dir)
+        let priorCheckpoint = SessionCheckpoint(
+            activity: .run,
+            startedAt: base.addingTimeInterval(-600),
+            movingSeconds: 123,
+            distanceMeters: 456,
+            route: [],
+            splitSeconds: [60, 60],
+            savedAt: base.addingTimeInterval(-30)
+        )
+        try checkpoints.save(priorCheckpoint)
+
+        let recorder = WorkoutRecorder(
+            provider: FakeLocationProvider(),
+            checkpoints: checkpoints,
+            clock: { base },
+            liveActivity: live
+        )
+
+        recorder.start(activity: .run, armed: true)
+        #expect(live.began.map(\.status) == [.ready])
+
+        recorder.didChangeAuthorization(.denied)
+
+        recorder.cancelAfterAuthorizationDenial()
+
+        #expect(recorder.state == .idle)
+        #expect(live.ended.map(\.status) == [.finished])
+
+        let saved = try #require(checkpoints.load())
+        #expect(saved == priorCheckpoint)
+    }
+
     @Test func armedTimeoutEndsTheLiveActivity() async {
         let live = LiveActivitySpy()
         let recorder = WorkoutRecorder(
