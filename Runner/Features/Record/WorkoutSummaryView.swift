@@ -4,6 +4,7 @@ struct WorkoutSummaryView: View {
     let workout: RecordedWorkout
     var achievements: [Achievement] = []
     var isSaving = false
+    var isAlreadySaved = false
     let onSave: () -> Void
     let onDiscard: () -> Void
 
@@ -48,7 +49,9 @@ struct WorkoutSummaryView: View {
                         if isSaving {
                             ProgressView().tint(Color.rBackground)
                         } else {
-                            Text(String(localized: "Save workout"))
+                            Text(isAlreadySaved
+                                 ? String(localized: "Done")
+                                 : String(localized: "Save workout"))
                                 .font(.system(size: 17, weight: .bold, design: .rounded))
                         }
                     }
@@ -58,12 +61,14 @@ struct WorkoutSummaryView: View {
                     .background(Capsule().fill(Color.rLime))
                 }
                 .disabled(isSaving)
-                Button(action: onDiscard) {
-                    Text(String(localized: "Discard"))
-                        .font(.system(size: 15, weight: .semibold))
-                        .foregroundStyle(Color.rTextSecondary)
+                if !isAlreadySaved {
+                    Button(action: onDiscard) {
+                        Text(String(localized: "Discard"))
+                            .font(.system(size: 15, weight: .semibold))
+                            .foregroundStyle(Color.rTextSecondary)
+                    }
+                    .disabled(isSaving)
                 }
-                .disabled(isSaving)
             }
             .padding(.bottom, 12)
         }
@@ -134,5 +139,31 @@ struct WorkoutSummaryView: View {
         case .global: String(localized: "all activities")
         case .perType(let type): type.localizedName
         }
+    }
+}
+
+/// Pure adapter that turns a persisted `RecordedWorkout` (the pending-celebration
+/// payload rehydrated from disk or memory) into the `ActivityWorkoutSummary` shape
+/// `TrophyMath.achievements(history:candidate:)` expects. Kept separate from
+/// `RecordView`'s own `candidate(from:)` helper — that one is scoped to an
+/// in-progress recording session; this one is scoped to a save that already
+/// happened before the app was reopened.
+enum PendingCelebrationPresentation {
+    static func candidate(from workout: RecordedWorkout) -> ActivityWorkoutSummary {
+        ActivityWorkoutSummary(
+            id: UUID(),
+            type: workout.type,
+            date: workout.start,
+            distanceMeters: workout.distanceMeters,
+            distanceEstimated: workout.distanceEstimated,
+            movingSeconds: workout.movingSeconds,
+            points: PointsEngine.workoutPoints(
+                type: workout.type,
+                distanceMeters: workout.distanceMeters
+            ),
+            calories: 0,
+            splitSeconds: workout.splitSeconds,
+            hasRoute: !workout.route.isEmpty
+        )
     }
 }

@@ -1,8 +1,11 @@
 import SwiftUI
+import SwiftData
 
 struct RootTabView: View {
     @Environment(AppModel.self) private var model
     @State private var showSettings = false
+    @Query(sort: \WorkoutRec.start, order: .reverse)
+    private var workouts: [WorkoutRec]
 
     var body: some View {
         @Bindable var model = model
@@ -26,6 +29,27 @@ struct RootTabView: View {
         .fullScreenCover(isPresented: $model.showRecordSheet) {
             RecordView(resumeFrom: model.pendingResume)
                 .onDisappear { model.pendingResume = nil }
+        }
+        .sheet(item: $model.pendingCelebration) { workout in
+            let candidate = PendingCelebrationPresentation.candidate(from: workout)
+            let history = workouts
+                .filter {
+                    !($0.type == workout.type &&
+                      $0.start == workout.start &&
+                      $0.end == workout.end)
+                }
+                .map(ActivityWorkoutSummary.init(workout:))
+            WorkoutSummaryView(
+                workout: workout,
+                achievements: TrophyMath.achievements(
+                    history: history,
+                    candidate: candidate
+                ),
+                isSaving: false,
+                isAlreadySaved: true,
+                onSave: { model.clearPendingCelebration() },
+                onDiscard: { model.clearPendingCelebration() }
+            )
         }
         .alert("Resume your workout?", isPresented: resumeAlertBinding) {
             Button("Resume") { model.showRecordSheet = true }
