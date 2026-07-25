@@ -32,6 +32,12 @@ PRICING = {
         "cache_read": 0.00,
         "output": 0.00,
     },
+    "claude-opus-5": {
+        "fresh_input": 5.00,
+        "cache_created": 6.25,
+        "cache_read": 0.50,
+        "output": 25.00,
+    },
     "claude-opus-4-8": {
         "fresh_input": 5.00,
         "cache_created": 6.25,
