@@ -2,7 +2,7 @@ import Foundation
 import CoreLocation
 import Observation
 
-struct RecordedWorkout: Equatable, Sendable {
+struct RecordedWorkout: Codable, Equatable, Sendable {
     let type: ActivityType
     let start: Date
     let end: Date
