@@ -641,6 +641,16 @@
         }
       }
     },
+    "Arm a run without unlocking Runner.": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Armez une course sans déverrouiller Runner."
+          }
+        }
+      }
+    },
     "Auto-paused": {
       "localizations": {
         "fr": {
@@ -2207,6 +2217,16 @@
           "stringUnit": {
             "state": "translated",
             "value": "Intermédiaires"
+          }
+        }
+      }
+    },
+    "Start Run": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Démarrer la course"
           }
         }
       }

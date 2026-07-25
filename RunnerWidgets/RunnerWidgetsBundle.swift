@@ -5,5 +5,6 @@ import WidgetKit
 struct RunnerWidgetsBundle: WidgetBundle {
     var body: some Widget {
         RunLiveActivity()
+        StartRunControl()
     }
 }

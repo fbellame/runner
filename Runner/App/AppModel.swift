@@ -121,6 +121,24 @@ final class AppModel {
                                     metricsProvider: { profile.currentMetrics() })
     }
 
+    /// True when no other owner already has the recorder: no unanswered resume
+    /// prompt, no open record sheet, and the recorder itself is idle. Shared by
+    /// auto-walk detection and the Start Run intent so neither can hijack a
+    /// session the other (or the user) already owns.
+    var canAutoStart: Bool {
+        pendingResume == nil &&
+        !showRecordSheet &&
+        recorder.state == .idle
+    }
+
+    /// Entry point for the Lock Screen / Control Center `StartRunIntent`. Arms a
+    /// run so its clock stays frozen until real movement, without unlocking or
+    /// foregrounding the app.
+    func startRunFromIntent() {
+        guard canAutoStart else { return }
+        recorder.start(activity: .run, armed: true)
+    }
+
     /// Opt-in so tests can build an AppModel without a motion provider. The
     /// coordinator holds a weak-ish view of the app through closures rather than a
     /// back-reference, keeping the dependency one-way.
@@ -128,10 +146,7 @@ final class AppModel {
         autoWalk = AutoWalkCoordinator(
             motion: motion, recorder: recorder, health: health, checkpoints: checkpoints,
             canAutoStart: { [weak self] in
-                guard let self else { return false }
-                // The record sheet and an unanswered resume prompt both own the
-                // recorder; a manual session must never be hijacked.
-                return self.pendingResume == nil && !self.showRecordSheet
+                self?.canAutoStart == true
             },
             save: { [weak self] workout in
                 await self?.sync.saveRecorded(workout)
