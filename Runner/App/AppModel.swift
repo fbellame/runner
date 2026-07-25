@@ -30,6 +30,8 @@ final class AppModel {
     let recorder: WorkoutRecorder
     let checkpoints: CheckpointStore
     let profile: ProfileStore
+    let pendingCelebrations: PendingCelebrationStore
+    var pendingCelebration: RecordedWorkout?
     private(set) var autoWalk: AutoWalkCoordinator?
 
     var pendingResume: SessionCheckpoint?
@@ -102,11 +104,16 @@ final class AppModel {
         UserDefaults.standard.set(kilometers, forKey: key)
     }
 
-    init(store: DataStore, health: HealthStoring, recorder: WorkoutRecorder, checkpoints: CheckpointStore) {
+    init(store: DataStore,
+         health: HealthStoring,
+         recorder: WorkoutRecorder,
+         checkpoints: CheckpointStore,
+         pendingCelebrations: PendingCelebrationStore = PendingCelebrationStore()) {
         self.store = store
         self.health = health
         self.recorder = recorder
         self.checkpoints = checkpoints
+        self.pendingCelebrations = pendingCelebrations
         self.dailyGoal = Self.storedGoal()
         self.weeklyGoldTarget = Self.storedWeeklyTarget()
         self.weeklyDistanceGoals = Dictionary(uniqueKeysWithValues:
@@ -137,6 +144,47 @@ final class AppModel {
     func startRunFromIntent() {
         guard canAutoStart else { return }
         recorder.start(activity: .run, armed: true)
+    }
+
+    /// Entry point for the Lock Screen / Control Center `TogglePauseIntent`.
+    /// Routes through the recorder's own guarded `pauseManually()` /
+    /// `resumeManually()` rather than reimplementing the transition: those
+    /// carry the hard-won guards against double-announcing while already
+    /// auto-paused and against pausing an armed (not-yet-moving) session.
+    /// While armed there is nothing to toggle — an armed session has no
+    /// motion yet, so "pause" is meaningless and `pauseManually()` already
+    /// refuses to run; this guard just makes that explicit at the call site.
+    func togglePauseFromIntent() {
+        guard !recorder.isArmed else { return }
+        if recorder.state == .manuallyPaused {
+            recorder.resumeManually()
+        } else {
+            recorder.pauseManually()
+        }
+    }
+
+    /// Entry point for the Lock Screen / Control Center `FinishRunIntent`.
+    /// Ends the session at the last real moving timestamp (not "now" — the
+    /// Lock Screen tap can land seconds after the user actually stopped),
+    /// saves it through the same path as every other save, persists it as
+    /// the pending celebration for Task 13 to surface on next open, and
+    /// closes out the recorder/Live Activity via `completeSave()`.
+    ///
+    /// `completeSave()` calls `announceSaved()` internally — do not announce
+    /// separately here, or "Run saved" speaks twice.
+    func finishRunFromIntent() async {
+        guard let workout = recorder.finish(endingAt: recorder.lastMovingAt) else { return }
+        _ = await sync.saveRecorded(workout)
+        checkpoints.clear()
+        try? pendingCelebrations.save(workout)
+        pendingCelebration = workout
+        recorder.completeSave()
+    }
+
+    /// Called once Task 13's presentation has consumed `pendingCelebration`.
+    func clearPendingCelebration() {
+        pendingCelebrations.clear()
+        pendingCelebration = nil
     }
 
     /// Opt-in so tests can build an AppModel without a motion provider. The
@@ -204,6 +252,9 @@ final class AppModel {
         // Load the checkpoint first: a pending resume owns the recorder, and the
         // auto-walk guard reads that flag.
         pendingResume = checkpoints.load()
+        if pendingCelebration == nil {
+            pendingCelebration = pendingCelebrations.load()
+        }
         await autoWalk?.onForeground()
         await sync.syncNow()
         if !UserDefaults.standard.bool(forKey: Self.profilePromptKey) {
@@ -220,6 +271,9 @@ final class AppModel {
 
     func onForeground() async {
         await profile.refreshFromHealth()
+        if pendingCelebration == nil {
+            pendingCelebration = pendingCelebrations.load()
+        }
         await autoWalk?.onForeground()
         await sync.syncNow()
     }
