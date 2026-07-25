@@ -14,6 +14,9 @@ targets:
     platform: iOS
     sources:
       - Runner
+    dependencies:
+      - target: RunnerWidgets
+        embed: true
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.farid.runner
@@ -44,6 +47,32 @@ targets:
         NSSupportsLiveActivities: true
         UIBackgroundModes: [location, audio]
         ITSAppUsesNonExemptEncryption: false
+  RunnerWidgets:
+    type: app-extension
+    platform: iOS
+    sources:
+      - path: RunnerWidgets
+      - path: Runner/Core/Recording/RunAttributes.swift
+      - path: Runner/Core/Recording/RunActivityAttributes.swift
+      - path: Runner/Resources/Localizable.xcstrings
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.farid.runner.widgets
+        PRODUCT_NAME: RunnerWidgets
+        CODE_SIGN_STYLE: Automatic
+        TARGETED_DEVICE_FAMILY: "1"
+        APPLICATION_EXTENSION_API_ONLY: YES
+        SKIP_INSTALL: YES
+        SWIFT_STRICT_CONCURRENCY: complete
+    info:
+      path: RunnerWidgets/Info.plist
+      properties:
+        CFBundleDisplayName: Runner
+        CFBundleShortVersionString: "1.10"
+        CFBundleVersion: "13"
+        NSExtension:
+          NSExtensionPointIdentifier: com.apple.widgetkit-extension
+        NSSupportsLiveActivities: true
   RunnerTests:
     type: bundle.unit-test
     platform: iOS

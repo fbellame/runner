@@ -1051,6 +1051,26 @@
         }
       }
     },
+    "Finish": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Terminer"
+          }
+        }
+      }
+    },
+    "Finish run": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Terminer la course"
+          }
+        }
+      }
+    },
     "First weekly goal": {
       "localizations": {
         "fr": {
@@ -1681,6 +1701,26 @@
         }
       }
     },
+    "Pause": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Pause"
+          }
+        }
+      }
+    },
+    "Pause or resume run": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Mettre la course en pause ou la reprendre"
+          }
+        }
+      }
+    },
     "Paused": {
       "localizations": {
         "fr": {
@@ -1937,6 +1977,16 @@
           "stringUnit": {
             "state": "translated",
             "value": "Course annulée"
+          }
+        }
+      }
+    },
+    "Run in progress": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Course en cours"
           }
         }
       }

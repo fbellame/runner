@@ -30,3 +30,10 @@ struct RunActivitySnapshot: Codable, Hashable, Sendable {
 struct RunAttributes: Sendable {
     let sessionID: UUID
 }
+
+/// Target-neutral identifiers shared between the app and the `RunnerWidgets`
+/// extension. Kept ActivityKit-free like the rest of this file.
+enum RunnerWidgetContract {
+    static let bundleIdentifier = "com.farid.runner.widgets"
+    static let extensionPointIdentifier = "com.apple.widgetkit-extension"
+}
