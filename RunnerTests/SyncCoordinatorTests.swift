@@ -368,6 +368,50 @@ struct SyncCoordinatorTests {
         #expect(health.savedWorkouts.isEmpty)    // already in Health; not re-pushed
     }
 
+    /// CRITICAL 2 (wave 3) regression: `saveRecorded` guards concurrency by the
+    /// deterministic id `D`, but when it reconciles onto a legacy random-UUID
+    /// row `L` it awaits HealthKit under `L`, not `D`. `retryPendingSaves()`
+    /// used to filter pending rows by `rec.id` (i.e. `L`), which was never in
+    /// `savesInFlight` — a concurrent `syncNow()` landing inside that
+    /// HealthKit await saw the legacy row as un-guarded and pushed it to
+    /// Health a second time. The existing I6 test above only covers
+    /// `hkSynced == true` (no HealthKit call happens at all in that case),
+    /// which is why this slipped through.
+    @Test func concurrentSyncDuringLegacyReconciliationPushesLegacyRowOnce() async throws {
+        let (sync, health, store) = try make()
+        health.stepsByDay = [day(0): 1_000]
+        let start = day(0).addingTimeInterval(8 * 3600)
+        let legacyID = UUID()   // pre-upgrade: random, not the deterministic id
+        try store.upsertWorkout(id: legacyID, type: .run, start: start,
+                                end: start.addingTimeInterval(1_500),
+                                movingSeconds: 1_500, distanceMeters: 5_000, points: 75,
+                                routeData: nil, splitSeconds: [],
+                                source: "runner", hkSynced: false)
+
+        let workout = RecordedWorkout(type: .run, start: start,
+                                      end: start.addingTimeInterval(1_500),
+                                      movingSeconds: 1_500, distanceMeters: 5_000,
+                                      route: [], splitSeconds: [])
+        // A distinct, unrelated session — its own saveRecorded's trailing
+        // syncNow() (-> retryPendingSaves()) is what surfaces the bug, by
+        // running concurrently with the legacy row's HealthKit await.
+        let distinct = RecordedWorkout(type: .run, start: day(0).addingTimeInterval(12 * 3600),
+                                       end: day(0).addingTimeInterval(12 * 3600 + 900),
+                                       movingSeconds: 900, distanceMeters: 3_000,
+                                       route: [], splitSeconds: [])
+        health.saveHook = { [weak sync, weak health] in
+            health?.saveHook = nil
+            await sync?.saveRecorded(distinct)
+        }
+
+        let outcome = await sync.saveRecorded(workout)
+
+        #expect(outcome == .saved)
+        #expect(try store.allWorkouts().count == 2)     // legacy row + distinct, no duplicate row
+        // Exactly one HealthKit push for the legacy session.
+        #expect(health.savedWorkouts.filter { $0.0.start == start }.count == 1)
+    }
+
     @Test func storedGoalsPreservedOnResync() async throws {
         let (sync, health, store) = try make(goal: 150)
         // Yesterday was finalized under goal 70.

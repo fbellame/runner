@@ -156,6 +156,22 @@ struct WorkoutRecorderTests {
         #expect(rec.state == .recording)
     }
 
+    /// Regression: `pauseManually()` persists `isPaused = true` immediately, but
+    /// `resumeManually()` used to update only in-memory state — the checkpoint on
+    /// disk stayed paused until the next periodic write (up to 30 s later). A
+    /// crash inside that window rehydrated an actively-resumed run as paused.
+    /// Reload the checkpoint straight off disk, without feeding another location
+    /// sample, so a periodic checkpoint from `didUpdate` cannot mask the bug.
+    @Test func manualResumeImmediatelyPersistsUnpausedCheckpoint() {
+        let (rec, _, cp) = makeRecorder()
+        rec.start(activity: .run)
+        rec.didUpdate(locations: [loc(x: 0, t: 0)])
+        rec.pauseManually()
+        rec.resumeManually()
+        let saved = cp.load()
+        #expect(saved?.isPaused == false)
+    }
+
     @Test func recordsKmSplits() {
         let (rec, _, _) = makeRecorder()
         rec.start(activity: .run)

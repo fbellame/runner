@@ -362,7 +362,13 @@ final class SyncCoordinator {
         // distinct saves were allowed to overlap (CRITICAL 4): a concurrent
         // save's trailing `syncNow()` can now land inside another save's
         // HealthKit await.
-        for rec in pending where !savesInFlight.contains(rec.id) {
+        //
+        // CRITICAL 2 (wave 3): `savesInFlight` is always keyed by the
+        // deterministic `(type, start)` id, but a reconciled legacy row's
+        // `rec.id` is its own pre-upgrade random UUID — never a member of
+        // that set. Recompute the deterministic id from the row's own
+        // `(type, start)` so both sides compare in the same identity domain.
+        for rec in pending where !savesInFlight.contains(Self.recordedWorkoutID(type: rec.type, start: rec.start)) {
             let workout = RecordedWorkout(type: rec.type, start: rec.start, end: rec.end,
                                           movingSeconds: rec.movingSeconds,
                                           distanceMeters: rec.distanceMeters,

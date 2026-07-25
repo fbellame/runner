@@ -314,6 +314,10 @@ final class WorkoutRecorder: LocationProvidingDelegate {
         pendingGap = !route.isEmpty // fresh segment; gap marker will show honestly
         timeAnchor = clock()
         state = .recording
+        // Symmetric with pauseManually(): persist the un-paused state immediately
+        // rather than waiting for the next periodic checkpoint (up to 30 s away),
+        // so a crash right after resuming doesn't rehydrate the run as paused.
+        saveCheckpoint(at: clock())
         if !autoStarted { announcer.announce(.resumed) }
         if presentsLiveActivity {
             liveActivity.update(liveSnapshot())
