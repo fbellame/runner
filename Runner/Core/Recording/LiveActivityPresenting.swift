@@ -9,6 +9,21 @@ protocol LiveActivityPresenting: Sendable {
     func begin(_ snapshot: RunActivitySnapshot)
     func update(_ snapshot: RunActivitySnapshot)
     func end(_ snapshot: RunActivitySnapshot)
+
+    /// Ends every Live Activity this presenter's underlying framework
+    /// currently has on the lock screen — including ones that outlived a
+    /// prior, now-dead process, which this presenter's own in-memory state
+    /// (e.g. `LiveActivityController.activity`) has no record of.
+    ///
+    /// Orphan reconciliation normally happens inside `begin()`, but two
+    /// crash-recovery exits — `AppModel.saveCheckpointedWorkout()` ("Save
+    /// as-is") and the Discard button on the resume prompt — never call
+    /// `begin()` at all, since they don't start a new session. Without this,
+    /// a Live Activity from a session that crashed mid-run would stay on the
+    /// lock screen indefinitely, showing stale numbers for a run that is
+    /// already saved or discarded, until the user happened to start another
+    /// run. Safe to call when nothing exists.
+    func endAllSurvivingActivities()
 }
 
 /// Does nothing. Used by `AutoWalkCoordinator` and in tests — auto-recorded
@@ -18,6 +33,7 @@ struct SilentLiveActivityPresenter: LiveActivityPresenting {
     func begin(_ snapshot: RunActivitySnapshot) {}
     func update(_ snapshot: RunActivitySnapshot) {}
     func end(_ snapshot: RunActivitySnapshot) {}
+    func endAllSurvivingActivities() {}
 }
 
 /// Decides whether a new snapshot warrants pushing an ActivityKit update.

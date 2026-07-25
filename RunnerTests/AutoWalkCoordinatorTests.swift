@@ -37,6 +37,7 @@ struct AutoWalkCoordinatorTests {
         func begin(_ snapshot: RunActivitySnapshot) { beginCount += 1 }
         func update(_ snapshot: RunActivitySnapshot) {}
         func end(_ snapshot: RunActivitySnapshot) {}
+        func endAllSurvivingActivities() {}
     }
 
     private struct Harness {

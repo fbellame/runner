@@ -9,9 +9,11 @@ struct LiveActivityWiringTests {
         var began: [RunActivitySnapshot] = []
         var updated: [RunActivitySnapshot] = []
         var ended: [RunActivitySnapshot] = []
+        var endAllSurvivingActivitiesCallCount = 0
         func begin(_ snapshot: RunActivitySnapshot) { began.append(snapshot) }
         func update(_ snapshot: RunActivitySnapshot) { updated.append(snapshot) }
         func end(_ snapshot: RunActivitySnapshot) { ended.append(snapshot) }
+        func endAllSurvivingActivities() { endAllSurvivingActivitiesCallCount += 1 }
     }
 
     private let base = Date().addingTimeInterval(-2)
@@ -108,6 +110,81 @@ struct LiveActivityWiringTests {
         )
         recorder.start(activity: .walk, armed: true)
         #expect(live.began.isEmpty)
+    }
+
+    /// CRITICAL 2 regression: `completeSave()` used to guard its ENTIRE body
+    /// (including `announceSaved()`) on `lastFinishedSnapshot`, which is only
+    /// ever assigned for `.run` (`presentsLiveActivity` gates it to
+    /// `activity == .run`). `RecordView.save(_:)` calls `completeSave()` for
+    /// every activity type the UI offers, so a manual walk or bike save
+    /// silently lost Phase 2's audible "Run saved" confirmation. The
+    /// announcement must fire regardless; only the (here, no-op) Live
+    /// Activity teardown stays conditional.
+    @Test func completeSaveAnnouncesRunSavedForAManualWalkWithNoLiveActivity() throws {
+        final class AnnouncementSpy: Announcing {
+            var events: [RunAnnouncement] = []
+            func announce(_ event: RunAnnouncement) { events.append(event) }
+        }
+        let live = LiveActivitySpy()
+        let spy = AnnouncementSpy()
+        let recorder = WorkoutRecorder(
+            provider: FakeLocationProvider(),
+            clock: { base },
+            announcer: spy,
+            liveActivity: live
+        )
+
+        recorder.start(activity: .walk)
+        recorder.didUpdate(locations: [
+            location(x: 0, seconds: 0, speed: 2),
+            location(x: 5, seconds: 3, speed: 2)
+        ])
+        _ = try #require(recorder.finish(endingAt: recorder.lastMovingAt))
+
+        recorder.completeSave()
+
+        #expect(spy.events.filter { $0 == .runSaved }.count == 1)
+        #expect(live.began.isEmpty)
+        #expect(live.updated.isEmpty)
+        #expect(live.ended.isEmpty)
+    }
+
+    /// CRITICAL 4 regression: Cancel on the authorization-denied overlay used
+    /// to call only `dismiss()` — no `finish()`, no `discard()`, no `end()` —
+    /// so the recorder stayed non-idle and the `.error` Live Activity was
+    /// stranded on the lock screen forever. `cancelAfterAuthorizationDenial()`
+    /// must end it while preserving recorded progress: the on-disk checkpoint
+    /// is left in place (not cleared, unlike `discard()`) so the crash-resume
+    /// prompt can still recover the workout on next launch.
+    @Test func cancelAfterAuthorizationDenialEndsActivityAndPreservesCheckpoint() throws {
+        let live = LiveActivitySpy()
+        let dir = FileManager.default.temporaryDirectory
+            .appendingPathComponent("cancel-denied-\(UUID().uuidString)")
+        let checkpoints = CheckpointStore(directory: dir)
+        let recorder = WorkoutRecorder(
+            provider: FakeLocationProvider(),
+            checkpoints: checkpoints,
+            clock: { base },
+            liveActivity: live
+        )
+
+        recorder.start(activity: .run)
+        recorder.didUpdate(locations: [
+            location(x: 0, seconds: 0, speed: 2),
+            location(x: 5, seconds: 3, speed: 2)
+        ])
+        let observedDistance = recorder.distanceMeters
+        #expect(observedDistance > 0)
+
+        recorder.didChangeAuthorization(.denied)
+        #expect(live.updated.last?.status == .error)
+
+        recorder.cancelAfterAuthorizationDenial()
+
+        #expect(recorder.state == .idle)
+        #expect(live.ended.map(\.status) == [.finished])
+        let saved = try #require(checkpoints.load())
+        #expect(saved.distanceMeters == observedDistance)
     }
 
     @Test func armedTimeoutEndsTheLiveActivity() async {

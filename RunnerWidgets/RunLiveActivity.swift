@@ -11,7 +11,13 @@ struct RunLiveActivity: Widget {
             VStack(alignment: .leading, spacing: 10) {
                 Text(title(for: snapshot))
                     .font(.headline)
-                if let message = snapshot.message {
+                // `.error`'s headline already IS `snapshot.message` (see
+                // `title(for:)` below) — showing it again as the caption
+                // would render the same sentence twice. Every other status's
+                // headline is a fixed phrase, so its optional `message`
+                // (e.g. the reduced-accuracy warning) is genuinely new
+                // information and still belongs in the caption.
+                if let message = snapshot.message, snapshot.status != .error {
                     Text(message).font(.caption)
                 }
                 HStack {
@@ -70,7 +76,7 @@ struct RunLiveActivity: Widget {
         case .ready: String(localized: "Ready — start moving")
         case .recording: String(localized: "Run in progress")
         case .paused: String(localized: "Paused")
-        case .finished: String(localized: "Run saved")
+        case .finished: String(localized: "Run finished")
         case .error: snapshot.message ?? String(localized: "Location access is required")
         }
     }

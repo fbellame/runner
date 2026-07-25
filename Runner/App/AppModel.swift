@@ -211,6 +211,14 @@ final class AppModel {
 
     /// "Save as-is" from the crash-resume prompt: credit the checkpointed progress
     /// without resuming the session — the workout is never lost.
+    ///
+    /// CRITICAL 3 fix: this never touches `recorder` otherwise — the workout
+    /// is built straight from the on-disk checkpoint, not from resuming an
+    /// in-memory session — so orphan reconciliation (which lives only inside
+    /// `LiveActivityController.begin()`) never runs for this path. A Live
+    /// Activity that survived a pre-crash process would otherwise stay on
+    /// the lock screen forever, showing stale numbers for a run that is now
+    /// saved. End it explicitly.
     func saveCheckpointedWorkout() async {
         guard let checkpoint = pendingResume else { return }
         let workout = RecordedWorkout(type: checkpoint.activity,
@@ -221,6 +229,18 @@ final class AppModel {
                                       route: checkpoint.route,
                                       splitSeconds: checkpoint.splitSeconds)
         await sync.saveRecorded(workout)
+        recorder.endStrandedLiveActivity()
+        checkpoints.clear()
+        pendingResume = nil
+    }
+
+    /// "Discard" from the crash-resume prompt (`RootTabView`'s alert). Same
+    /// reasoning as `saveCheckpointedWorkout()` above: this never resumes
+    /// the session, so it never reaches `LiveActivityController.begin()`'s
+    /// orphan reconciliation — a pre-crash Live Activity would otherwise
+    /// strand on the lock screen showing a run that was just thrown away.
+    func discardPendingResume() {
+        recorder.endStrandedLiveActivity()
         checkpoints.clear()
         pendingResume = nil
     }

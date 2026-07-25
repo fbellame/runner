@@ -414,11 +414,63 @@ final class WorkoutRecorder: LocationProvidingDelegate {
     /// ends the Live Activity using the stats `finish()` captured — the
     /// recorder itself has already been reset by this point, so there is no
     /// live state left to build a snapshot from.
+    ///
+    /// CRITICAL 2 fix: `RecordView.save(_:)` calls this for every activity
+    /// type the UI offers (run, walk, bike), but `lastFinishedSnapshot` is
+    /// only ever assigned for `.run` (`presentsLiveActivity` gates it — see
+    /// that property's doc comment). The announcement must not be gated by
+    /// that: a manual walk or bike save answers the same "did it record at
+    /// all?" question Phase 2 exists for, and has no Live Activity to end.
+    /// Only the teardown stays conditional on there being a snapshot to end.
     func completeSave() {
-        guard let snapshot = lastFinishedSnapshot else { return }
         announceSaved()
+        guard let snapshot = lastFinishedSnapshot else { return }
         liveActivity.end(snapshot)
         lastFinishedSnapshot = nil
+    }
+
+    /// CRITICAL 3 fix: the seam `AppModel` uses to end a Live Activity
+    /// stranded by a crash — "Save as-is" and Discard on the resume prompt
+    /// never call `start()`/`finish()`/`discard()` on THIS recorder instance
+    /// (there is no in-memory session to resume; the workout is built
+    /// straight from the on-disk checkpoint), so none of this recorder's own
+    /// state changes. `liveActivity` stays `private`; this is the minimal
+    /// forwarding that lets `AppModel` reach `endAllSurvivingActivities()`
+    /// without exposing the presenter itself.
+    func endStrandedLiveActivity() {
+        liveActivity.endAllSurvivingActivities()
+    }
+
+    /// CRITICAL 4 fix: Cancel on `RecordView`'s authorization-denied overlay.
+    /// GPS access was just revoked, so the recorder cannot keep recording —
+    /// but Cancel is not Discard: the user didn't ask to throw the run away,
+    /// only to back out of a session that can no longer track them. Unlike
+    /// `discard()`, the on-disk checkpoint is left untouched (not cleared),
+    /// so the crash-resume prompt can still recover it on next launch. Unlike
+    /// `finish()`, no `RecordedWorkout` is returned — there is no summary
+    /// sheet to show for a session the user backed out of via Cancel rather
+    /// than sliding to finish. Ends any stranded `.error` Live Activity and
+    /// returns the recorder to `.idle` either way.
+    func cancelAfterAuthorizationDenial() {
+        guard state != .idle else { return }
+        guard !isArmed else {
+            // An armed session has never recorded real progress — no sample
+            // has been accepted yet, so `saveCheckpoint` below would write a
+            // bogus zero-distance checkpoint over whatever legitimate PRIOR
+            // session's recovery copy is on disk. `discardArmedSession`
+            // already does exactly what's needed here (ends the Live
+            // Activity if presented, stops updates, resets) without
+            // touching the checkpoint at all.
+            discardArmedSession()
+            return
+        }
+        if state == .recording { advanceTimer(to: clock()) }
+        saveCheckpoint(at: clock())
+        if presentsLiveActivity {
+            liveActivity.end(liveSnapshot(status: .finished))
+        }
+        provider.stopUpdates()
+        reset()
     }
 
     /// Both armed exit paths (finish()'s `isArmed` early-return, and the armed

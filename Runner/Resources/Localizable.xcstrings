@@ -1981,6 +1981,16 @@
         }
       }
     },
+    "Run finished": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Course terminée"
+          }
+        }
+      }
+    },
     "Run in progress": {
       "localizations": {
         "fr": {

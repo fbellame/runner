@@ -191,6 +191,33 @@ final class LiveActivityController: LiveActivityPresenting {
         }
     }
 
+    /// CRITICAL 3 fix: called from crash-recovery exits that skip `begin()`
+    /// entirely (`AppModel.saveCheckpointedWorkout()` and the resume
+    /// prompt's Discard), which is the only place orphan reconciliation
+    /// normally runs. Reads `Activity<RunAttributes>.activities` directly —
+    /// same as `begin()`'s orphan scan — rather than trusting this
+    /// controller's own `activity`, because the surviving activity belongs
+    /// to a process that no longer exists; this controller's in-memory
+    /// state (freshly `nil` after a relaunch) has no idea it's there.
+    func endAllSurvivingActivities() {
+        // Mirrors `end()`: invalidate any in-flight deferred request so a
+        // `begin()` stray-clearing task that resumes after this call does
+        // not turn around and request a brand-new activity for a session
+        // that just got torn down.
+        requestGate.invalidate()
+        activity = nil
+        previous = nil
+        lastUpdateAt = nil
+        let existing = Activity<RunAttributes>.activities
+        guard !existing.isEmpty else { return }
+        let boxes = existing.map { SendableActivityBox(activity: $0) }
+        Task {
+            for box in boxes {
+                await box.activity.end(nil, dismissalPolicy: .immediate)
+            }
+        }
+    }
+
     func end(_ snapshot: RunActivitySnapshot) {
         // If a `begin()` stray-clearing task is between "strays ended" and
         // "request landed", this run is finishing (or being discarded)

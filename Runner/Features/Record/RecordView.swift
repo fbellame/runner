@@ -241,7 +241,10 @@ struct RecordView: View {
             }
             .font(.system(size: 15, weight: .bold))
             .foregroundStyle(Color.rLime)
-            Button(String(localized: "Cancel")) { dismiss() }
+            Button(String(localized: "Cancel")) {
+                recorder.cancelAfterAuthorizationDenial()
+                dismiss()
+            }
                 .font(.system(size: 14))
                 .foregroundStyle(Color.rTextSecondary)
         }

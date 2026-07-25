@@ -33,8 +33,7 @@ struct RootTabView: View {
                 Task { await model.saveCheckpointedWorkout() }
             }
             Button("Discard", role: .destructive) {
-                model.checkpoints.clear()
-                model.pendingResume = nil
+                model.discardPendingResume()
             }
         } message: {
             Text("Runner was interrupted mid-workout. Your progress was saved.")
