@@ -281,7 +281,15 @@ struct RecordView: View {
         isSaving = true
         defer { isSaving = false }
         // One shared save path (local-first, then HealthKit) lives on the coordinator.
-        let failure = await model.sync.saveRecorded(workout)
+        let outcome = await model.sync.saveRecorded(workout)
+        // CRITICAL 5: the same "local write failed but we said it saved" bug the
+        // Lock-Screen path had. Until the durable copy exists, keep the recovery
+        // checkpoint, say nothing out loud, keep the summary sheet open with its
+        // Save button live, and show why.
+        guard outcome.isLocallyDurable else {
+            saveFailedMessage = outcome.durableFailure
+            return
+        }
         model.checkpoints.clear()
         // IN-APP save path only. Confirms out loud that the run was actually
         // captured — otherwise the last thing a hands-free user hears is
@@ -294,7 +302,9 @@ struct RecordView: View {
         // separate call site that needs its own cue, but exactly once.
         model.recorder.completeSave()
         finished = nil
-        if let failure {
+        // A HealthKit-only failure still counts as saved: the local store is the
+        // durable copy and `retryPendingSaves` pushes it later.
+        if let failure = outcome.healthKitFailure {
             saveFailedMessage = failure
         } else {
             dismiss()

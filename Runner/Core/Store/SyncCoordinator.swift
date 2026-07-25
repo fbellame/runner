@@ -1,5 +1,52 @@
 import Foundation
 
+/// What `SyncCoordinator.saveRecorded` actually did.
+///
+/// CRITICAL 4 + CRITICAL 5 fix. This replaces a `String?` return in which `nil`
+/// meant BOTH "saved" and "dropped because another save was in flight", and in
+/// which a failed *local* write was indistinguishable from a clean save because
+/// `try?` swallowed it. Callers gate the two irreversible acts of the save path
+/// — clearing the recovery checkpoint and speaking "Run saved" — on
+/// `isLocallyDurable`, which is true only when the durable local copy really
+/// exists.
+enum RecordedSaveOutcome: Equatable, Sendable {
+    /// Written locally and accepted by HealthKit.
+    case saved
+    /// Written locally; HealthKit refused. The run is safe — the local store is
+    /// the durable copy and `retryPendingSaves` will push it later. Announcing
+    /// success here is intentional and long-standing behaviour.
+    case savedLocallyOnly(reason: String)
+    /// The durable local write failed. The run exists nowhere: the caller must
+    /// keep the recovery checkpoint and must NOT announce a save.
+    case localFailed(reason: String)
+    /// An identical workout was already being saved by another in-flight call,
+    /// so this call did nothing. Not a success — the caller has learned nothing
+    /// about whether the other call will land, so it must not clear the
+    /// checkpoint or announce on the strength of this result.
+    case duplicateInFlight
+
+    /// True only when a durable local copy of the workout now exists.
+    var isLocallyDurable: Bool {
+        switch self {
+        case .saved, .savedLocallyOnly: true
+        case .localFailed, .duplicateInFlight: false
+        }
+    }
+
+    /// The HealthKit-only failure message, for UI that reports a partial save.
+    /// Preserves the old `String?` contract for the in-app save sheet.
+    var healthKitFailure: String? {
+        if case .savedLocallyOnly(let reason) = self { return reason }
+        return nil
+    }
+
+    /// The message for a failure that means the run was NOT persisted.
+    var durableFailure: String? {
+        if case .localFailed(let reason) = self { return reason }
+        return nil
+    }
+}
+
 @MainActor
 final class SyncCoordinator {
     static let windowDays = 90
@@ -20,7 +67,17 @@ final class SyncCoordinator {
     private(set) var lastError: String?
     private(set) var isSyncing = false
     private var rerunRequested = false
-    private var isSavingRecorded = false
+    /// CRITICAL 4 fix: the workouts whose saves are currently in flight, not a
+    /// bare "a save is running" flag. The old flag dropped ANY overlapping call,
+    /// including one for a completely different workout, and reported that drop
+    /// as success. Identity is what the guard was always trying to express: a
+    /// second tap on Save for the SAME run is a no-op; a second, distinct run is
+    /// not, and must actually be written. Concurrent saves of distinct workouts
+    /// are safe to run in parallel — they touch different rows (distinct ids)
+    /// and `syncNow()` already carries its own re-entrancy guard — so distinct
+    /// calls proceed rather than queue, which also keeps a nested save (one
+    /// issued from inside another's HealthKit await) from deadlocking.
+    private var savesInFlight: [RecordedWorkout] = []
 
     init(health: HealthStoring, store: DataStore, currentGoal: @escaping () -> Int,
          currentWeeklyTarget: @escaping () -> Int,
@@ -62,44 +119,109 @@ final class SyncCoordinator {
         } while rerunRequested
     }
 
+    /// The local-store identity of a recorded workout.
+    ///
+    /// CRITICAL 3 support. "Write the workout" and "clear the recovery
+    /// checkpoint" cannot be made one atomic step, so a kill between them leaves
+    /// a checkpoint on disk for a run that is already saved. Under the previous
+    /// `let id = UUID()`, the resume prompt's "Save as-is" would then write that
+    /// run a SECOND time under a brand-new id — a duplicate workout. Deriving
+    /// the id from the session's own identity turns that second write into an
+    /// upsert over the same row instead.
+    ///
+    /// Identity is `(type, start)`: `startedAt` is assigned once per session and
+    /// `RecordedWorkout` already treats `start` as its identity (see its
+    /// `Identifiable` conformance). The checkpoint round-trips `startedAt`
+    /// through JSON, so the instant is quantised to milliseconds rather than
+    /// trusting the last bits of a `Double`. Two distinct recordings cannot
+    /// share a type and a start millisecond, so this collides only where the two
+    /// records genuinely describe the same session.
+    static func recordedWorkoutID(type: ActivityType, start: Date) -> UUID {
+        let millis = Int64((start.timeIntervalSince1970 * 1000).rounded())
+        let key = "runner|\(type.rawValue)|\(millis)"
+        // Two FNV-1a passes over differently-salted copies of the same key give
+        // 128 stable bits without pulling in a hashing dependency. Swift's own
+        // `hashValue` is per-process randomised and cannot be used here.
+        var bytes: [UInt8] = []
+        for salt in ["hi|", "lo|"] {
+            var hash: UInt64 = 0xcbf2_9ce4_8422_2325
+            for byte in Array((salt + key).utf8) {
+                hash ^= UInt64(byte)
+                hash = hash &* 0x0000_0100_0000_01b3
+            }
+            for shift in stride(from: 56, through: 0, by: -8) {
+                bytes.append(UInt8(truncatingIfNeeded: hash >> UInt64(shift)))
+            }
+        }
+        // RFC 4122 version/variant bits, so the result is a well-formed UUID.
+        bytes[6] = (bytes[6] & 0x0f) | 0x40
+        bytes[8] = (bytes[8] & 0x3f) | 0x80
+        return UUID(uuid: (bytes[0], bytes[1], bytes[2], bytes[3],
+                           bytes[4], bytes[5], bytes[6], bytes[7],
+                           bytes[8], bytes[9], bytes[10], bytes[11],
+                           bytes[12], bytes[13], bytes[14], bytes[15]))
+    }
+
     /// Persists a freshly recorded workout: local store first (durable even if the
     /// app dies mid-save), then HealthKit, then mark synced under the same id —
-    /// the one save path shared with retryPendingSaves. Returns an error message
-    /// when the HealthKit save failed (the workout is kept locally and retried).
+    /// the one save path shared with retryPendingSaves.
+    ///
+    /// CRITICAL 5 fix: the local write's error is no longer swallowed by `try?`.
+    /// It is the durable copy everything else relies on, so its failure is
+    /// reported as `.localFailed` and HealthKit is not attempted at all — a
+    /// half-save that reaches Health but has no local row would be re-pushed by
+    /// `retryPendingSaves` on the next recovery attempt and duplicate there.
+    /// The caller keeps its recovery checkpoint instead and can retry the whole
+    /// thing. HealthKit-only failure keeps its long-standing meaning: the run is
+    /// safe locally, so announcing the save is still correct.
     @discardableResult
-    func saveRecorded(_ workout: RecordedWorkout) async -> String? {
-        guard !isSavingRecorded else { return nil }
-        isSavingRecorded = true
-        defer { isSavingRecorded = false }
+    func saveRecorded(_ workout: RecordedWorkout) async -> RecordedSaveOutcome {
+        guard !savesInFlight.contains(workout) else { return .duplicateInFlight }
+        savesInFlight.append(workout)
+        defer { savesInFlight.removeAll { $0 == workout } }
 
         let points = PointsEngine.workoutPoints(type: workout.type,
                                                 distanceMeters: workout.distanceMeters)
         let kcal = workoutCalories(type: workout.type, distanceMeters: workout.distanceMeters,
                                    movingSeconds: workout.movingSeconds, metrics: metricsProvider())
         let routeData = try? workout.route.encoded()
-        let id = UUID()
-        try? store.upsertWorkout(id: id, type: workout.type, start: workout.start,
-                                 end: workout.end, movingSeconds: workout.movingSeconds,
-                                 distanceMeters: workout.distanceMeters,
-                                 distanceEstimated: workout.distanceEstimated, points: points,
-                                 routeData: routeData, splitSeconds: workout.splitSeconds,
-                                 source: "runner", hkSynced: false, calories: kcal,
-                                 autoStarted: workout.autoStarted)
-        var failure: String?
+        let id = Self.recordedWorkoutID(type: workout.type, start: workout.start)
+        // A re-save of a session that already reached HealthKit (the crash
+        // window between the local write and `checkpoints.clear()`, recovered
+        // via "Save as-is") must refresh the local row without pushing a second
+        // copy into Health.
+        let alreadyInHealth = (try? store.workout(id: id))?.hkSynced == true
         do {
-            _ = try await health.saveWorkout(workout, points: points)
-            try? store.upsertWorkout(id: id, type: workout.type, start: workout.start,
-                                     end: workout.end, movingSeconds: workout.movingSeconds,
-                                     distanceMeters: workout.distanceMeters,
-                                     distanceEstimated: workout.distanceEstimated, points: points,
-                                     routeData: routeData, splitSeconds: workout.splitSeconds,
-                                     source: "runner", hkSynced: true, calories: kcal,
-                                     autoStarted: workout.autoStarted)
+            try store.upsertWorkout(id: id, type: workout.type, start: workout.start,
+                                    end: workout.end, movingSeconds: workout.movingSeconds,
+                                    distanceMeters: workout.distanceMeters,
+                                    distanceEstimated: workout.distanceEstimated, points: points,
+                                    routeData: routeData, splitSeconds: workout.splitSeconds,
+                                    source: "runner", hkSynced: alreadyInHealth, calories: kcal,
+                                    autoStarted: workout.autoStarted)
         } catch {
-            failure = error.localizedDescription
+            // Surface it the same way a failed sync is surfaced (TodayView reads
+            // `lastError`), and skip the `syncNow()` below that would clear it.
+            lastError = error.localizedDescription
+            return .localFailed(reason: error.localizedDescription)
+        }
+        var failure: String?
+        if !alreadyInHealth {
+            do {
+                _ = try await health.saveWorkout(workout, points: points)
+                try? store.upsertWorkout(id: id, type: workout.type, start: workout.start,
+                                         end: workout.end, movingSeconds: workout.movingSeconds,
+                                         distanceMeters: workout.distanceMeters,
+                                         distanceEstimated: workout.distanceEstimated, points: points,
+                                         routeData: routeData, splitSeconds: workout.splitSeconds,
+                                         source: "runner", hkSynced: true, calories: kcal,
+                                         autoStarted: workout.autoStarted)
+            } catch {
+                failure = error.localizedDescription
+            }
         }
         await syncNow()
-        return failure
+        return failure.map { .savedLocallyOnly(reason: $0) } ?? .saved
     }
 
     private func performSync() async {
@@ -216,7 +338,17 @@ final class SyncCoordinator {
 
     private func retryPendingSaves() async {
         guard let pending = try? store.pendingSync(), !pending.isEmpty else { return }
-        for rec in pending {
+        // A workout whose own `saveRecorded` is between its local write and its
+        // HealthKit await is already on its way to Health, and its local row is
+        // legitimately still `hkSynced == false`. Pushing it again from here
+        // would put a duplicate in Health. This only became reachable once
+        // distinct saves were allowed to overlap (CRITICAL 4): a concurrent
+        // save's trailing `syncNow()` can now land inside another save's
+        // HealthKit await.
+        let inFlightIDs = Set(savesInFlight.map {
+            Self.recordedWorkoutID(type: $0.type, start: $0.start)
+        })
+        for rec in pending where !inFlightIDs.contains(rec.id) {
             let workout = RecordedWorkout(type: rec.type, start: rec.start, end: rec.end,
                                           movingSeconds: rec.movingSeconds,
                                           distanceMeters: rec.distanceMeters,

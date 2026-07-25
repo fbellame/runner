@@ -17,6 +17,9 @@ final class FakeHealthStore: HealthStoring {
     var observers: [() -> Void] = []
     var workoutsHook: (() async -> Void)?
     var saveHook: (() async -> Void)?
+    /// Fires inside the very first `await` `AppModel.onLaunch()` performs, so a
+    /// test can observe the model's state mid-launch (CRITICAL 1 ordering).
+    var shouldRequestAuthorizationHook: (() async -> Void)?
     var dailyStepsDaysBack: [Int] = []
     var dailyWalkRunDistanceDaysBack: [Int] = []
     var rangedWalkRunDistance: Double = 0
@@ -28,7 +31,10 @@ final class FakeHealthStore: HealthStoring {
     var cannedBody = HealthBody(heightCm: nil, weightKg: nil, birthDate: nil, sex: .unspecified)
 
     func requestAuthorization() async throws {}
-    func shouldRequestAuthorization() async -> Bool { false }
+    func shouldRequestAuthorization() async -> Bool {
+        await shouldRequestAuthorizationHook?()
+        return false
+    }
     func bodyMetrics() async throws -> HealthBody { cannedBody }
     func diagnosticsReport() async -> String { "fake" }
     func earliestHistoryDate() async throws -> Date? {

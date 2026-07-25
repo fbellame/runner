@@ -72,6 +72,33 @@ struct AppModelTests {
         #expect(model.pendingResume?.activity == .run)
     }
 
+    /// CRITICAL 1 regression: the checkpoint (and any pending celebration) must
+    /// be read synchronously, BEFORE `onLaunch()`'s first `await`. Every instant
+    /// where `pendingResume` is still nil is an instant where `canAutoStart`
+    /// reads true, so a cold `StartRunIntent` can arm a brand-new session that
+    /// then overwrites the unrecovered workout's checkpoint.
+    @Test func launchLoadsCheckpointBeforeItsFirstAwait() async throws {
+        let (model, health, checkpoints) = try makeModel()
+        try checkpoints.save(SessionCheckpoint(activity: .run,
+                                               startedAt: Date().addingTimeInterval(-600),
+                                               movingSeconds: 600,
+                                               distanceMeters: 2_000,
+                                               route: [],
+                                               splitSeconds: [300, 300],
+                                               savedAt: .now))
+        var canAutoStartDuringLaunch: Bool?
+        var pendingResumeDuringLaunch: Bool?
+        health.shouldRequestAuthorizationHook = {
+            canAutoStartDuringLaunch = model.canAutoStart
+            pendingResumeDuringLaunch = model.pendingResume != nil
+        }
+
+        await model.onLaunch()
+
+        #expect(pendingResumeDuringLaunch == true)
+        #expect(canAutoStartDuringLaunch == false)
+    }
+
     @Test func saveAsIsPersistsCheckpointedWorkoutWithoutResuming() async throws {
         let (model, health, checkpoints) = try makeModel()
         let start = Date().addingTimeInterval(-1_800)

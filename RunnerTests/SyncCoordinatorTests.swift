@@ -226,8 +226,8 @@ struct SyncCoordinatorTests {
         health.saveHook = {
             pendingAtHKSaveTime = (try? store.pendingSync().count) ?? -1
         }
-        let failure = await sync.saveRecorded(workout)
-        #expect(failure == nil)
+        let outcome = await sync.saveRecorded(workout)
+        #expect(outcome == .saved)
         #expect(pendingAtHKSaveTime == 1)   // durable locally before HealthKit ran
         let all = try store.allWorkouts()
         #expect(all.count == 1)             // one record, marked synced afterwards
@@ -245,8 +245,9 @@ struct SyncCoordinatorTests {
                                       end: day(0).addingTimeInterval(8 * 3600 + 1500),
                                       movingSeconds: 1500, distanceMeters: 5_000,
                                       route: [], splitSeconds: [])
-        let failure = await sync.saveRecorded(workout)
-        #expect(failure != nil)
+        let outcome = await sync.saveRecorded(workout)
+        #expect(outcome.healthKitFailure != nil)
+        #expect(outcome.isLocallyDurable)
         let id = try #require(try store.allWorkouts().first?.id)
         #expect(try store.pendingSync().count == 1)
         // HealthKit recovers; the retry syncs the SAME record, no duplicate
@@ -275,6 +276,33 @@ struct SyncCoordinatorTests {
         #expect(health.savedWorkouts.count == 1)
         #expect(try store.allWorkouts().count == 1)
         #expect(try store.ledger(on: day(0))?.totalPoints == 85)
+    }
+
+    /// CRITICAL 4 regression: the overlap guard used to `return nil` — which is
+    /// this function's SUCCESS value — for any call landing while another save
+    /// was in flight, including one for a completely different workout. The
+    /// caller then cleared the recovery checkpoint and spoke "Run saved" for a
+    /// workout that was never written anywhere.
+    @Test func concurrentDistinctSavesAreBothPersisted() async throws {
+        let (sync, health, store) = try make()
+        health.stepsByDay = [day(0): 1_000]
+        let first = RecordedWorkout(type: .run, start: day(0).addingTimeInterval(8 * 3600),
+                                    end: day(0).addingTimeInterval(8 * 3600 + 1500),
+                                    movingSeconds: 1500, distanceMeters: 5_000,
+                                    route: [], splitSeconds: [])
+        let second = RecordedWorkout(type: .run, start: day(0).addingTimeInterval(12 * 3600),
+                                     end: day(0).addingTimeInterval(12 * 3600 + 900),
+                                     movingSeconds: 900, distanceMeters: 3_000,
+                                     route: [], splitSeconds: [])
+        health.saveHook = { [weak sync, weak health] in
+            health?.saveHook = nil
+            await sync?.saveRecorded(second)
+        }
+
+        await sync.saveRecorded(first)
+
+        #expect(try store.allWorkouts().count == 2)
+        #expect(health.savedWorkouts.count == 2)
     }
 
     @Test func storedGoalsPreservedOnResync() async throws {

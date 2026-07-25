@@ -35,7 +35,21 @@ struct CheckpointStore {
         return try? JSONDecoder().decode(SessionCheckpoint.self, from: data)
     }
 
+    /// Same hardening as `PendingCelebrationStore.clear()` (IMPORTANT 6): a
+    /// silently-failed delete leaves a checkpoint behind for a run that has
+    /// already been saved, which raises a spurious crash-resume prompt. A
+    /// truncated file fails to decode, so `load()` still reads as "nothing to
+    /// resume". Kept non-throwing — every call site clears a checkpoint whose
+    /// workout is already durable elsewhere, and the residual risk is now a
+    /// duplicate-looking prompt rather than a lost or duplicated workout (the
+    /// stable id in `SyncCoordinator.recordedWorkoutID` makes a re-save of the
+    /// same session an upsert, not a second row).
     func clear() {
-        try? FileManager.default.removeItem(at: fileURL)
+        guard FileManager.default.fileExists(atPath: fileURL.path) else { return }
+        do {
+            try FileManager.default.removeItem(at: fileURL)
+        } catch {
+            try? Data().write(to: fileURL, options: .atomic)
+        }
     }
 }

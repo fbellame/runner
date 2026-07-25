@@ -12,6 +12,10 @@ enum AppTab {
 final class AppModel {
     static let goalKey = "dailyGoal"
     static let profilePromptKey = "didShowProfilePrompt_v1_1"
+    /// IMPORTANT 6: records that a celebration was dismissed, out-of-band from
+    /// the file whose deletion may have failed. Holds the celebration's `start`
+    /// as a Unix timestamp; see `clearPendingCelebration()`.
+    static let acknowledgedCelebrationKey = "acknowledgedCelebrationStart"
     /// Single source for the allowed daily-goal bounds — the Settings stepper,
     /// the didSet clamp, and storedGoal() must never disagree.
     static let goalRange = 50...500
@@ -142,8 +146,70 @@ final class AppModel {
     /// run so its clock stays frozen until real movement, without unlocking or
     /// foregrounding the app.
     func startRunFromIntent() {
+        // CRITICAL 1, the half that hoisting the load inside `onLaunch()` cannot
+        // reach: a `LiveActivityIntent` can background-launch the app, so
+        // `perform()` may run before `onLaunch()` ever does. `pendingResume`
+        // would then be nil purely because nothing has read the disk yet,
+        // `canAutoStart` would read true, and this would arm a brand-new
+        // session whose checkpoint writes overwrite an unrecovered workout.
+        // Consult the store, not just the in-memory flag.
+        if pendingResume == nil, recorder.state == .idle {
+            pendingResume = checkpoints.load()
+        }
         guard canAutoStart else { return }
         recorder.start(activity: .run, armed: true)
+    }
+
+    /// What a Lock Screen control tap found when it arrived.
+    private enum IntentSession: Equatable {
+        /// A real in-memory session — act on it directly, as before.
+        case existing
+        /// Nothing was in memory but a checkpoint was, so the session has been
+        /// rehydrated. Carries the checkpoint's `savedAt` as the end-of-activity
+        /// fallback for a checkpoint that holds no route points.
+        case adopted(endedAt: Date)
+        /// Nothing to act on. Any stranded Live Activity has been ended.
+        case unavailable
+    }
+
+    /// CRITICAL 2 fix. ActivityKit activities outlive the app process, so the
+    /// Lock Screen can be showing a live Live Activity with working-looking
+    /// Pause and Finish buttons while the app has been killed and relaunched
+    /// into a fresh idle recorder. Loading `pendingResume` does not rehydrate
+    /// the recorder, so both intents used to hit their no-op guards: the user
+    /// tapped Finish on a real-looking run and nothing happened, forever.
+    ///
+    /// The fix rehydrates rather than special-casing the intents, because that
+    /// makes the buttons genuinely work instead of merely failing louder: after
+    /// `start(resumeFrom:)` the recorder holds the real session, Pause pauses
+    /// it, Resume resumes recording it (a real recovery, without unlocking),
+    /// and Finish takes the ordinary, already-tested finish path. It also reuses
+    /// the Live Activity mechanism Task 8 built for exactly this case —
+    /// `begin()` matches the surviving activity by `startedAt`, which the
+    /// checkpoint restores, and adopts it instead of stranding it or stacking a
+    /// second one beside it.
+    ///
+    /// The checkpoint is read from disk rather than from `pendingResume`: a
+    /// `LiveActivityIntent` can background-launch the app, and there is no
+    /// guarantee `onLaunch()` has run before `perform()` does.
+    ///
+    /// When no session can be recovered at all — no checkpoint, or a checkpoint
+    /// for an activity that never presents a Live Activity — there is nothing
+    /// to control, so the surviving activity is a pure orphan. Phase 3's
+    /// `endStrandedLiveActivity()` is the existing seam for that; the run's own
+    /// data (if any) is left untouched on disk.
+    private func resolveIntentSession() -> IntentSession {
+        guard recorder.state == .idle else { return .existing }
+        guard let checkpoint = pendingResume ?? checkpoints.load(),
+              checkpoint.activity == .run else {
+            recorder.endStrandedLiveActivity()
+            return .unavailable
+        }
+        // The recorder now owns this session, so the resume prompt must not
+        // also claim it.
+        pendingResume = nil
+        recorder.start(activity: checkpoint.activity, resumeFrom: checkpoint)
+        return .adopted(endedAt: checkpoint.savedAt)
     }
 
     /// Entry point for the Lock Screen / Control Center `TogglePauseIntent`.
@@ -155,6 +221,13 @@ final class AppModel {
     /// motion yet, so "pause" is meaningless and `pauseManually()` already
     /// refuses to run; this guard just makes that explicit at the call site.
     func togglePauseFromIntent() {
+        guard resolveIntentSession() != .unavailable else { return }
+        // IMPORTANT 7: the widget only renders these controls on manual-run
+        // Live Activities, but repository code cannot prove the system never
+        // invokes an intent outside the rendered button. Make the auto-walk
+        // silence guarantee by construction at the entry point, matching the
+        // guards already on every other announcement site.
+        guard recorder.activity == .run, !recorder.autoStarted else { return }
         guard !recorder.isArmed else { return }
         if recorder.state == .manuallyPaused {
             recorder.resumeManually()
@@ -172,19 +245,96 @@ final class AppModel {
     ///
     /// `completeSave()` calls `announceSaved()` internally — do not announce
     /// separately here, or "Run saved" speaks twice.
+    ///
+    /// CRITICAL 3: the ordering below is chosen so that at every instant the run
+    /// is recoverable from at least one durable record. `finish()` leaves a
+    /// checkpoint on disk; the celebration is written BEFORE the long save, so
+    /// there is no window in which the checkpoint is already gone and the
+    /// celebration is not yet there. The checkpoint is destroyed last, and only
+    /// once the durable local copy is confirmed.
+    ///
+    /// CRITICAL 5: `isLocallyDurable` — not "no HealthKit error" — gates both
+    /// irreversible acts (clearing the checkpoint, speaking "Run saved"). A
+    /// HealthKit-only failure still announces, deliberately: the local store is
+    /// the durable copy, so the run really is safe.
     func finishRunFromIntent() async {
-        guard let workout = recorder.finish(endingAt: recorder.lastMovingAt) else { return }
-        _ = await sync.saveRecorded(workout)
-        checkpoints.clear()
-        try? pendingCelebrations.save(workout)
+        let session = resolveIntentSession()
+        guard session != .unavailable else { return }
+        // IMPORTANT 7 — see `togglePauseFromIntent()`.
+        guard recorder.activity == .run, !recorder.autoStarted else { return }
+        // A checkpoint with no route points has no last-moving timestamp; its
+        // `savedAt` is the closest honest end, and far better than "now" (which
+        // would bake however long the process was dead into the workout).
+        let fallbackEnd: Date? = if case .adopted(let endedAt) = session { endedAt } else { nil }
+        guard let workout = recorder.finish(endingAt: recorder.lastMovingAt ?? fallbackEnd) else {
+            return
+        }
+        // Durable before the await, so a kill during the save leaves BOTH the
+        // checkpoint and the celebration behind rather than neither.
+        var celebrationPersisted = true
+        do {
+            try pendingCelebrations.save(workout)
+            UserDefaults.standard.removeObject(forKey: Self.acknowledgedCelebrationKey)
+        } catch {
+            celebrationPersisted = false
+        }
+        let outcome = await sync.saveRecorded(workout)
+        guard outcome.isLocallyDurable else {
+            // The run exists nowhere but the checkpoint. Keep it, drop the
+            // celebration file (it would claim a save that never happened), and
+            // stay silent — a missing cue is recoverable, a lost run is not.
+            // The Live Activity is deliberately left showing its `.finished`
+            // state: its Finish button now routes back through
+            // `resolveIntentSession()` and retries this whole path.
+            try? pendingCelebrations.clear()
+            pendingResume = checkpoints.load()
+            return
+        }
+        // IMPORTANT 6: if the celebration could not be made durable, keep the
+        // recovery checkpoint rather than destroying the only other record of
+        // the run. The cost is a resume prompt for an already-saved run, and
+        // "Save as-is" now upserts under the same stable id rather than
+        // duplicating it (see `SyncCoordinator.recordedWorkoutID`).
+        if celebrationPersisted {
+            checkpoints.clear()
+        }
         pendingCelebration = workout
         recorder.completeSave()
     }
 
     /// Called once Task 13's presentation has consumed `pendingCelebration`.
+    ///
+    /// IMPORTANT 6: a failed delete used to be swallowed while the in-memory
+    /// state was cleared regardless, so an acknowledged celebration reappeared
+    /// on a later launch. `PendingCelebrationStore.clear()` now falls back to
+    /// truncating the file; if even that fails, the acknowledgement is recorded
+    /// in UserDefaults — a different storage mechanism, so it can survive
+    /// whatever is wrong with the file — and the load path honours it.
     func clearPendingCelebration() {
-        pendingCelebrations.clear()
+        let start = pendingCelebration?.start
+        do {
+            try pendingCelebrations.clear()
+            UserDefaults.standard.removeObject(forKey: Self.acknowledgedCelebrationKey)
+        } catch {
+            if let start {
+                UserDefaults.standard.set(start.timeIntervalSince1970,
+                                          forKey: Self.acknowledgedCelebrationKey)
+            }
+        }
         pendingCelebration = nil
+    }
+
+    /// Reads the pending celebration, skipping one the user has already
+    /// dismissed but whose file could not be deleted (IMPORTANT 6).
+    private func loadPendingCelebration() -> RecordedWorkout? {
+        guard let workout = pendingCelebrations.load() else { return nil }
+        guard let acknowledged = UserDefaults.standard
+            .object(forKey: Self.acknowledgedCelebrationKey) as? Double,
+              abs(workout.start.timeIntervalSince1970 - acknowledged) < 0.001 else {
+            return workout
+        }
+        try? pendingCelebrations.clear()   // opportunistic retry
+        return nil
     }
 
     /// Opt-in so tests can build an AppModel without a motion provider. The
@@ -196,8 +346,13 @@ final class AppModel {
             canAutoStart: { [weak self] in
                 self?.canAutoStart == true
             },
+            // CRITICAL 5, silent path: the coordinator clears the checkpoint
+            // after a save, so it has to learn whether the durable write landed.
+            // Reporting `false` keeps the walk's recovery copy on disk. Nothing
+            // is announced either way — auto-recorded walks stay silent.
             save: { [weak self] workout in
-                await self?.sync.saveRecorded(workout)
+                guard let self else { return false }
+                return await self.sync.saveRecorded(workout).isLocallyDurable
             })
     }
 
@@ -228,6 +383,18 @@ final class AppModel {
     }
 
     func onLaunch() async {
+        // CRITICAL 1: load the checkpoint (and any pending celebration) FIRST —
+        // synchronously, before a single `await`. Both are cheap local file
+        // reads. A pending resume owns the recorder, and `canAutoStart` reads
+        // that flag: for as long as `pendingResume` is nil, a cold
+        // `StartRunIntent` can arm a brand-new session that then writes through
+        // the same `CheckpointStore` and overwrites the unrecovered workout. The
+        // comment below this used to claim "load the checkpoint first" while
+        // sitting after four awaits; now the code matches it.
+        pendingResume = checkpoints.load()
+        if pendingCelebration == nil {
+            pendingCelebration = loadPendingCelebration()
+        }
         if await health.shouldRequestAuthorization() {
             try? await health.requestAuthorization()
         }
@@ -249,12 +416,6 @@ final class AppModel {
                 }
             }
         }
-        // Load the checkpoint first: a pending resume owns the recorder, and the
-        // auto-walk guard reads that flag.
-        pendingResume = checkpoints.load()
-        if pendingCelebration == nil {
-            pendingCelebration = pendingCelebrations.load()
-        }
         await autoWalk?.onForeground()
         await sync.syncNow()
         if !UserDefaults.standard.bool(forKey: Self.profilePromptKey) {
@@ -270,10 +431,18 @@ final class AppModel {
     }
 
     func onForeground() async {
-        await profile.refreshFromHealth()
-        if pendingCelebration == nil {
-            pendingCelebration = pendingCelebrations.load()
+        // CRITICAL 1, same ordering hazard as `onLaunch()`: the local reads that
+        // decide who owns the recorder go before any `await`. `pendingResume` is
+        // re-read here too — this process may have been background-launched by a
+        // Lock Screen intent long before the user brought the app forward, and a
+        // checkpoint could have appeared since launch.
+        if pendingResume == nil, recorder.state == .idle {
+            pendingResume = checkpoints.load()
         }
+        if pendingCelebration == nil {
+            pendingCelebration = loadPendingCelebration()
+        }
+        await profile.refreshFromHealth()
         await autoWalk?.onForeground()
         await sync.syncNow()
     }
@@ -297,8 +466,11 @@ final class AppModel {
                                       distanceMeters: checkpoint.distanceMeters,
                                       route: checkpoint.route,
                                       splitSeconds: checkpoint.splitSeconds)
-        await sync.saveRecorded(workout)
+        let outcome = await sync.saveRecorded(workout)
         recorder.endStrandedLiveActivity()
+        // CRITICAL 5: the checkpoint is this run's only copy until the local
+        // write lands. If it did not, keep it and leave the prompt up.
+        guard outcome.isLocallyDurable else { return }
         checkpoints.clear()
         pendingResume = nil
     }

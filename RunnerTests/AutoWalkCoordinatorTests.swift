@@ -63,7 +63,7 @@ struct AutoWalkCoordinatorTests {
         let coordinator = AutoWalkCoordinator(motion: motion, recorder: recorder, health: health,
                                               checkpoints: checkpoints, clock: { self.now },
                                               canAutoStart: canAutoStart,
-                                              save: { saved.workouts.append($0) })
+                                              save: { saved.workouts.append($0); return true })
         return Harness(coordinator: coordinator, motion: motion, recorder: recorder,
                        health: health, location: location, saved: saved, checkpoints: checkpoints)
     }
@@ -309,7 +309,7 @@ struct AutoWalkCoordinatorTests {
             checkpoints: checkpoints,
             clock: { self.now },
             canAutoStart: { true },
-            save: { _ in }
+            save: { _ in true }
         )
 
         await coordinator.ingest(walking(-300))

@@ -34,7 +34,18 @@ struct PendingCelebrationStore: Sendable {
         return try? JSONDecoder().decode(RecordedWorkout.self, from: data)
     }
 
-    func clear() {
-        try? FileManager.default.removeItem(at: fileURL)
+    /// IMPORTANT 6 fix: this used to be `try?`-silent. A failed delete leaves
+    /// an already-acknowledged celebration on disk, so it reappears on a later
+    /// launch as if the run had just finished. Deletion is not the only way to
+    /// make `load()` return nil, so fall back to truncating the file — a
+    /// zero-byte file fails to decode and reads as "nothing pending" — and only
+    /// throw when even that is impossible, so the caller can compensate.
+    func clear() throws {
+        guard FileManager.default.fileExists(atPath: fileURL.path) else { return }
+        do {
+            try FileManager.default.removeItem(at: fileURL)
+        } catch {
+            try Data().write(to: fileURL, options: .atomic)
+        }
     }
 }

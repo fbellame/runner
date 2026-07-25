@@ -12,6 +12,12 @@ final class DataStore {
     let container: ModelContainer
     private var context: ModelContext { container.mainContext }
 
+    #if DEBUG
+    /// When set, the next `upsertWorkout` throws this instead of writing. See
+    /// the guard inside `upsertWorkout` for why this seam exists.
+    var upsertFailureForTesting: Error?
+    #endif
+
     init(inMemory: Bool = false) throws {
         let config = ModelConfiguration(isStoredInMemoryOnly: inMemory)
         container = try ModelContainer(for: DayLedger.self, WorkoutRec.self, UserProfile.self,
@@ -114,6 +120,16 @@ final class DataStore {
                        calories: Double = 0, caloriesFromHealth: Bool = false,
                        co2SavedGrams: Double = 0, co2FromHealth: Bool = false,
                        autoStarted: Bool = false) throws -> WorkoutRec {
+        #if DEBUG
+        // Test-only seam. SwiftData's write cannot be made to fail on demand,
+        // and the branch that matters most — a failed durable write must never
+        // be reported to the user as a saved run (CRITICAL 5) — is the single
+        // most dangerous path in the recording pipeline. Compiled out of
+        // release builds; nothing but a test ever sets it.
+        if let upsertFailureForTesting {
+            throw upsertFailureForTesting
+        }
+        #endif
         var descriptor = FetchDescriptor<WorkoutRec>(predicate: #Predicate { $0.id == id })
         descriptor.fetchLimit = 1
         let rec: WorkoutRec
@@ -156,6 +172,14 @@ final class DataStore {
         }
         try context.save()
         return rec
+    }
+
+    /// Looks a recorded workout up by its stable id. Used by `saveRecorded` to
+    /// tell a first save from a crash-recovery re-save of the same session.
+    func workout(id: UUID) throws -> WorkoutRec? {
+        var descriptor = FetchDescriptor<WorkoutRec>(predicate: #Predicate { $0.id == id })
+        descriptor.fetchLimit = 1
+        return try context.fetch(descriptor).first
     }
 
     func workouts(onDay date: Date) throws -> [WorkoutRec] {

@@ -28,7 +28,9 @@ final class AutoWalkCoordinator {
     /// Everything the coordinator needs to know about the rest of the app, without
     /// reaching into AppModel and creating a cycle.
     private let canAutoStart: () -> Bool
-    private let save: (RecordedWorkout) async -> Void
+    /// Returns whether the durable local copy landed; a walk whose save failed
+    /// must keep its checkpoint (CRITICAL 5).
+    private let save: (RecordedWorkout) async -> Bool
 
     private var detector = WalkDetector()
     private var isObserving = false
@@ -49,7 +51,7 @@ final class AutoWalkCoordinator {
          checkpoints: CheckpointStore,
          clock: @escaping () -> Date = { Date() },
          canAutoStart: @escaping () -> Bool,
-         save: @escaping (RecordedWorkout) async -> Void) {
+         save: @escaping (RecordedWorkout) async -> Bool) {
         self.motion = motion
         self.recorder = recorder
         self.health = health
@@ -148,10 +150,11 @@ final class AutoWalkCoordinator {
             recorder.discard()
             return
         }
-        await save(workout)
         // finish() leaves a checkpoint behind so a crash between finish and save
-        // stays recoverable. The save landed, so it must not outlive it and raise
-        // a resume prompt for a walk already on disk.
+        // stays recoverable. Only clear it once the durable copy really landed:
+        // otherwise this silent path would destroy the walk's only record and
+        // nobody would ever hear about it (CRITICAL 5).
+        guard await save(workout) else { return }
         checkpoints.clear()
     }
 }
