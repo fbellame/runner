@@ -305,6 +305,69 @@ struct SyncCoordinatorTests {
         #expect(health.savedWorkouts.count == 2)
     }
 
+    /// CRITICAL 3 regression: the overlap guard used full `RecordedWorkout`
+    /// value equality, but the persistent store's identity is `(type, start)`.
+    /// Two representations of the same session — a live finish and a recovery
+    /// "Save as-is", whose `end` can legitimately differ — are NOT value-equal,
+    /// so both used to sail past the guard and each independently push the
+    /// workout to HealthKit.
+    @Test func concurrentSaveOfTheSameSessionWithADifferentEndIsNotPushedTwice() async throws {
+        let (sync, health, store) = try make()
+        health.stepsByDay = [day(0): 1_000]
+        let start = day(0).addingTimeInterval(8 * 3600)
+        let liveFinish = RecordedWorkout(type: .run, start: start,
+                                         end: start.addingTimeInterval(1_500),
+                                         movingSeconds: 1_500, distanceMeters: 5_000,
+                                         route: [], splitSeconds: [])
+        // Same session (same type + start), recovered via "Save as-is": the
+        // checkpoint's `savedAt` becomes `end`, which differs from the live
+        // finish's real GPS-derived end — exactly CRITICAL 3's scenario.
+        let recovered = RecordedWorkout(type: .run, start: start,
+                                        end: start.addingTimeInterval(1_490),
+                                        movingSeconds: 1_490, distanceMeters: 4_950,
+                                        route: [], splitSeconds: [])
+        health.saveHook = { [weak sync, weak health] in
+            health?.saveHook = nil
+            await sync?.saveRecorded(recovered)
+        }
+
+        let outcome = await sync.saveRecorded(liveFinish)
+
+        #expect(outcome == .saved)
+        #expect(health.savedWorkouts.count == 1)      // pushed to HealthKit once, not twice
+        #expect(try store.allWorkouts().count == 1)
+    }
+
+    /// IMPORTANT 6 regression: a checkpoint written by a pre-upgrade build
+    /// corresponds to a workout row (if it was ever saved) under a random
+    /// UUID, since recovery saves didn't use a deterministic id yet.
+    /// Recovering it now must reconcile onto that existing row rather than
+    /// create a second one — and re-push to HealthKit — under the new
+    /// deterministic id.
+    @Test func recoveringALegacyCheckpointReconcilesOntoItsPreUpgradeRow() async throws {
+        let (sync, health, store) = try make()
+        health.stepsByDay = [day(0): 1_000]
+        let start = day(0).addingTimeInterval(8 * 3600)
+        let legacyID = UUID()   // pre-upgrade: random, not the deterministic id
+        try store.upsertWorkout(id: legacyID, type: .run, start: start,
+                                end: start.addingTimeInterval(1_500),
+                                movingSeconds: 1_500, distanceMeters: 5_000, points: 75,
+                                routeData: nil, splitSeconds: [],
+                                source: "runner", hkSynced: true)
+
+        let workout = RecordedWorkout(type: .run, start: start,
+                                      end: start.addingTimeInterval(1_500),
+                                      movingSeconds: 1_500, distanceMeters: 5_000,
+                                      route: [], splitSeconds: [])
+        let outcome = await sync.saveRecorded(workout)
+
+        #expect(outcome == .saved)
+        let all = try store.allWorkouts()
+        #expect(all.count == 1)                 // reconciled, not duplicated
+        #expect(all.first?.id == legacyID)
+        #expect(health.savedWorkouts.isEmpty)    // already in Health; not re-pushed
+    }
+
     @Test func storedGoalsPreservedOnResync() async throws {
         let (sync, health, store) = try make(goal: 150)
         // Yesterday was finalized under goal 70.

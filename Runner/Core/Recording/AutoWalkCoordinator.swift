@@ -110,7 +110,20 @@ final class AutoWalkCoordinator {
     private func autoStart(walkBeganAt: Date) {
         // A manually started run must never be hijacked, and an unanswered
         // crash-resume prompt still owns the recorder.
-        guard canAutoStart(), recorder.state == .idle, !isAutoSession else { return }
+        //
+        // CRITICAL 1 (regression fix): `autoStop()` clears `isAutoSession` and
+        // `finish()` leaves the recorder `.idle` even when a silent save fails
+        // and its checkpoint is deliberately retained for recovery — so both
+        // in-memory ownership guards above release the instant that happens,
+        // while the checkpoint the failed save left behind is still sitting on
+        // disk. Without this, the very next walk would auto-start a fresh
+        // session whose own periodic checkpoint writes land on the same file
+        // and silently destroy the only surviving copy of the failed one.
+        // Consulting the store directly closes that gap regardless of which
+        // process wrote the retained checkpoint or how long ago: a later
+        // auto-start can never overwrite a checkpoint no one has resolved yet.
+        guard canAutoStart(), recorder.state == .idle, !isAutoSession,
+              checkpoints.load() == nil else { return }
         isAutoSession = true
         recorder.start(activity: .walk, backdatedTo: walkBeganAt, autoStarted: true)
     }

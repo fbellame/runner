@@ -77,7 +77,15 @@ final class SyncCoordinator {
     /// and `syncNow()` already carries its own re-entrancy guard — so distinct
     /// calls proceed rather than queue, which also keeps a nested save (one
     /// issued from inside another's HealthKit await) from deadlocking.
-    private var savesInFlight: [RecordedWorkout] = []
+    ///
+    /// CRITICAL 3 fix: keyed on `recordedWorkoutID(type:start:)` — the same
+    /// identity the persistent store uses — rather than full `RecordedWorkout`
+    /// value equality. Two representations of the same session (a live finish
+    /// versus a recovery "Save as-is") can differ in fields like `end`, so
+    /// value equality let both proceed and each independently push to
+    /// HealthKit. `(type, start)` is "the same session" everywhere else in this
+    /// file; the in-flight guard now means the same thing.
+    private var savesInFlight: Set<UUID> = []
 
     init(health: HealthStoring, store: DataStore, currentGoal: @escaping () -> Int,
          currentWeeklyTarget: @escaping () -> Int,
@@ -176,16 +184,25 @@ final class SyncCoordinator {
     /// safe locally, so announcing the save is still correct.
     @discardableResult
     func saveRecorded(_ workout: RecordedWorkout) async -> RecordedSaveOutcome {
-        guard !savesInFlight.contains(workout) else { return .duplicateInFlight }
-        savesInFlight.append(workout)
-        defer { savesInFlight.removeAll { $0 == workout } }
+        let deterministicID = Self.recordedWorkoutID(type: workout.type, start: workout.start)
+        guard !savesInFlight.contains(deterministicID) else { return .duplicateInFlight }
+        savesInFlight.insert(deterministicID)
+        defer { savesInFlight.remove(deterministicID) }
 
         let points = PointsEngine.workoutPoints(type: workout.type,
                                                 distanceMeters: workout.distanceMeters)
         let kcal = workoutCalories(type: workout.type, distanceMeters: workout.distanceMeters,
                                    movingSeconds: workout.movingSeconds, metrics: metricsProvider())
         let routeData = try? workout.route.encoded()
-        let id = Self.recordedWorkoutID(type: workout.type, start: workout.start)
+        // IMPORTANT 6: a checkpoint written by a pre-upgrade build corresponds,
+        // if it was ever saved at all, to a row under a random UUID — recovery
+        // saves didn't use a deterministic id yet. Reconcile onto that existing
+        // row (same `(type, start)`, different id) instead of creating a
+        // duplicate under the new deterministic one. Cheap: one extra indexed
+        // lookup, only on the recovery path where the deterministic id misses.
+        let id = (try? store.workout(id: deterministicID)) != nil
+            ? deterministicID
+            : (try? store.workout(type: workout.type, start: workout.start))?.id ?? deterministicID
         // A re-save of a session that already reached HealthKit (the crash
         // window between the local write and `checkpoints.clear()`, recovered
         // via "Save as-is") must refresh the local row without pushing a second
@@ -345,10 +362,7 @@ final class SyncCoordinator {
         // distinct saves were allowed to overlap (CRITICAL 4): a concurrent
         // save's trailing `syncNow()` can now land inside another save's
         // HealthKit await.
-        let inFlightIDs = Set(savesInFlight.map {
-            Self.recordedWorkoutID(type: $0.type, start: $0.start)
-        })
-        for rec in pending where !inFlightIDs.contains(rec.id) {
+        for rec in pending where !savesInFlight.contains(rec.id) {
             let workout = RecordedWorkout(type: rec.type, start: rec.start, end: rec.end,
                                           movingSeconds: rec.movingSeconds,
                                           distanceMeters: rec.distanceMeters,

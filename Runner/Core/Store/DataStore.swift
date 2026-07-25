@@ -182,6 +182,23 @@ final class DataStore {
         return try context.fetch(descriptor).first
     }
 
+    /// Looks a recorded workout up by `(type, start)` regardless of its id.
+    ///
+    /// IMPORTANT 6 support: a workout recorded before recovered saves used a
+    /// deterministic id (`SyncCoordinator.recordedWorkoutID`) is stored under a
+    /// random UUID. A checkpoint left behind by that pre-upgrade build still
+    /// describes the same `(type, start)`, so `saveRecorded` uses this to
+    /// reconcile onto that existing row instead of creating a duplicate under
+    /// the new deterministic id.
+    func workout(type: ActivityType, start: Date) throws -> WorkoutRec? {
+        let typeRaw = type.rawValue
+        var descriptor = FetchDescriptor<WorkoutRec>(
+            predicate: #Predicate { $0.typeRaw == typeRaw && $0.start == start }
+        )
+        descriptor.fetchLimit = 1
+        return try context.fetch(descriptor).first
+    }
+
     func workouts(onDay date: Date) throws -> [WorkoutRec] {
         let cal = Calendar.current
         let lo = cal.startOfDay(for: date)

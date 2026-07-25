@@ -47,6 +47,41 @@ struct CheckpointStoreTests {
         #expect(store.load() == nil)
     }
 
+    @Test func roundTripPreservesPausedFlag() throws {
+        let store = tempStore()
+        let paused = SessionCheckpoint(activity: .run, startedAt: sample.startedAt,
+                                       movingSeconds: sample.movingSeconds,
+                                       distanceMeters: sample.distanceMeters,
+                                       route: sample.route, splitSeconds: sample.splitSeconds,
+                                       savedAt: sample.savedAt, isPaused: true)
+        try store.save(paused)
+        #expect(store.load()?.isPaused == true)
+    }
+
+    /// CRITICAL 2 migration regression: real checkpoints written by 1.10 (15)
+    /// and earlier have no "isPaused" key on disk at all. Adding a non-optional
+    /// field without this handling would make `JSONDecoder` throw on those
+    /// files, and `load()` swallows decode errors as "nothing to recover" —
+    /// silently discarding a genuine, still-live recovery checkpoint. This
+    /// proves an old-format file still decodes, defaulting to `isPaused == false`
+    /// (that build's actual behavior: always resume as recording).
+    @Test func oldFormatCheckpointWithoutPausedKeyStillDecodes() throws {
+        let store = tempStore()
+        let data = try JSONEncoder().encode(sample)
+        var json = try #require(try JSONSerialization.jsonObject(with: data) as? [String: Any])
+        #expect(json["isPaused"] != nil)          // sanity: the new key really is present
+        json.removeValue(forKey: "isPaused")      // simulate a pre-upgrade file
+        let legacyData = try JSONSerialization.data(withJSONObject: json)
+        try FileManager.default.createDirectory(at: store.directory, withIntermediateDirectories: true)
+        try legacyData.write(to: store.directory.appendingPathComponent("checkpoint.json"))
+
+        let loaded = try #require(store.load())
+
+        #expect(loaded.isPaused == false)
+        #expect(loaded.activity == sample.activity)
+        #expect(loaded.distanceMeters == sample.distanceMeters)
+    }
+
     @Test func routePointArrayCodableRoundTrip() throws {
         let points = [RoutePoint(lat: 1, lon: 2, t: .init(timeIntervalSince1970: 3), afterGap: true)]
         let data = try points.encoded()

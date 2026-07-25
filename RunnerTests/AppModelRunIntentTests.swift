@@ -283,6 +283,95 @@ struct AppModelRunIntentTests {
         #expect(health.savedWorkouts.count == healthSavesAfterFirst)
     }
 
+    /// IMPORTANT 4 regression: wave 1 correctly keeps the checkpoint when
+    /// `pendingCelebrations.save` throws, but nothing used to recreate the
+    /// celebration from that retained checkpoint — so a process death right
+    /// after this exact failure lost the celebration forever, even though the
+    /// run itself was safe. `saveCheckpointedWorkout()` — the recovery path
+    /// that owns the retained checkpoint — must restore it.
+    @Test func recoveringACheckpointRestoresACelebrationLostToProcessDeath() async throws {
+        let checkpointDir = FileManager.default.temporaryDirectory
+            .appendingPathComponent("app-intents-\(UUID().uuidString)")
+        let checkpoints = CheckpointStore(directory: checkpointDir)
+        // A regular FILE (not a directory) at the celebration store's path: its
+        // `createDirectory(at:)` throws "file already exists", simulating a
+        // real-world celebration-write failure without needing a test seam in
+        // production code.
+        let blockedCelebrationPath = FileManager.default.temporaryDirectory
+            .appendingPathComponent("blocked-\(UUID().uuidString)")
+        try Data().write(to: blockedCelebrationPath)
+        let firstProcessPending = PendingCelebrationStore(directory: blockedCelebrationPath)
+        let firstProcess = AppModel(
+            store: try DataStore(inMemory: true), health: FakeHealthStore(),
+            recorder: WorkoutRecorder(provider: FakeLocationProvider(), checkpoints: checkpoints),
+            checkpoints: checkpoints, pendingCelebrations: firstProcessPending
+        )
+        let lastMovingAt = Date().addingTimeInterval(-30)
+        try checkpoints.save(checkpoint(lastMovingAt: lastMovingAt))
+
+        await firstProcess.finishRunFromIntent()
+        // The celebration write failed; the run is durable regardless, and the
+        // checkpoint was kept specifically because the celebration was not.
+        #expect(firstProcessPending.load() == nil)
+        #expect(checkpoints.load() != nil)
+
+        // Process death: a fresh AppModel sharing the same on-disk checkpoint,
+        // with no in-memory `pendingCelebration` left to save it — the only
+        // way this run's celebration can still reach the user.
+        let secondProcessPending = PendingCelebrationStore(directory: checkpointDir)
+        let secondProcess = AppModel(
+            store: try DataStore(inMemory: true), health: FakeHealthStore(),
+            recorder: WorkoutRecorder(provider: FakeLocationProvider(), checkpoints: checkpoints),
+            checkpoints: checkpoints, pendingCelebrations: secondProcessPending
+        )
+        secondProcess.pendingResume = checkpoints.load()
+
+        await secondProcess.saveCheckpointedWorkout()
+
+        #expect(secondProcess.pendingCelebration != nil)
+        #expect(secondProcess.pendingCelebration?.distanceMeters == 2_400)
+        #expect(secondProcessPending.load() != nil)   // durable too, not just in-memory
+    }
+
+    /// IMPORTANT 5 regression: the celebration file is written before the local
+    /// save completes (CRITICAL 3's ordering), so a kill in that gap can leave
+    /// a celebration file whose durable row was never confirmed written. A
+    /// checkpoint for the same session still being on disk is the tell — it is
+    /// only ever cleared once the durable copy landed — so the celebration must
+    /// not be presented (falsely claiming `isAlreadySaved: true`) until then.
+    @Test func loadingACelebrationWithAStillLiveCheckpointDefersToTheResumePrompt() async throws {
+        let (model, pending, _, _) = try makeModel()
+        let lastMovingAt = Date().addingTimeInterval(-30)
+        let cp = checkpoint(lastMovingAt: lastMovingAt)
+        try model.checkpoints.save(cp)
+        let workout = RecordedWorkout(type: cp.activity, start: cp.startedAt,
+                                      end: cp.savedAt, movingSeconds: cp.movingSeconds,
+                                      distanceMeters: cp.distanceMeters, route: cp.route,
+                                      splitSeconds: cp.splitSeconds)
+        try pending.save(workout)
+
+        await model.onLaunch()
+
+        #expect(model.pendingCelebration == nil)   // not presented as already-saved
+        #expect(model.pendingResume != nil)        // the resume prompt offers it back instead
+    }
+
+    /// Counterpart: once the checkpoint really is gone (the common case — the
+    /// save completed and cleared it), a pending celebration for an unrelated
+    /// or already-resolved session must still load normally.
+    @Test func loadingACelebrationWithNoLiveCheckpointStillPresentsIt() async throws {
+        let (model, pending, _, _) = try makeModel()
+        let workout = RecordedWorkout(type: .run, start: Date(timeIntervalSince1970: 1_761_000_000),
+                                      end: Date(timeIntervalSince1970: 1_761_000_600),
+                                      movingSeconds: 600, distanceMeters: 2_000,
+                                      route: [], splitSeconds: [])
+        try pending.save(workout)
+
+        await model.onLaunch()
+
+        #expect(model.pendingCelebration == workout)
+    }
+
     /// IMPORTANT 6: a dismissed celebration whose file could not be deleted
     /// must not reappear on a later launch.
     @Test func anAcknowledgedCelebrationDoesNotReappearWhenItsFileSurvives() async throws {

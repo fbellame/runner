@@ -218,6 +218,35 @@ struct WorkoutRecorderTests {
         #expect(rec.state == .recording)
     }
 
+    /// CRITICAL 2 regression: a checkpoint written while manually paused must
+    /// rehydrate back into `.manuallyPaused`. Before the fix, `start(resumeFrom:)`
+    /// always restored `.recording` regardless of the checkpoint's own state, so
+    /// a run that was paused when the process died came back as if actively
+    /// recording — the surviving Live Activity's "Resume" button then did the
+    /// opposite of what it said on the first tap.
+    @Test func resumeFromCheckpointRestoresPausedState() {
+        let (rec, _, _) = makeRecorder()
+        let checkpoint = SessionCheckpoint(activity: .run, startedAt: base,
+                                           movingSeconds: 120, distanceMeters: 800,
+                                           route: [RoutePoint(lat: 45.5, lon: -73.6, t: base, afterGap: false)],
+                                           splitSeconds: [], savedAt: base, isPaused: true)
+        rec.start(activity: .run, resumeFrom: checkpoint)
+        #expect(rec.state == .manuallyPaused)
+    }
+
+    /// Counterpart: a checkpoint written while actively recording (the common
+    /// case, and every checkpoint from before this fix) must still resume as
+    /// `.recording` — this fix must not flip the default.
+    @Test func resumeFromCheckpointWithoutPauseFlagStillRestoresRecording() {
+        let (rec, _, _) = makeRecorder()
+        let checkpoint = SessionCheckpoint(activity: .run, startedAt: base,
+                                           movingSeconds: 120, distanceMeters: 800,
+                                           route: [RoutePoint(lat: 45.5, lon: -73.6, t: base, afterGap: false)],
+                                           splitSeconds: [], savedAt: base)
+        rec.start(activity: .run, resumeFrom: checkpoint)
+        #expect(rec.state == .recording)
+    }
+
     @Test func deniedAuthorizationSetsFlag() {
         let (rec, _, _) = makeRecorder()
         rec.didChangeAuthorization(.denied)

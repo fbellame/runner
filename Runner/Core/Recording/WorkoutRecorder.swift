@@ -231,7 +231,13 @@ final class WorkoutRecorder: LocationProvidingDelegate {
         lastCheckpointAt = nil
         autoPause = AutoPauseDetector(activity: activity, startPaused: self.isArmed)
         timeAnchor = clock()
-        state = self.isArmed ? .autoPaused : .recording
+        // CRITICAL 2: a checkpoint written while manually paused must rehydrate
+        // back into `.manuallyPaused`, not `.recording` — otherwise a Live
+        // Activity surviving process death keeps showing "Resume" over a
+        // session the recorder now believes is actively recording, and the
+        // first tap does the opposite of what the button says.
+        state = self.isArmed ? .autoPaused
+            : (checkpoint?.isPaused == true ? .manuallyPaused : .recording)
         // Approximate location (~km accuracy) fails the filter's 30 m gate, so the
         // session would silently record nothing: ask for precise, and flag the UI.
         reducedAccuracy = provider.accuracyAuthorization == .reducedAccuracy
@@ -647,11 +653,14 @@ final class WorkoutRecorder: LocationProvidingDelegate {
 
     private func saveCheckpoint(at time: Date) {
         guard let startedAt else { return }
+        // CRITICAL 2: record whether the session is manually paused right now,
+        // so a later `start(resumeFrom:)` can restore that state instead of
+        // always resuming as `.recording`.
         let checkpoint = SessionCheckpoint(activity: activity, startedAt: startedAt,
                                            movingSeconds: movingSeconds,
                                            distanceMeters: distanceMeters,
                                            route: route, splitSeconds: splitSeconds,
-                                           savedAt: time)
+                                           savedAt: time, isPaused: state == .manuallyPaused)
         try? checkpoints.save(checkpoint)
         lastCheckpointAt = time
     }

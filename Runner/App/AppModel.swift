@@ -331,6 +331,21 @@ final class AppModel {
         guard let acknowledged = UserDefaults.standard
             .object(forKey: Self.acknowledgedCelebrationKey) as? Double,
               abs(workout.start.timeIntervalSince1970 - acknowledged) < 0.001 else {
+            // IMPORTANT 5: the celebration is written BEFORE the local save
+            // completes (CRITICAL 3's ordering, which closes a worse window and
+            // must not be undone). A kill in that gap leaves a celebration file
+            // whose durable row may never have been written — presenting it
+            // would assert `isAlreadySaved: true` to the user when it might not
+            // be true. The checkpoint is the tell: it is cleared only once the
+            // durable copy is confirmed, so as long as one survives for this
+            // same session, the celebration is not yet trustworthy. Defer to
+            // the resume prompt instead — `saveCheckpointedWorkout()` restores
+            // this exact celebration (IMPORTANT 4) once the run is genuinely
+            // durable.
+            if let checkpoint = checkpoints.load(),
+               checkpoint.activity == workout.type, checkpoint.startedAt == workout.start {
+                return nil
+            }
             return workout
         }
         try? pendingCelebrations.clear()   // opportunistic retry
@@ -473,6 +488,18 @@ final class AppModel {
         guard outcome.isLocallyDurable else { return }
         checkpoints.clear()
         pendingResume = nil
+        // IMPORTANT 4: a prior `finishRunFromIntent()` may have durably saved
+        // this exact run but failed to persist its celebration file — the
+        // checkpoint was kept specifically so this moment could still happen.
+        // Without this, the run is safe but the user is never told: the
+        // in-memory celebration from that earlier attempt does not survive
+        // the process death that made this recovery necessary in the first
+        // place. `try?`: a second failure to persist just means no file to
+        // reload on a later relaunch — the in-memory celebration still shows
+        // right now, same tolerance as IMPORTANT 6.
+        UserDefaults.standard.removeObject(forKey: Self.acknowledgedCelebrationKey)
+        try? pendingCelebrations.save(workout)
+        pendingCelebration = workout
     }
 
     /// "Discard" from the crash-resume prompt (`RootTabView`'s alert). Same

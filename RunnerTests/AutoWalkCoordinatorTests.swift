@@ -50,7 +50,8 @@ struct AutoWalkCoordinatorTests {
         let checkpoints: CheckpointStore
     }
 
-    private func makeHarness(canAutoStart: @escaping () -> Bool = { true }) -> Harness {
+    private func makeHarness(canAutoStart: @escaping () -> Bool = { true },
+                             saveSucceeds: Bool = true) -> Harness {
         let motion = FakeMotionActivityProvider()
         let location = FakeLocationProvider()
         let dir = FileManager.default.temporaryDirectory
@@ -63,7 +64,11 @@ struct AutoWalkCoordinatorTests {
         let coordinator = AutoWalkCoordinator(motion: motion, recorder: recorder, health: health,
                                               checkpoints: checkpoints, clock: { self.now },
                                               canAutoStart: canAutoStart,
-                                              save: { saved.workouts.append($0); return true })
+                                              save: { workout in
+                                                  guard saveSucceeds else { return false }
+                                                  saved.workouts.append(workout)
+                                                  return true
+                                              })
         return Harness(coordinator: coordinator, motion: motion, recorder: recorder,
                        health: health, location: location, saved: saved, checkpoints: checkpoints)
     }
@@ -197,6 +202,41 @@ struct AutoWalkCoordinatorTests {
         await h.coordinator.ingest(still(310))
         #expect(h.saved.workouts.count == 1)
         #expect(h.saved.workouts[0].distanceMeters == 600)
+    }
+
+    /// CRITICAL 1 regression (wave 2): wave 1's own C5 fix correctly retains
+    /// the checkpoint when a silent auto-walk save fails, but `autoStop()`
+    /// clears `isAutoSession` regardless and `finish()` leaves the recorder
+    /// `.idle` — releasing every in-memory ownership guard while the
+    /// checkpoint sits on disk. Without a fix, the very next walk auto-starts
+    /// a fresh session whose own periodic checkpoint writes overwrite the
+    /// retained one, destroying the only surviving record of the failed walk.
+    @Test func aFailedSaveIsNotOverwrittenByTheNextAutoWalk() async {
+        let h = makeHarness(saveSucceeds: false)
+        h.health.rangedWalkRunDistance = 0
+        // First walk: the silent save fails, so its checkpoint must be kept.
+        await h.coordinator.ingest(walking(-300))
+        await h.coordinator.ingest(walking(0))
+        recordSomeGPS(h)
+        await h.coordinator.ingest(still(10))
+        await h.coordinator.ingest(still(310))
+        #expect(h.saved.workouts.isEmpty)                 // the save failed
+        let retained = h.checkpoints.load()
+        #expect(retained != nil)                          // and its checkpoint was kept
+
+        // A second walk begins right after — same shape as the first, offset
+        // past the first walk's stop so the detector treats it as a fresh run.
+        await h.coordinator.ingest(walking(320))
+        await h.coordinator.ingest(walking(620))
+        h.recorder.didUpdate(locations: [loc(x: 0, t: 619), loc(x: 200, t: 620)])
+        await h.coordinator.ingest(still(630))
+        await h.coordinator.ingest(still(930))
+
+        // No later auto-start may overwrite the retained recovery checkpoint —
+        // whether by starting a session that writes over it, or by silently
+        // saving and clearing it out from under the still-unresolved first walk.
+        #expect(h.checkpoints.load() == retained)
+        #expect(h.saved.workouts.isEmpty)
     }
 
     @Test func aSavedWalkLeavesNoCheckpointBehind() async {

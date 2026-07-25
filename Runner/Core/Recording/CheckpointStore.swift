@@ -8,6 +8,45 @@ struct SessionCheckpoint: Codable, Equatable {
     let route: [RoutePoint]
     let splitSeconds: [Double]
     let savedAt: Date
+    /// True when the session was manually paused at the moment this checkpoint
+    /// was written. CRITICAL 2 fix: without this, rehydrating a checkpoint
+    /// (`WorkoutRecorder.start(resumeFrom:)`) always restored `.recording`,
+    /// even for a run that was paused when the process died — so the Live
+    /// Activity kept showing a "Resume" button whose first tap actually paused
+    /// the (already-restarted-as-recording) session.
+    ///
+    /// MIGRATION: checkpoints written by 1.10 (15) and earlier — real files on
+    /// the user's phone right now — have no such key on disk. `init(from:)`
+    /// below defaults a missing key to `false`, matching that build's actual
+    /// behavior (always resumed as recording), rather than letting a
+    /// perfectly good, still-live checkpoint fail to decode and be silently
+    /// discarded as "nothing to recover."
+    let isPaused: Bool
+
+    init(activity: ActivityType, startedAt: Date, movingSeconds: Double,
+         distanceMeters: Double, route: [RoutePoint], splitSeconds: [Double],
+         savedAt: Date, isPaused: Bool = false) {
+        self.activity = activity
+        self.startedAt = startedAt
+        self.movingSeconds = movingSeconds
+        self.distanceMeters = distanceMeters
+        self.route = route
+        self.splitSeconds = splitSeconds
+        self.savedAt = savedAt
+        self.isPaused = isPaused
+    }
+
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        activity = try container.decode(ActivityType.self, forKey: .activity)
+        startedAt = try container.decode(Date.self, forKey: .startedAt)
+        movingSeconds = try container.decode(Double.self, forKey: .movingSeconds)
+        distanceMeters = try container.decode(Double.self, forKey: .distanceMeters)
+        route = try container.decode([RoutePoint].self, forKey: .route)
+        splitSeconds = try container.decode([Double].self, forKey: .splitSeconds)
+        savedAt = try container.decode(Date.self, forKey: .savedAt)
+        isPaused = try container.decodeIfPresent(Bool.self, forKey: .isPaused) ?? false
+    }
 }
 
 struct CheckpointStore {
