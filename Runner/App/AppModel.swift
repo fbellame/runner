@@ -145,7 +145,10 @@ final class AppModel {
     /// Entry point for the Lock Screen / Control Center `StartRunIntent`. Arms a
     /// run so its clock stays frozen until real movement, without unlocking or
     /// foregrounding the app.
-    func startRunFromIntent() {
+    @discardableResult
+    func startRunFromIntent(
+        announcesStartOnMovement: Bool = true
+    ) -> StartRunVoiceOutcome {
         // CRITICAL 1, the half that hoisting the load inside `onLaunch()` cannot
         // reach: a `LiveActivityIntent` can background-launch the app, so
         // `perform()` may run before `onLaunch()` ever does. `pendingResume`
@@ -156,9 +159,17 @@ final class AppModel {
         if pendingResume == nil, recorder.state == .idle {
             pendingResume = checkpoints.load()
         }
-        guard canAutoStart else { return }
-        recorder.start(activity: .run, armed: true)
+        // Auto-detected walks are silent even if a voice or system invocation
+        // reaches this entry point while one is active.
+        guard !recorder.autoStarted else { return .silent }
+        guard canAutoStart else { return .alreadyInProgress }
+        recorder.start(
+            activity: .run,
+            armed: true,
+            announcesArmedStartOnMovement: announcesStartOnMovement
+        )
         presentActiveSessionIfNeeded()
+        return .started
     }
 
     /// A Lock Screen `StartRunIntent` can arm and run a session in a process the
@@ -253,6 +264,74 @@ final class AppModel {
         }
     }
 
+    /// Siri's explicit Pause command. Unlike `togglePauseFromIntent()`, this
+    /// can never resume a run that is already paused. It still delegates the
+    /// transition to `pauseManually()` so the armed and auto-pause guards, the
+    /// checkpoint ordering, and Live Activity update remain centralized.
+    @discardableResult
+    func pauseRunFromIntent(announcing: Bool = true) -> PauseRunVoiceOutcome {
+        guard resolveIntentSession() != .unavailable else { return .noRun }
+        // IMPORTANT 7 — see `togglePauseFromIntent()`.
+        guard !recorder.autoStarted else { return .silent }
+        guard recorder.activity == .run else { return .noRun }
+        guard !recorder.isArmed else { return .ready }
+        guard recorder.state != .manuallyPaused else { return .alreadyPaused }
+        recorder.pauseManually(announcing: announcing)
+        return recorder.state == .manuallyPaused ? .paused : .alreadyPaused
+    }
+
+    /// Siri's explicit Resume command. It only resumes a manual pause; saying
+    /// "resume" while recording never calls the toggle and therefore can never
+    /// pause the run. An auto-paused run keeps the detector's established
+    /// movement-driven resume behavior.
+    @discardableResult
+    func resumeRunFromIntent(announcing: Bool = true) -> ResumeRunVoiceOutcome {
+        guard resolveIntentSession() != .unavailable else { return .noRun }
+        // IMPORTANT 7 — see `togglePauseFromIntent()`.
+        guard !recorder.autoStarted else { return .silent }
+        guard recorder.activity == .run else { return .noRun }
+        guard !recorder.isArmed else { return .ready }
+        switch recorder.state {
+        case .manuallyPaused:
+            recorder.resumeManually(announcing: announcing)
+            return .resumed
+        case .recording:
+            return .alreadyRunning
+        case .autoPaused:
+            return .waitingForMovement
+        case .idle:
+            return .noRun
+        }
+    }
+
+    /// Siri status uses the same crash-recovery path as the control intents, so
+    /// it can report a run whose process died while its checkpoint and Live
+    /// Activity survived. Armed and paused sessions are deliberately valid.
+    func runStatusFromIntent() -> RunStatusVoiceOutcome {
+        guard resolveIntentSession() != .unavailable else { return .noRun }
+        // IMPORTANT 7 — status is a user-facing surface too.
+        guard !recorder.autoStarted else { return .silent }
+        guard recorder.activity == .run else { return .noRun }
+        let phase: RunStatusSnapshot.Phase
+        if recorder.isArmed {
+            phase = .ready
+        } else {
+            phase = switch recorder.state {
+            case .recording: .recording
+            case .autoPaused, .manuallyPaused: .paused
+            case .idle: .recording
+            }
+        }
+        return .status(
+            RunStatusSnapshot(
+                phase: phase,
+                distanceMeters: recorder.distanceMeters,
+                movingSeconds: recorder.movingSeconds,
+                paceSecondsPerKm: recorder.paceSecondsPerKm
+            )
+        )
+    }
+
     /// Entry point for the Lock Screen / Control Center `FinishRunIntent`.
     /// Ends the session at the last real moving timestamp (not "now" — the
     /// Lock Screen tap can land seconds after the user actually stopped),
@@ -260,8 +339,10 @@ final class AppModel {
     /// the pending celebration for Task 13 to surface on next open, and
     /// closes out the recorder/Live Activity via `completeSave()`.
     ///
-    /// `completeSave()` calls `announceSaved()` internally — do not announce
-    /// separately here, or "Run saved" speaks twice.
+    /// `completeSave()` calls `announceSaved()` internally on the default
+    /// Lock Screen path — do not announce separately here, or "Run saved"
+    /// speaks twice. The Siri-only wrapper passes `announcingSaved: false`
+    /// because its `ProvidesDialog` result owns that invocation's speech.
     ///
     /// CRITICAL 3: the ordering below is chosen so that at every instant the run
     /// is recoverable from at least one durable record. `finish()` leaves a
@@ -274,17 +355,21 @@ final class AppModel {
     /// irreversible acts (clearing the checkpoint, speaking "Run saved"). A
     /// HealthKit-only failure still announces, deliberately: the local store is
     /// the durable copy, so the run really is safe.
-    func finishRunFromIntent() async {
+    @discardableResult
+    func finishRunFromIntent(
+        announcingSaved: Bool = true
+    ) async -> FinishRunVoiceOutcome {
         let session = resolveIntentSession()
-        guard session != .unavailable else { return }
+        guard session != .unavailable else { return .noRun }
         // IMPORTANT 7 — see `togglePauseFromIntent()`.
-        guard recorder.activity == .run, !recorder.autoStarted else { return }
+        guard !recorder.autoStarted else { return .silent }
+        guard recorder.activity == .run else { return .noRun }
         // A checkpoint with no route points has no last-moving timestamp; its
         // `savedAt` is the closest honest end, and far better than "now" (which
         // would bake however long the process was dead into the workout).
         let fallbackEnd: Date? = if case .adopted(let endedAt) = session { endedAt } else { nil }
         guard let workout = recorder.finish(endingAt: recorder.lastMovingAt ?? fallbackEnd) else {
-            return
+            return .notStarted
         }
         // Durable before the await, so a kill during the save leaves BOTH the
         // checkpoint and the celebration behind rather than neither.
@@ -305,7 +390,7 @@ final class AppModel {
             // `resolveIntentSession()` and retries this whole path.
             try? pendingCelebrations.clear()
             pendingResume = checkpoints.load()
-            return
+            return .saveFailed
         }
         // IMPORTANT 6: if the celebration could not be made durable, keep the
         // recovery checkpoint rather than destroying the only other record of
@@ -316,7 +401,8 @@ final class AppModel {
             checkpoints.clear()
         }
         pendingCelebration = workout
-        recorder.completeSave()
+        recorder.completeSave(announcing: announcingSaved)
+        return .saved
     }
 
     /// Called once Task 13's presentation has consumed `pendingCelebration`.

@@ -117,6 +117,11 @@ final class WorkoutRecorder: LocationProvidingDelegate {
     /// fields by the time either of those fires.
     private var lastFinishedSnapshot: RunActivitySnapshot?
     private var didAnnounceLocationDenied = false
+    /// Siri speaks its own immediate start confirmation. Only that path sets
+    /// this false, suppressing the later armed-to-moving `.runStarted` cue so
+    /// AirPods do not say the same confirmation twice. Lock Screen controls
+    /// and in-app starts keep the existing cue through the default value.
+    private var announcesArmedStartOnMovement = true
     /// Bumped on every `start()`. Captured by the armed-timeout task so it can
     /// verify, after resuming from sleep, that it still belongs to the session
     /// currently in flight — a structural check independent of where/whether
@@ -192,7 +197,7 @@ final class WorkoutRecorder: LocationProvidingDelegate {
     /// moving time up front, so duration is honest from the very first sample.
     func start(activity: ActivityType, resumeFrom checkpoint: SessionCheckpoint? = nil,
                backdatedTo walkBeganAt: Date? = nil, autoStarted: Bool = false,
-               armed: Bool = false) {
+               armed: Bool = false, announcesArmedStartOnMovement: Bool = true) {
         // Cancel any pending armed-timeout FIRST, before any other state changes:
         // a new session must never share a window — however brief — where its
         // own `isArmed`/state is live while the previous session's timer is
@@ -206,6 +211,7 @@ final class WorkoutRecorder: LocationProvidingDelegate {
         self.activity = activity
         self.autoStarted = autoStarted
         self.isArmed = armed && checkpoint == nil && walkBeganAt == nil
+        self.announcesArmedStartOnMovement = announcesArmedStartOnMovement
         didAnnounceLocationDenied = false
         let now = clock()
         gpsBeganAt = walkBeganAt == nil ? nil : now
@@ -284,7 +290,7 @@ final class WorkoutRecorder: LocationProvidingDelegate {
     /// user paused a live run." Refusing the pause here keeps `resumeManually()`
     /// unreachable from the armed state, so it can never re-enter `.recording`
     /// without going through the one-shot `isArmed` rebase in `ingest`.
-    func pauseManually() {
+    func pauseManually(announcing: Bool = true) {
         guard !isArmed, state == .recording || state == .autoPaused else { return }
         // If the session was already `.autoPaused`, `ingest`'s auto-pause branch has
         // already announced `.paused` for this same real-world stop — the user tapping
@@ -294,7 +300,7 @@ final class WorkoutRecorder: LocationProvidingDelegate {
         if wasRecording { advanceTimer(to: clock()) }
         state = .manuallyPaused
         saveCheckpoint(at: clock())
-        if wasRecording, !autoStarted { announcer.announce(.paused) }
+        if wasRecording, announcing, !autoStarted { announcer.announce(.paused) }
         if presentsLiveActivity {
             liveActivity.update(liveSnapshot())
         }
@@ -307,7 +313,7 @@ final class WorkoutRecorder: LocationProvidingDelegate {
     // an auto-pause — because the tap itself is the user's own explicit "resume"
     // action and deserves its own confirmation, distinct from whatever announced
     // (or didn't) the stop that preceded it.
-    func resumeManually() {
+    func resumeManually(announcing: Bool = true) {
         guard state == .manuallyPaused else { return }
         autoPause = AutoPauseDetector(activity: activity)
         lastKeptLocation = nil
@@ -318,7 +324,7 @@ final class WorkoutRecorder: LocationProvidingDelegate {
         // rather than waiting for the next periodic checkpoint (up to 30 s away),
         // so a crash right after resuming doesn't rehydrate the run as paused.
         saveCheckpoint(at: clock())
-        if !autoStarted { announcer.announce(.resumed) }
+        if announcing, !autoStarted { announcer.announce(.resumed) }
         if presentsLiveActivity {
             liveActivity.update(liveSnapshot())
         }
@@ -418,12 +424,13 @@ final class WorkoutRecorder: LocationProvidingDelegate {
         announcer.announce(.runSaved)
     }
 
-    /// IN-APP SAVE PATH ONLY: called from `RecordView.save(_:)`, replacing
-    /// the `announceSaved()` call that used to sit there (see its doc comment
-    /// above). Speaks "Run saved" exactly once via `announceSaved()`, then
-    /// ends the Live Activity using the stats `finish()` captured — the
-    /// recorder itself has already been reset by this point, so there is no
-    /// live state left to build a snapshot from.
+    /// Called from `RecordView.save(_:)` and intent-driven saves, replacing the
+    /// `announceSaved()` call that used to sit in the in-app path (see its doc
+    /// comment above). By default it speaks "Run saved" exactly once via
+    /// `announceSaved()`, then ends the Live Activity using the stats `finish()`
+    /// captured — the recorder itself has already been reset by this point, so
+    /// there is no live state left to build a snapshot from. Siri passes
+    /// `announcing: false` because `ProvidesDialog` speaks that confirmation.
     ///
     /// CRITICAL 2 fix: `RecordView.save(_:)` calls this for every activity
     /// type the UI offers (run, walk, bike), but `lastFinishedSnapshot` is
@@ -432,8 +439,10 @@ final class WorkoutRecorder: LocationProvidingDelegate {
     /// that: a manual walk or bike save answers the same "did it record at
     /// all?" question Phase 2 exists for, and has no Live Activity to end.
     /// Only the teardown stays conditional on there being a snapshot to end.
-    func completeSave() {
-        announceSaved()
+    func completeSave(announcing: Bool = true) {
+        if announcing {
+            announceSaved()
+        }
         guard let snapshot = lastFinishedSnapshot else { return }
         liveActivity.end(snapshot)
         lastFinishedSnapshot = nil
@@ -524,6 +533,7 @@ final class WorkoutRecorder: LocationProvidingDelegate {
         isArmed = false
         lastMovingAt = nil
         didAnnounceLocationDenied = false
+        announcesArmedStartOnMovement = true
     }
 
     // MARK: LocationProvidingDelegate
@@ -596,7 +606,7 @@ final class WorkoutRecorder: LocationProvidingDelegate {
                     armedTimeoutTask?.cancel()
                     armedTimeoutTask = nil
                 }
-                if !autoStarted {
+                if !autoStarted, !wasArmed || announcesArmedStartOnMovement {
                     announcer.announce(wasArmed ? .runStarted : .resumed)
                 }
             } else if !wasAutoPaused && paused && !autoStarted {

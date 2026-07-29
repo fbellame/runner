@@ -2016,7 +2016,7 @@
         "fr": {
           "stringUnit": {
             "state": "translated",
-            "value": "Course commencée"
+            "value": "Course démarrée"
           }
         }
       }
@@ -2667,6 +2667,226 @@
           "stringUnit": {
             "state": "translated",
             "value": "vs 4 semaines précédentes"
+          }
+        }
+      }
+    },
+    "%@ kilometers": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@ kilomètres"
+          }
+        }
+      }
+    },
+    "%lld minutes": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%lld minutes"
+          }
+        }
+      }
+    },
+    "%lld minutes %lld seconds": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%lld minutes %lld secondes"
+          }
+        }
+      }
+    },
+    "%lld seconds": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%lld secondes"
+          }
+        }
+      }
+    },
+    "1 minute": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "1 minute"
+          }
+        }
+      }
+    },
+    "1 second": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "1 seconde"
+          }
+        }
+      }
+    },
+    "A run is already in progress": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Une course est déjà en cours"
+          }
+        }
+      }
+    },
+    "Check Run Status": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Vérifier l'état de la course"
+          }
+        }
+      }
+    },
+    "Finish Run": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Terminer la course"
+          }
+        }
+      }
+    },
+    "No run in progress": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Aucune course en cours"
+          }
+        }
+      }
+    },
+    "Pace unavailable": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Rythme indisponible"
+          }
+        }
+      }
+    },
+    "Pause Run": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Mettre la course en pause"
+          }
+        }
+      }
+    },
+    "Resume Run": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Reprendre la course"
+          }
+        }
+      }
+    },
+    "Run could not be saved": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "La course n'a pas pu être enregistrée"
+          }
+        }
+      }
+    },
+    "Run has not started yet": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "La course n'a pas encore démarrée"
+          }
+        }
+      }
+    },
+    "Run is already in progress": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "La course est déjà en cours"
+          }
+        }
+      }
+    },
+    "Run is already paused": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "La course est déjà en pause"
+          }
+        }
+      }
+    },
+    "Run paused": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Course en pause"
+          }
+        }
+      }
+    },
+    "Run ready": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Course prête"
+          }
+        }
+      }
+    },
+    "Run resumed": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Course reprise"
+          }
+        }
+      }
+    },
+    "Run Status": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "État de la course"
+          }
+        }
+      }
+    },
+    "Run will resume when you start moving": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "La course reprendra quand vous recommencerez à bouger"
           }
         }
       }

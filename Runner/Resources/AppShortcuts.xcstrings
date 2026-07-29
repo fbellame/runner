@@ -1,0 +1,156 @@
+{
+  "sourceLanguage": "en",
+  "strings": {
+    "Check my run in ${applicationName}": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Donne-moi l'état de ma course dans ${applicationName}"
+          }
+        }
+      }
+    },
+    "Finish my ${applicationName} run": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Termine ma course avec ${applicationName}"
+          }
+        }
+      }
+    },
+    "Finish my run with ${applicationName}": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Termine ma course ${applicationName}"
+          }
+        }
+      }
+    },
+    "How is my run going in ${applicationName}": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Où j'en suis dans ma course ${applicationName}"
+          }
+        }
+      }
+    },
+    "Pause ${applicationName}": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Mets ${applicationName} en pause"
+          }
+        }
+      }
+    },
+    "Pause my ${applicationName} run": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Mets ma course en pause avec ${applicationName}"
+          }
+        }
+      }
+    },
+    "Pause my run with ${applicationName}": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Mets ma course ${applicationName} en pause"
+          }
+        }
+      }
+    },
+    "Resume ${applicationName}": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Reprends ${applicationName}"
+          }
+        }
+      }
+    },
+    "Resume my ${applicationName} run": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Continue ma course avec ${applicationName}"
+          }
+        }
+      }
+    },
+    "Resume my run with ${applicationName}": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Reprends ma course ${applicationName}"
+          }
+        }
+      }
+    },
+    "Start ${applicationName}": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Démarre ${applicationName}"
+          }
+        }
+      }
+    },
+    "Start a run with ${applicationName}": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Lance une course avec ${applicationName}"
+          }
+        }
+      }
+    },
+    "Start my run with ${applicationName}": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Démarre ma course ${applicationName}"
+          }
+        }
+      }
+    },
+    "Stop my run with ${applicationName}": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Arrête ma course ${applicationName}"
+          }
+        }
+      }
+    },
+    "What is my run status in ${applicationName}": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Où en est ma course ${applicationName}"
+          }
+        }
+      }
+    }
+  },
+  "version": "1.0"
+}

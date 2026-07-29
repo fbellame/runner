@@ -32,7 +32,7 @@ targets:
       properties:
         CFBundleDisplayName: Runner
         CFBundleShortVersionString: "1.10"
-        CFBundleVersion: "16"
+        CFBundleVersion: "19"
         CFBundleLocalizations: [en, fr]
         CFBundleDevelopmentRegion: en
         UILaunchScreen:
@@ -46,6 +46,9 @@ targets:
         NSMotionUsageDescription: "Runner uses motion activity to notice when you have been walking for a while, so it can record the walk for you."
         NSSupportsLiveActivities: true
         UIBackgroundModes: [location, audio]
+        INAlternativeAppNames:
+          - INAlternativeAppName: Course
+          - INAlternativeAppName: Run
         ITSAppUsesNonExemptEncryption: false
   RunnerWidgets:
     type: app-extension
@@ -69,7 +72,7 @@ targets:
       properties:
         CFBundleDisplayName: Runner
         CFBundleShortVersionString: "1.10"
-        CFBundleVersion: "16"
+        CFBundleVersion: "19"
         NSExtension:
           NSExtensionPointIdentifier: com.apple.widgetkit-extension
         NSSupportsLiveActivities: true

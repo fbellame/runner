@@ -11,6 +11,7 @@ struct RunnerApp: App {
         let model = AppModel.live()
         _model = State(initialValue: model)
         AppDependencyManager.shared.add(dependency: model)
+        RunnerAppShortcuts.updateAppShortcutParameters()
     }
 
     var body: some Scene {

@@ -24,7 +24,18 @@
 	<key>CFBundleShortVersionString</key>
 	<string>1.10</string>
 	<key>CFBundleVersion</key>
-	<string>18</string>
+	<string>19</string>
+	<key>INAlternativeAppNames</key>
+	<array>
+		<dict>
+			<key>INAlternativeAppName</key>
+			<string>Course</string>
+		</dict>
+		<dict>
+			<key>INAlternativeAppName</key>
+			<string>Run</string>
+		</dict>
+	</array>
 	<key>ITSAppUsesNonExemptEncryption</key>
 	<false/>
 	<key>NSHealthShareUsageDescription</key>
