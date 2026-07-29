@@ -168,6 +168,12 @@ final class AppModel {
     /// popping a full-screen cover would be the loudest possible violation.
     private func presentActiveSessionIfNeeded() {
         guard recorder.state != .idle, !recorder.autoStarted else { return }
+        // `RootTabView` hosts the record cover and the celebration sheet on the
+        // same view; asking for both at once drops one of them. The celebration
+        // is the older, already-durable event and the one the user has not
+        // acknowledged yet, so it wins — `clearPendingCelebration()` re-runs
+        // this the moment it is dismissed, and the live run is still there.
+        guard pendingCelebration == nil else { return }
         showRecordSheet = true
     }
 
@@ -333,6 +339,10 @@ final class AppModel {
             }
         }
         pendingCelebration = nil
+        // The celebration was blocking the live-run cover (see
+        // `presentActiveSessionIfNeeded()`); now that it is gone, a session
+        // still running underneath it gets its screen.
+        presentActiveSessionIfNeeded()
     }
 
     /// Reads the pending celebration, skipping one the user has already

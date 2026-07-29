@@ -30,8 +30,16 @@ struct AutoPauseDetector {
     }
 
     mutating func update(speed: Double, at time: Date) -> Bool {
+        // A speed no unassisted human can hold is a GPS re-acquisition glitch
+        // (a reflection off a passing vehicle, a cold fix snapping into place),
+        // not movement. Treat it as no information at all rather than as
+        // "above threshold": gating only the instant-resume branch on the
+        // ceiling still let two glitched samples a second apart satisfy the
+        // ordinary dwell and un-pause a run standing at a red light. It must
+        // likewise not reset the pause accumulator of a recording session.
+        guard speed <= maxPlausibleSpeed else { return isPaused }
         if isPaused {
-            if speed >= instantResumeSpeed, speed <= maxPlausibleSpeed {
+            if speed >= instantResumeSpeed {
                 isPaused = false
                 belowSince = nil
                 aboveSince = nil

@@ -630,14 +630,23 @@ final class WorkoutRecorder: LocationProvidingDelegate {
 
             // 6. Km splits.
             let completedKm = Int(distanceMeters / 1000.0)
+            var cue: (km: Int, seconds: Double)?
             while splitSeconds.count < completedKm {
                 let split = movingSeconds - lastSplitMovingSeconds
                 splitSeconds.append(split)
                 lastSplitMovingSeconds = movingSeconds
                 onKmSplit?(splitSeconds.count)
-                if !autoStarted {
-                    announcer.announce(.kmSplit(km: splitSeconds.count, splitSeconds: split))
-                }
+                cue = (splitSeconds.count, split)
+            }
+            // At most one spoken cue per ingestion pass. The loop normally runs
+            // once, so this is usually the same thing; it differs only when a
+            // single accepted sample crosses several kilometre boundaries at
+            // once. `LocationFilter` enforces a minimum displacement but no
+            // maximum, so a GPS jump can do exactly that — and announcing three
+            // kilometres back to back, two of them with zero-second splits,
+            // would be worse than saying nothing. The haptic still fires per km.
+            if let cue, !autoStarted {
+                announcer.announce(.kmSplit(km: cue.km, splitSeconds: cue.seconds))
             }
 
             // 7. Periodic checkpoint.

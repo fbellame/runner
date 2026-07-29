@@ -41,16 +41,6 @@
         }
       }
     },
-    "Active time": {
-      "localizations": {
-        "fr": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Temps actif"
-          }
-        }
-      }
-    },
     "Badges unlocked": {
       "localizations": {
         "fr": {
@@ -71,32 +61,12 @@
         }
       }
     },
-    "Best streak": {
-      "localizations": {
-        "fr": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Meilleure série"
-          }
-        }
-      }
-    },
     "Close": {
       "localizations": {
         "fr": {
           "stringUnit": {
             "state": "translated",
             "value": "Fermer"
-          }
-        }
-      }
-    },
-    "Consistency": {
-      "localizations": {
-        "fr": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Régularité"
           }
         }
       }
@@ -117,26 +87,6 @@
           "stringUnit": {
             "state": "translated",
             "value": "Ignorer"
-          }
-        }
-      }
-    },
-    "Fastest 1 km": {
-      "localizations": {
-        "fr": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "1 km le plus rapide"
-          }
-        }
-      }
-    },
-    "Fastest 5 km": {
-      "localizations": {
-        "fr": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "5 km les plus rapides"
           }
         }
       }
@@ -1056,7 +1006,7 @@
         "fr": {
           "stringUnit": {
             "state": "translated",
-            "value": "Kilomètre le plus rapide"
+            "value": "1 km le plus rapide"
           }
         }
       }

@@ -55,9 +55,21 @@ struct AutoPauseTests {
         #expect(d.update(speed: 0.8, at: t(1)) == false)
     }
 
-    @Test func implausibleSpeedDoesNotInstantResumeButStillAccumulatesDwell() {
+    /// The red-light false-resume: gating only the instant branch on the
+    /// ceiling let two glitched samples a second apart satisfy the ordinary
+    /// dwell instead. An implausible speed must carry no information at all.
+    @Test func implausibleSpeedNeverResumesAPausedSession() {
         var d = AutoPauseDetector(activity: .run, startPaused: true)
         #expect(d.update(speed: 8.1, at: t(0)) == true)
-        #expect(d.update(speed: 0.8, at: t(1)) == false)
+        #expect(d.update(speed: 9.0, at: t(1)) == true)
+        #expect(d.update(speed: 12.0, at: t(5)) == true)
+        #expect(d.update(speed: 2.0, at: t(6)) == false)  // a real one still does
+    }
+
+    @Test func implausibleSpeedDoesNotResetThePauseAccumulator() {
+        var d = AutoPauseDetector(activity: .run)
+        #expect(d.update(speed: 0.1, at: t(0)) == false)   // below → counting
+        #expect(d.update(speed: 40.0, at: t(3)) == false)  // glitch → ignored, not a reset
+        #expect(d.update(speed: 0.1, at: t(6)) == true)    // ≥6 s below → paused
     }
 }
