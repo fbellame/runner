@@ -45,17 +45,10 @@ struct ArmedWorkoutRecorderTests {
             location(x: 4, seconds: 12, speed: 2)
         ])
 
-        #expect(recorder.state == .autoPaused)
-        #expect(recorder.movingSeconds == 0)
-
-        recorder.didUpdate(locations: [
-            location(x: 8, seconds: 13, speed: 2)
-        ])
-
         #expect(recorder.state == .recording)
         #expect(!recorder.isArmed)
-        #expect(recorder.startedAt == base.addingTimeInterval(13))
-        #expect(recorder.movingSeconds == 0)
+        #expect(recorder.startedAt == base.addingTimeInterval(10))
+        #expect(recorder.movingSeconds == 2)
     }
 
     @Test func secondAutoPauseCycleDoesNotRebaseStartedAt() {
@@ -80,7 +73,7 @@ struct ArmedWorkoutRecorderTests {
 
         #expect(recorder.state == .recording)
         #expect(recorder.startedAt == firstRebase)
-        #expect(recorder.startedAt == base.addingTimeInterval(3))
+        #expect(recorder.startedAt == base)
     }
 
     @Test func manualPauseIsANoOpWhileArmedAndRebaseStillHappensOnFirstMovement() {
@@ -99,18 +92,10 @@ struct ArmedWorkoutRecorderTests {
             location(x: 4, seconds: 12, speed: 2)
         ])
 
-        #expect(recorder.state == .autoPaused)
-        #expect(recorder.isArmed)
-        #expect(recorder.movingSeconds == 0)
-
-        recorder.didUpdate(locations: [
-            location(x: 8, seconds: 13, speed: 2)
-        ])
-
         #expect(recorder.state == .recording)
         #expect(!recorder.isArmed)
-        #expect(recorder.startedAt == base.addingTimeInterval(13))
-        #expect(recorder.movingSeconds == 0)
+        #expect(recorder.startedAt == base.addingTimeInterval(10))
+        #expect(recorder.movingSeconds == 2)
     }
 
     /// Regression for the armed-fallback bug: `lastKeptLocation` is only ever
@@ -131,22 +116,20 @@ struct ArmedWorkoutRecorderTests {
         recorder.didUpdate(locations: [location(x: 0, seconds: 0, speed: -1)])
         #expect(recorder.state == .autoPaused)
 
-        // Real displacement (4 m every 2 s ⇒ 2 m/s, well above the 0.5 m/s
-        // walk/run threshold) computed purely from timestamps/coordinates,
-        // with sensor speed unavailable on every sample.
+        // Real displacement (4 m every 2 s ⇒ 2 m/s) computed purely from
+        // timestamps/coordinates, with sensor speed unavailable on every
+        // sample. 2 m/s clears the 1.5 m/s instant-resume speed and stays
+        // under the 8 m/s plausibility ceiling, so the session un-freezes on
+        // that first moving sample rather than waiting out a dwell window.
         recorder.didUpdate(locations: [
             location(x: 4, seconds: 2, speed: -1),
             location(x: 8, seconds: 4, speed: -1)
         ])
-        #expect(recorder.state == .autoPaused) // only 2 s continuously above threshold so far
-
-        recorder.didUpdate(locations: [
-            location(x: 12, seconds: 6, speed: -1)
-        ])
 
         #expect(recorder.state == .recording)
         #expect(!recorder.isArmed)
-        #expect(recorder.startedAt == base.addingTimeInterval(6))
-        #expect(recorder.movingSeconds == 0)
+        #expect(recorder.startedAt == base.addingTimeInterval(2))
+        // Un-frozen at t=2, so the t=4 sample credits the 2 s in between.
+        #expect(recorder.movingSeconds == 2)
     }
 }

@@ -51,8 +51,12 @@ struct WorkoutTailTrimTests {
             recorder.finish(endingAt: recorder.lastMovingAt)
         )
         #expect(workout.end == base.addingTimeInterval(7))
-        #expect(workout.start == base.addingTimeInterval(3))
-        #expect(workout.movingSeconds == 4)
+        // The very first sample already reports 2 m/s, which clears the
+        // 1.5 m/s instant-resume speed, so the armed session un-freezes at
+        // t=0 instead of waiting out a dwell window — the run starts when the
+        // user was actually already moving.
+        #expect(workout.start == base)
+        #expect(workout.movingSeconds == 7)
     }
 
     @Test func finishingAnArmedSessionThatNeverMovedProducesNoWorkout() {

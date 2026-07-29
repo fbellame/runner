@@ -362,8 +362,8 @@ struct AutoWalkCoordinatorTests {
         // AutoWalkCoordinator's separate 5-minute stop detection — to actually
         // exercise the two `!autoStarted`-guarded announcement branches inside
         // `ingest` (the auto-pause branch and the auto-resume/`wasArmed` branch).
-        // Below the walk threshold (0.5 m/s) for the full 10 s `pauseAfter` window
-        // trips a genuine auto-pause; back above it for the 3 s `resumeAfter`
+        // Below the walk threshold (0.5 m/s) for the 6 s `pauseAfter` window
+        // trips a genuine auto-pause; back above it for the 1 s `resumeAfter`
         // window trips a genuine auto-resume. The intermediate `recorder.state`
         // assertions prove these branches actually ran — not merely that nothing
         // threw — because `.autoPaused`/`.recording` are set only as a side effect

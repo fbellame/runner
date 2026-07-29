@@ -52,5 +52,13 @@ struct HandsFreeReleaseContractTests {
                 == "Course terminée")
         #expect(String(localized: "Ready — start moving", locale: fr)
                 == "Prêt — commencez à bouger")
+        #expect(String(localized: "1 kilometer", locale: fr)
+                == "1 kilomètre")
+        #expect(String(localized: "\(2) kilometers", locale: fr)
+                == "2 kilomètres")
+        #expect(String(localized: "Pace \(5) minutes per kilometer", locale: fr)
+                == "Rythme : 5 minutes par kilomètre")
+        #expect(String(localized: "Pace \(5) minutes \(42) per kilometer", locale: fr)
+                == "Rythme : 5 minutes 42 par kilomètre")
     }
 }

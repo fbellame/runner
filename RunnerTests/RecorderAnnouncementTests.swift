@@ -155,4 +155,68 @@ struct RecorderAnnouncementTests {
 
         #expect(spy.events == [.runSaved])
     }
+
+    @Test func announcesEachKilometerOnceWithItsOwnSplit() {
+        let spy = AnnouncementSpy()
+        let recorder = WorkoutRecorder(
+            provider: FakeLocationProvider(),
+            clock: { base },
+            announcer: spy
+        )
+        recorder.start(activity: .run)
+
+        for i in 0...210 {
+            recorder.didUpdate(locations: [location(x: Double(i) * 10,
+                                                    seconds: Double(i) * 3,
+                                                    speed: 2)])
+        }
+
+        let expected: [RunAnnouncement] = recorder.splitSeconds.enumerated().map {
+            .kmSplit(km: $0.offset + 1, splitSeconds: $0.element)
+        }
+        #expect(recorder.splitSeconds.count == 2)
+        #expect(spy.events == expected)
+    }
+
+    @Test func autoStartedSessionNeverAnnouncesKilometerSplits() {
+        let spy = AnnouncementSpy()
+        let recorder = WorkoutRecorder(
+            provider: FakeLocationProvider(),
+            clock: { base },
+            announcer: spy
+        )
+        recorder.start(activity: .walk, autoStarted: true)
+
+        for i in 0...110 {
+            recorder.didUpdate(locations: [location(x: Double(i) * 10,
+                                                    seconds: Double(i) * 3,
+                                                    speed: 2)])
+        }
+
+        #expect(recorder.splitSeconds.count == 1)
+        #expect(spy.events.isEmpty)
+    }
+
+    @Test func resumeFromCheckpointDoesNotReannounceCompletedSplits() {
+        let spy = AnnouncementSpy()
+        let checkpoint = SessionCheckpoint(
+            activity: .run,
+            startedAt: base,
+            movingSeconds: 640,
+            distanceMeters: 2_500,
+            route: [RoutePoint(lat: 45.5, lon: -73.6, t: base, afterGap: false)],
+            splitSeconds: [300, 310],
+            savedAt: base
+        )
+        let recorder = WorkoutRecorder(
+            provider: FakeLocationProvider(),
+            clock: { base },
+            announcer: spy
+        )
+        recorder.start(activity: .run, resumeFrom: checkpoint)
+        recorder.didUpdate(locations: [location(x: 5_000, seconds: 10, speed: 2)])
+
+        #expect(recorder.splitSeconds == [300, 310])
+        #expect(spy.events.isEmpty)
+    }
 }

@@ -158,6 +158,17 @@ final class AppModel {
         }
         guard canAutoStart else { return }
         recorder.start(activity: .run, armed: true)
+        presentActiveSessionIfNeeded()
+    }
+
+    /// A Lock Screen `StartRunIntent` can arm and run a session in a process the
+    /// user never saw. When they do open the app, it must land on the live run —
+    /// same session, same counters as the Live Activity — not on the Today tab.
+    /// Auto-detected walks are excluded: v1.5 chose full silence for those, and
+    /// popping a full-screen cover would be the loudest possible violation.
+    private func presentActiveSessionIfNeeded() {
+        guard recorder.state != .idle, !recorder.autoStarted else { return }
+        showRecordSheet = true
     }
 
     /// What a Lock Screen control tap found when it arrived.
@@ -410,6 +421,7 @@ final class AppModel {
         if pendingCelebration == nil {
             pendingCelebration = loadPendingCelebration()
         }
+        presentActiveSessionIfNeeded()
         if await health.shouldRequestAuthorization() {
             try? await health.requestAuthorization()
         }
@@ -457,6 +469,7 @@ final class AppModel {
         if pendingCelebration == nil {
             pendingCelebration = loadPendingCelebration()
         }
+        presentActiveSessionIfNeeded()
         await profile.refreshFromHealth()
         await autoWalk?.onForeground()
         await sync.syncNow()

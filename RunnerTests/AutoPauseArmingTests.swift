@@ -8,23 +8,20 @@ struct AutoPauseArmingTests {
         base.addingTimeInterval(seconds)
     }
 
-    @Test func armedDetectorStaysPausedUntilThreeContinuousMovingSeconds() {
+    @Test func armedDetectorStartsOnTheFirstPlausibleRunningSample() {
         var detector = AutoPauseDetector(activity: .run, startPaused: true)
 
         #expect(detector.isPaused)
-        #expect(detector.update(speed: 2.0, at: t(0)) == true)
-        #expect(detector.update(speed: 2.0, at: t(2)) == true)
-        #expect(detector.update(speed: 2.0, at: t(3)) == false)
+        #expect(detector.update(speed: 2.0, at: t(0)) == false)
     }
 
-    @Test func armedDetectorResetsItsResumeWindowAfterABriefBlip() {
+    @Test func armedDetectorUsesOneSecondDwellForSlowPlausibleMovement() {
         var detector = AutoPauseDetector(activity: .run, startPaused: true)
 
-        #expect(detector.update(speed: 2.0, at: t(0)) == true)
+        #expect(detector.update(speed: 0.8, at: t(0)) == true)
         #expect(detector.update(speed: 0.1, at: t(2)) == true)
-        #expect(detector.update(speed: 2.0, at: t(3)) == true)
-        #expect(detector.update(speed: 2.0, at: t(5)) == true)
-        #expect(detector.update(speed: 2.0, at: t(6)) == false)
+        #expect(detector.update(speed: 0.8, at: t(3)) == true)
+        #expect(detector.update(speed: 0.8, at: t(4)) == false)
     }
 
     @Test func existingConstructionStillStartsUnpaused() {

@@ -11,6 +11,7 @@ struct RunLiveActivity: Widget {
             VStack(alignment: .leading, spacing: 10) {
                 Text(title(for: snapshot))
                     .font(.headline)
+                    .invalidatableContent()
                 // `.error`'s headline already IS `snapshot.message` (see
                 // `title(for:)` below) — showing it again as the caption
                 // would render the same sentence twice. Every other status's
@@ -25,6 +26,7 @@ struct RunLiveActivity: Widget {
                     stat(String(localized: "Distance"), WidgetFormat.km(snapshot.distanceMeters))
                     stat(String(localized: "Pace"), WidgetFormat.pace(snapshot.paceSecondsPerKm))
                 }
+                .invalidatableContent()
                 if snapshot.status != .ready && snapshot.status != .finished {
                     HStack {
                         Button(intent: TogglePauseIntent()) {
@@ -37,10 +39,12 @@ struct RunLiveActivity: Widget {
                                     : "pause.fill"
                             )
                         }
+                        .invalidatableContent()
                         Button(intent: FinishRunIntent()) {
                             Label(String(localized: "Finish"),
                                   systemImage: "stop.fill")
                         }
+                        .invalidatableContent()
                     }
                     .buttonStyle(.bordered)
                 }
@@ -53,12 +57,15 @@ struct RunLiveActivity: Widget {
             return DynamicIsland {
                 DynamicIslandExpandedRegion(.leading) {
                     Text(WidgetFormat.duration(snapshot.movingSeconds))
+                        .invalidatableContent()
                 }
                 DynamicIslandExpandedRegion(.trailing) {
                     Text(WidgetFormat.km(snapshot.distanceMeters))
+                        .invalidatableContent()
                 }
                 DynamicIslandExpandedRegion(.bottom) {
                     Text(title(for: snapshot))
+                        .invalidatableContent()
                 }
             } compactLeading: {
                 Image(systemName: snapshot.status == .paused

@@ -631,9 +631,13 @@ final class WorkoutRecorder: LocationProvidingDelegate {
             // 6. Km splits.
             let completedKm = Int(distanceMeters / 1000.0)
             while splitSeconds.count < completedKm {
-                splitSeconds.append(movingSeconds - lastSplitMovingSeconds)
+                let split = movingSeconds - lastSplitMovingSeconds
+                splitSeconds.append(split)
                 lastSplitMovingSeconds = movingSeconds
                 onKmSplit?(splitSeconds.count)
+                if !autoStarted {
+                    announcer.announce(.kmSplit(km: splitSeconds.count, splitSeconds: split))
+                }
             }
 
             // 7. Periodic checkpoint.

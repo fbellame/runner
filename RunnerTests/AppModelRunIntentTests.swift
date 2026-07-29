@@ -51,6 +51,34 @@ struct AppModelRunIntentTests {
         #expect(model.recorder.state == .recording)
     }
 
+    @Test func lockScreenStartQueuesTheLiveRecordSheet() throws {
+        let (model, _, _, _) = try makeModel()
+
+        model.startRunFromIntent()
+
+        #expect(model.showRecordSheet)
+    }
+
+    @Test func foregroundDoesNotPresentAnAutoStartedWalkOrIdleRecorder() async throws {
+        let (idleModel, _, _, _) = try makeModel()
+        await idleModel.onForeground()
+        #expect(!idleModel.showRecordSheet)
+
+        let (autoWalkModel, _, _, _) = try makeModel()
+        autoWalkModel.recorder.start(activity: .walk, autoStarted: true)
+        await autoWalkModel.onForeground()
+        #expect(!autoWalkModel.showRecordSheet)
+    }
+
+    @Test func foregroundPresentsAnExistingManualRun() async throws {
+        let (model, _, _, _) = try makeModel()
+        model.recorder.start(activity: .run)
+
+        await model.onForeground()
+
+        #expect(model.showRecordSheet)
+    }
+
     @Test func finishTrimsSavesPersistsAndClearsCheckpoint() async throws {
         let (model, pending, _, announcements) = try makeModel()
         let end = Date()

@@ -79,7 +79,7 @@ struct WorkoutRecorderTests {
         rec.start(activity: .run)
         rec.didUpdate(locations: [loc(x: 0, t: 0)])
         rec.didUpdate(locations: [loc(x: 10, t: 4)])
-        // standing still until auto-pause engages (pauseAfter = 10 s for runs)
+        // standing still until auto-pause engages (pauseAfter = 6 s for runs)
         for i in 1...6 {
             rec.didUpdate(locations: [loc(x: 10.5, t: 4 + Double(i) * 2, speed: 0.0)])
         }
@@ -89,14 +89,13 @@ struct WorkoutRecorderTests {
         for i in 1...10 {
             rec.didUpdate(locations: [loc(x: 10.5, t: 16 + Double(i) * 10, speed: 0.0)])
         }
-        // movement resumes (resumeAfter = 3 s)
+        // A plausible running sample resumes immediately without crediting the
+        // paused interval.
         rec.didUpdate(locations: [loc(x: 20, t: 120)])
-        rec.didUpdate(locations: [loc(x: 26, t: 122)])
-        rec.didUpdate(locations: [loc(x: 30, t: 123)])
         #expect(rec.state == .recording)
-        // the paused interval credits nothing — no phantom 10 s from the stale fix
+        // The paused interval credits nothing.
         #expect(abs(rec.movingSeconds - atPause) < 0.01)
-        rec.didUpdate(locations: [loc(x: 40, t: 127)])
+        rec.didUpdate(locations: [loc(x: 40, t: 124)])
         #expect(abs(rec.movingSeconds - (atPause + 4)) < 0.01)
     }
 
@@ -134,7 +133,7 @@ struct WorkoutRecorderTests {
         }
         #expect(rec.state == .autoPaused)
         let frozen = rec.distanceMeters
-        // moving again: ≥3 s above threshold resumes; the first post-resume sample
+        // moving again: a plausible running sample resumes immediately; the first post-resume sample
         // arrives >15 s after the last kept one, so it is a gap point (no distance) —
         // distance grows again from the sample after it.
         rec.didUpdate(locations: [loc(x: 20, t: 20)])

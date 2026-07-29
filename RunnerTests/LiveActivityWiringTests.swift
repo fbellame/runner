@@ -43,12 +43,8 @@ struct LiveActivityWiringTests {
         recorder.start(activity: .run, armed: true)
         #expect(live.began.map(\.status) == [.ready])
 
-        // Three samples, not two: the armed→recording transition itself
-        // consumes the first `resumeAfter` (3 s) of continuous movement (see
-        // `AutoPauseDetector`), and the sample that crosses that threshold
-        // becomes the filter's first *kept* point with nothing to diff
-        // against yet — a real, non-zero distance needs a further sample
-        // after the detector has already unpaused.
+        // The first plausible running sample instantly unfreezes the armed
+        // session, and the following sample records the first non-zero distance.
         recorder.didUpdate(locations: [
             location(x: 0, seconds: 0, speed: 2),
             location(x: 5, seconds: 3, speed: 2),

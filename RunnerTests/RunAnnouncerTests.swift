@@ -27,6 +27,27 @@ struct RunAnnouncerTests {
             String(localized: "Location access is required")
         ])
     }
+
+    @Test func kmSplitUsesSingularDistanceAndMinuteSecondPace() {
+        #expect(RunAnnouncement.kmSplit(km: 1, splitSeconds: 342).localizedText
+                == "\(String(localized: "1 kilometer")). \(String(localized: "Pace \(5) minutes \(42) per kilometer")).")
+    }
+
+    @Test func kmSplitUsesPluralDistanceAndMinuteSecondPace() {
+        #expect(RunAnnouncement.kmSplit(km: 2, splitSeconds: 338).localizedText
+                == "\(String(localized: "\(2) kilometers")). \(String(localized: "Pace \(5) minutes \(38) per kilometer")).")
+    }
+
+    @Test func kmSplitOmitsZeroSecondsFromExactMinutePace() {
+        #expect(RunAnnouncement.kmSplit(km: 3, splitSeconds: 300).localizedText
+                == "\(String(localized: "\(3) kilometers")). \(String(localized: "Pace \(5) minutes per kilometer")).")
+    }
+
+    @Test func kmSplitOmitsPaceForZeroOrNegativeSplit() {
+        let distance = String(localized: "\(4) kilometers")
+        #expect(RunAnnouncement.kmSplit(km: 4, splitSeconds: 0).localizedText == "\(distance).")
+        #expect(RunAnnouncement.kmSplit(km: 4, splitSeconds: -1).localizedText == "\(distance).")
+    }
 }
 
 @MainActor

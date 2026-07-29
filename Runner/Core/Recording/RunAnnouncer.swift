@@ -8,6 +8,7 @@ enum RunAnnouncement: Equatable, Sendable {
     case runSaved
     case runCancelled
     case locationDenied
+    case kmSplit(km: Int, splitSeconds: Double)
 
     var localizedText: String {
         switch self {
@@ -17,7 +18,29 @@ enum RunAnnouncement: Equatable, Sendable {
         case .runSaved: String(localized: "Run saved")
         case .runCancelled: String(localized: "Run cancelled")
         case .locationDenied: String(localized: "Location access is required")
+        case .kmSplit(let km, let splitSeconds): Self.kmSplitText(km: km, splitSeconds: splitSeconds)
         }
+    }
+
+    /// Kept out of `localizedText`'s switch on purpose: that switch is a
+    /// switch *expression* (implicit return per case), so a case body with
+    /// statements — the early exit for a missing split, in particular — will
+    /// not compile inline.
+    private static func kmSplitText(km: Int, splitSeconds: Double) -> String {
+        let distance = km == 1
+            ? String(localized: "1 kilometer")
+            : String(localized: "\(km) kilometers")
+        let total = max(0, Int(splitSeconds.rounded()))
+        guard total > 0 else { return "\(distance)." }
+        let minutes = total / 60
+        let seconds = total % 60
+        // Two pace variants rather than one padded format: a speech
+        // synthesiser reads "5 minutes 0" aloud on an exact minute, and "05"
+        // as "zero five".
+        let pace = seconds == 0
+            ? String(localized: "Pace \(minutes) minutes per kilometer")
+            : String(localized: "Pace \(minutes) minutes \(seconds) per kilometer")
+        return "\(distance). \(pace)."
     }
 }
 

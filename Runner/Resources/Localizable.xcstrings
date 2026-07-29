@@ -451,6 +451,16 @@
         }
       }
     },
+    "%lld kilometers": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%lld kilomètres"
+          }
+        }
+      }
+    },
     "%lld %@ to %lld lifetime %@": {
       "localizations": {
         "fr": {
@@ -547,6 +557,16 @@
           "stringUnit": {
             "state": "translated",
             "value": "1 jour en or"
+          }
+        }
+      }
+    },
+    "1 kilometer": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "1 kilomètre"
           }
         }
       }
@@ -1647,6 +1667,26 @@
           "stringUnit": {
             "state": "translated",
             "value": "Allure"
+          }
+        }
+      }
+    },
+    "Pace %lld minutes %lld per kilometer": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Rythme : %lld minutes %lld par kilomètre"
+          }
+        }
+      }
+    },
+    "Pace %lld minutes per kilometer": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Rythme : %lld minutes par kilomètre"
           }
         }
       }
