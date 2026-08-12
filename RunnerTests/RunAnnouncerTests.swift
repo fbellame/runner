@@ -28,25 +28,41 @@ struct RunAnnouncerTests {
         ])
     }
 
-    @Test func kmSplitUsesSingularDistanceAndMinuteSecondPace() {
-        #expect(RunAnnouncement.kmSplit(km: 1, splitSeconds: 342).localizedText
+    /// The first kilometre's split IS the run's pace, so naming both would be
+    /// noise. It keeps the plain single-pace wording.
+    @Test func firstKilometerAnnouncesASinglePace() {
+        #expect(RunAnnouncement.kmSplit(km: 1, splitSeconds: 342, averageSecondsPerKm: 342).localizedText
                 == "\(String(localized: "1 kilometer")). \(String(localized: "Pace \(5) minutes \(42) per kilometer")).")
     }
 
-    @Test func kmSplitUsesPluralDistanceAndMinuteSecondPace() {
-        #expect(RunAnnouncement.kmSplit(km: 2, splitSeconds: 338).localizedText
-                == "\(String(localized: "\(2) kilometers")). \(String(localized: "Pace \(5) minutes \(38) per kilometer")).")
+    /// From the second kilometre, one number is misleading: "2 kilometres.
+    /// Pace 5 minutes 38" sounds like the pace of the whole run when it is
+    /// only that kilometre's. Both are spoken, and each is named.
+    @Test func laterKilometersAnnounceSplitAndAveragePaceSeparatelyNamed() {
+        #expect(RunAnnouncement.kmSplit(km: 2, splitSeconds: 338, averageSecondsPerKm: 350).localizedText
+                == "\(String(localized: "\(2) kilometers")). "
+                 + "\(String(localized: "Last kilometer \(5) minutes \(38)")). "
+                 + "\(String(localized: "Average \(5) minutes \(50) per kilometer")).")
     }
 
-    @Test func kmSplitOmitsZeroSecondsFromExactMinutePace() {
-        #expect(RunAnnouncement.kmSplit(km: 3, splitSeconds: 300).localizedText
-                == "\(String(localized: "\(3) kilometers")). \(String(localized: "Pace \(5) minutes per kilometer")).")
+    @Test func exactMinutePacesDropTheZeroSecondsInBothPositions() {
+        #expect(RunAnnouncement.kmSplit(km: 3, splitSeconds: 300, averageSecondsPerKm: 360).localizedText
+                == "\(String(localized: "\(3) kilometers")). "
+                 + "\(String(localized: "Last kilometer \(5) minutes")). "
+                 + "\(String(localized: "Average \(6) minutes per kilometer")).")
+    }
+
+    /// A missing average must not swallow the split that IS available.
+    @Test func laterKilometerFallsBackToTheSplitAloneWithoutAnAverage() {
+        #expect(RunAnnouncement.kmSplit(km: 2, splitSeconds: 338, averageSecondsPerKm: nil).localizedText
+                == "\(String(localized: "\(2) kilometers")). "
+                 + "\(String(localized: "Last kilometer \(5) minutes \(38)")).")
     }
 
     @Test func kmSplitOmitsPaceForZeroOrNegativeSplit() {
         let distance = String(localized: "\(4) kilometers")
-        #expect(RunAnnouncement.kmSplit(km: 4, splitSeconds: 0).localizedText == "\(distance).")
-        #expect(RunAnnouncement.kmSplit(km: 4, splitSeconds: -1).localizedText == "\(distance).")
+        #expect(RunAnnouncement.kmSplit(km: 4, splitSeconds: 0, averageSecondsPerKm: 330).localizedText == "\(distance).")
+        #expect(RunAnnouncement.kmSplit(km: 4, splitSeconds: -1, averageSecondsPerKm: 330).localizedText == "\(distance).")
     }
 }
 

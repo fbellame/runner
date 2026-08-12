@@ -98,38 +98,40 @@ struct ArmedWorkoutRecorderTests {
         #expect(recorder.movingSeconds == 2)
     }
 
-    /// Regression for the armed-fallback bug: `lastKeptLocation` is only ever
-    /// assigned once real recording starts (state == .recording), which never
-    /// happens while armed — every armed sample is dropped by step 4. So the
-    /// computed-speed fallback in step 2 stayed permanently 0 unless a
-    /// speed-reference location survives the armed state on its own. Here
-    /// EVERY sample carries `speed: -1` (CoreLocation's "unavailable" sentinel
-    /// — e.g. a phone in a zipped pocket), so un-freezing can only happen via
-    /// that computed fallback, never via raw sensor speed.
-    @Test func armedSessionUnfreezesFromComputedSpeedWhenSensorSpeedIsUnavailable() {
+    /// An armed session must still un-freeze with no Doppler speed at all —
+    /// EVERY sample here carries `speed: -1` (CoreLocation's "unavailable"
+    /// sentinel, e.g. a phone in a zipped pocket), so only the displacement
+    /// fallback can start the run.
+    ///
+    /// This test used to assert that a single 4 m / 2 s sample started the run.
+    /// That is the sensitivity that made the session start itself while Farid
+    /// was still standing at the trailhead: over a 2 s baseline, 4 m is
+    /// indistinguishable from GPS noise. The contract is now sustained
+    /// displacement over `SpeedEstimator.minBaseline`, so `startedAt` lands on
+    /// the sample that proved it rather than on the first twitch.
+    @Test func armedSessionUnfreezesFromSustainedDisplacementWhenSensorSpeedIsUnavailable() {
         let recorder = makeRecorder()
         recorder.start(activity: .run, armed: true)
         #expect(recorder.state == .autoPaused)
 
-        // First sample only establishes the speed reference — no prior point
-        // exists yet, so its own computed speed is necessarily 0.
-        recorder.didUpdate(locations: [location(x: 0, seconds: 0, speed: -1)])
+        // Nothing can be concluded before a baseline exists.
+        for i in 0...4 {
+            recorder.didUpdate(locations: [location(x: Double(i) * 2, seconds: Double(i), speed: -1)])
+        }
         #expect(recorder.state == .autoPaused)
+        #expect(recorder.isArmed)
 
-        // Real displacement (4 m every 2 s ⇒ 2 m/s) computed purely from
-        // timestamps/coordinates, with sensor speed unavailable on every
-        // sample. 2 m/s clears the 1.5 m/s instant-resume speed and stays
-        // under the 8 m/s plausibility ceiling, so the session un-freezes on
-        // that first moving sample rather than waiting out a dwell window.
-        recorder.didUpdate(locations: [
-            location(x: 4, seconds: 2, speed: -1),
-            location(x: 8, seconds: 4, speed: -1)
-        ])
+        // t=5 is the first sample with a full 5 s baseline behind it: 10 m over
+        // 5 s ⇒ 2 m/s, clearing the 1.5 m/s instant-resume speed and staying
+        // under the 8 m/s plausibility ceiling.
+        recorder.didUpdate(locations: [location(x: 10, seconds: 5, speed: -1)])
 
         #expect(recorder.state == .recording)
         #expect(!recorder.isArmed)
-        #expect(recorder.startedAt == base.addingTimeInterval(2))
-        // Un-frozen at t=2, so the t=4 sample credits the 2 s in between.
+        #expect(recorder.startedAt == base.addingTimeInterval(5))
+
+        // Un-frozen at t=5, so the t=7 sample credits the 2 s in between.
+        recorder.didUpdate(locations: [location(x: 14, seconds: 7, speed: -1)])
         #expect(recorder.movingSeconds == 2)
     }
 }

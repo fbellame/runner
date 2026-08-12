@@ -171,11 +171,18 @@ struct RecorderAnnouncementTests {
                                                     speed: 2)])
         }
 
-        let expected: [RunAnnouncement] = recorder.splitSeconds.enumerated().map {
-            .kmSplit(km: $0.offset + 1, splitSeconds: $0.element)
-        }
         #expect(recorder.splitSeconds.count == 2)
-        #expect(spy.events == expected)
+        // The run average is captured live at each cue, so it cannot be
+        // reconstructed here the way the splits can — assert its presence and
+        // the split identity instead of a whole-event equality.
+        let cues: [(km: Int, seconds: Double, average: Double?)] = spy.events.compactMap {
+            guard case .kmSplit(let km, let seconds, let average) = $0 else { return nil }
+            return (km, seconds, average)
+        }
+        #expect(spy.events.count == 2)          // nothing else was announced
+        #expect(cues.map(\.km) == [1, 2])
+        #expect(cues.map(\.seconds) == recorder.splitSeconds)
+        #expect(cues.allSatisfy { $0.average != nil })
     }
 
     @Test func autoStartedSessionNeverAnnouncesKilometerSplits() {

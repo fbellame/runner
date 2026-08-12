@@ -1,5 +1,6 @@
 import Testing
 import Foundation
+import CoreLocation
 @testable import Runner
 
 /// Release contract for the v1.10 hands-free epic (Task 14).
@@ -60,5 +61,24 @@ struct HandsFreeReleaseContractTests {
                 == "Rythme : 5 minutes par kilomètre")
         #expect(String(localized: "Pace \(5) minutes \(42) per kilometer", locale: fr)
                 == "Rythme : 5 minutes 42 par kilomètre")
+        #expect(String(localized: "Last kilometer \(5) minutes \(38)", locale: fr)
+                == "Dernier kilomètre : 5 minutes 38")
+        #expect(String(localized: "Last kilometer \(5) minutes", locale: fr)
+                == "Dernier kilomètre : 5 minutes")
+        #expect(String(localized: "Average \(5) minutes \(50) per kilometer", locale: fr)
+                == "Moyenne : 5 minutes 50 par kilomètre")
+        #expect(String(localized: "Average \(6) minutes per kilometer", locale: fr)
+                == "Moyenne : 6 minutes par kilomètre")
+    }
+}
+
+@MainActor
+struct LocationProviderContractTests {
+    /// `AutoPauseDetector` can only advance on samples it is handed, and
+    /// nothing else in the recorder runs on wall-clock time. A distance filter
+    /// therefore means "stop moving ⇒ stop being told anything ⇒ never
+    /// auto-pause", which is exactly what happened in the field.
+    @Test func liveProviderKeepsDeliveringWhileStandingStill() {
+        #expect(SystemLocationProvider().configuredDistanceFilter == kCLDistanceFilterNone)
     }
 }

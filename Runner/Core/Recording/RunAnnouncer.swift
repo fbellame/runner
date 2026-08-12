@@ -8,7 +8,7 @@ enum RunAnnouncement: Equatable, Sendable {
     case runSaved
     case runCancelled
     case locationDenied
-    case kmSplit(km: Int, splitSeconds: Double)
+    case kmSplit(km: Int, splitSeconds: Double, averageSecondsPerKm: Double?)
 
     var localizedText: String {
         switch self {
@@ -18,42 +18,80 @@ enum RunAnnouncement: Equatable, Sendable {
         case .runSaved: String(localized: "Run saved")
         case .runCancelled: String(localized: "Run cancelled")
         case .locationDenied: String(localized: "Location access is required")
-        case .kmSplit(let km, let splitSeconds):
-            Self.kmSplitText(km: km, splitSeconds: splitSeconds)
+        case .kmSplit(let km, let splitSeconds, let averageSecondsPerKm):
+            Self.kmSplitText(km: km, splitSeconds: splitSeconds,
+                             averageSecondsPerKm: averageSecondsPerKm)
         }
+    }
+
+    /// How a pace names itself out loud. The plain form says only "Pace",
+    /// which is honest for the first kilometre — where the split and the run
+    /// average are the same number — and misleading afterwards.
+    enum PaceStyle {
+        case plain
+        case lastKilometer
+        case average
     }
 
     /// Kept out of `localizedText`'s switch on purpose: that switch is a
     /// switch *expression* (implicit return per case), so a case body with
     /// statements — the early exit for a missing split, in particular — will
     /// not compile inline.
-    private static func kmSplitText(km: Int, splitSeconds: Double) -> String {
+    private static func kmSplitText(km: Int, splitSeconds: Double,
+                                    averageSecondsPerKm: Double?) -> String {
         let distance = km == 1
             ? String(localized: "1 kilometer")
             : String(localized: "\(km) kilometers")
-        guard let pace = paceText(secondsPerKm: splitSeconds) else {
+        guard let split = paceText(secondsPerKm: splitSeconds,
+                                   style: km == 1 ? .plain : .lastKilometer) else {
             return "\(distance)."
         }
-        return "\(distance). \(pace)."
+        // From the second kilometre on, both numbers exist and differ, so both
+        // are spoken and each says which one it is.
+        guard km > 1,
+              let average = paceText(secondsPerKm: averageSecondsPerKm, style: .average) else {
+            return "\(distance). \(split)."
+        }
+        return "\(distance). \(split). \(average)."
     }
 
     /// Shared by split announcements and Siri status so both use the same
     /// speech-friendly "5 minutes 22" wording instead of a visual "5:22".
-    static func paceText(secondsPerKm: Double?, locale: Locale = .current) -> String? {
+    static func paceText(secondsPerKm: Double?, style: PaceStyle = .plain,
+                         locale: Locale = .current) -> String? {
         guard let secondsPerKm else { return nil }
         let total = max(0, Int(secondsPerKm.rounded()))
         guard total > 0 else { return nil }
         let minutes = total / 60
         let seconds = total % 60
-        // Two pace variants rather than one padded format: a speech
+        // Two variants per style rather than one padded format: a speech
         // synthesiser reads "5 minutes 0" aloud on an exact minute, and "05"
         // as "zero five".
-        return seconds == 0
-            ? String(localized: "Pace \(minutes) minutes per kilometer", locale: locale)
-            : String(
-                localized: "Pace \(minutes) minutes \(seconds) per kilometer",
-                locale: locale
-            )
+        switch style {
+        case .plain:
+            return seconds == 0
+                ? String(localized: "Pace \(minutes) minutes per kilometer", locale: locale)
+                : String(
+                    localized: "Pace \(minutes) minutes \(seconds) per kilometer",
+                    locale: locale
+                )
+        case .lastKilometer:
+            // No "per kilometer" tail: the phrase already names one kilometre,
+            // and the average that follows carries the unit for both.
+            return seconds == 0
+                ? String(localized: "Last kilometer \(minutes) minutes", locale: locale)
+                : String(
+                    localized: "Last kilometer \(minutes) minutes \(seconds)",
+                    locale: locale
+                )
+        case .average:
+            return seconds == 0
+                ? String(localized: "Average \(minutes) minutes per kilometer", locale: locale)
+                : String(
+                    localized: "Average \(minutes) minutes \(seconds) per kilometer",
+                    locale: locale
+                )
+        }
     }
 }
 

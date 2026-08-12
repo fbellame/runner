@@ -90,15 +90,10 @@ final class WorkoutRecorder: LocationProvidingDelegate {
     private let armedTimeout: Duration
     private let clock: () -> Date
     private var lastKeptLocation: CLLocation?
-    /// A speed-reference location maintained ONLY until real recording begins
-    /// (i.e. only while `lastKeptLocation == nil`). While armed, step 4 returns
-    /// early for every sample so `lastKeptLocation` never populates — without
-    /// this, the computed-speed fallback in step 2 is permanently 0 and an
-    /// armed session can only un-freeze via raw sensor speed, which CoreLocation
-    /// reports as -1 (unavailable) for a phone in a pocket. Once `lastKeptLocation`
-    /// becomes non-nil this is never consulted again, so existing computed-speed
-    /// behaviour after recording starts is completely unchanged.
-    private var lastSpeedReference: CLLocation?
+    /// Feeds `autoPause`. Independent of `lastKeptLocation` on purpose: it must
+    /// keep describing the present in exactly the states where no sample is
+    /// ever accepted — while armed, and for the whole length of a pause.
+    private var speedEstimator = SpeedEstimator()
     private var autoPause: AutoPauseDetector?
     private var lastCheckpointAt: Date?
     private var lastSplitMovingSeconds: Double = 0
@@ -234,6 +229,7 @@ final class WorkoutRecorder: LocationProvidingDelegate {
         }
         lastMovingAt = checkpoint?.route.last?.t
         lastKeptLocation = nil
+        speedEstimator.reset()
         lastCheckpointAt = nil
         autoPause = AutoPauseDetector(activity: activity, startPaused: self.isArmed)
         timeAnchor = clock()
@@ -522,7 +518,7 @@ final class WorkoutRecorder: LocationProvidingDelegate {
         route = []
         splitSeconds = []
         lastKeptLocation = nil
-        lastSpeedReference = nil
+        speedEstimator.reset()
         lastCheckpointAt = nil
         autoPause = nil
         lastSplitMovingSeconds = 0
@@ -577,23 +573,19 @@ final class WorkoutRecorder: LocationProvidingDelegate {
         //    GPS gaps (tunnels) keep the timer running; only pauses stop it.
         if state == .recording { advanceTimer(to: location.timestamp) }
 
-        // 2. Speed for auto-pause: sensor speed, else computed from last kept point.
-        let sensorSpeed = location.speed
-        let computedSpeed: Double
-        if let last = lastKeptLocation {
-            let dt = location.timestamp.timeIntervalSince(last.timestamp)
-            computedSpeed = dt > 0 ? location.distance(from: last) / dt : 0
-        } else if let reference = lastSpeedReference {
-            let dt = location.timestamp.timeIntervalSince(reference.timestamp)
-            computedSpeed = dt > 0 ? location.distance(from: reference) / dt : 0
-        } else {
-            computedSpeed = 0
-        }
-        let speed = sensorSpeed >= 0 ? sensorSpeed : computedSpeed
+        // 2. Speed for auto-pause. A fix too inaccurate for the route is also
+        //    too inaccurate to decide whether he is running: the state machine
+        //    used to run before the filter below, so a 65 m fix 60 m off the
+        //    route resumed a paused session as if he had sprinted.
+        let accuracyUsable = location.horizontalAccuracy >= 0
+            && location.horizontalAccuracy <= LocationFilter.maxHorizontalAccuracy
+        let speed = accuracyUsable ? speedEstimator.estimate(from: location) : nil
 
-        // 3. Feed the detector on EVERY sample so standing still triggers a pause.
+        // 3. Feed the detector on EVERY sample it can judge, so standing still
+        //    triggers a pause. A `nil` estimate means "no evidence yet", which
+        //    must not be read as stillness — it leaves the accumulators alone.
         //    A resume starts a fresh timer segment: the paused interval is never credited.
-        if var detector = autoPause {
+        if let speed, var detector = autoPause {
             let wasAutoPaused = state == .autoPaused
             let paused = detector.update(speed: speed, at: location.timestamp)
             autoPause = detector
@@ -656,7 +648,8 @@ final class WorkoutRecorder: LocationProvidingDelegate {
             // kilometres back to back, two of them with zero-second splits,
             // would be worse than saying nothing. The haptic still fires per km.
             if let cue, !autoStarted {
-                announcer.announce(.kmSplit(km: cue.km, splitSeconds: cue.seconds))
+                announcer.announce(.kmSplit(km: cue.km, splitSeconds: cue.seconds,
+                                            averageSecondsPerKm: paceSecondsPerKm))
             }
 
             // 7. Periodic checkpoint.
@@ -668,13 +661,6 @@ final class WorkoutRecorder: LocationProvidingDelegate {
             if presentsLiveActivity {
                 liveActivity.update(liveSnapshot())
             }
-        }
-
-        // 8. Speed reference for step 2's fallback: kept alive only until real
-        //    recording starts (see property doc). This is the one path reachable
-        //    while armed, since step 4 never sets lastKeptLocation in that state.
-        if lastKeptLocation == nil {
-            lastSpeedReference = location
         }
     }
 

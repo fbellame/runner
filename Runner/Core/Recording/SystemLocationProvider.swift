@@ -10,11 +10,22 @@ final class SystemLocationProvider: NSObject, LocationProviding, CLLocationManag
         manager.delegate = self
         manager.desiredAccuracy = kCLLocationAccuracyBest
         manager.activityType = .fitness
-        manager.distanceFilter = 3
+        // No distance filter: CoreLocation must keep delivering while he stands
+        // still. With a 3 m filter, stopping stopped the callbacks, so the
+        // auto-pause dwell had nothing to advance it and a stopped run simply
+        // never paused. The route stays protected from the extra samples by
+        // `LocationFilter.minDisplacementMeters`, which is a separate decision
+        // from "is he moving" and stays at 3 m.
+        manager.distanceFilter = kCLDistanceFilterNone
         manager.pausesLocationUpdatesAutomatically = false
     }
 
     var accuracyAuthorization: CLAccuracyAuthorization { manager.accuracyAuthorization }
+
+    /// Test seam. A distance filter here silently starves `AutoPauseDetector`,
+    /// which can only advance on delivered samples — the whole reason a stopped
+    /// run failed to auto-pause in the field.
+    var configuredDistanceFilter: CLLocationDistance { manager.distanceFilter }
 
     func requestWhenInUseAuthorization() {
         manager.requestWhenInUseAuthorization()

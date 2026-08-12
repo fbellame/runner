@@ -631,6 +631,26 @@
         }
       }
     },
+    "Average %lld minutes %lld per kilometer": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Moyenne : %lld minutes %lld par kilomètre"
+          }
+        }
+      }
+    },
+    "Average %lld minutes per kilometer": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Moyenne : %lld minutes par kilomètre"
+          }
+        }
+      }
+    },
     "Average pace": {
       "localizations": {
         "fr": {
@@ -1307,6 +1327,26 @@
           "stringUnit": {
             "state": "translated",
             "value": "Km %lld · %@"
+          }
+        }
+      }
+    },
+    "Last kilometer %lld minutes %lld": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Dernier kilomètre : %lld minutes %lld"
+          }
+        }
+      }
+    },
+    "Last kilometer %lld minutes": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Dernier kilomètre : %lld minutes"
           }
         }
       }
