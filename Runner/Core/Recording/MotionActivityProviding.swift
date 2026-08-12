@@ -7,7 +7,21 @@ struct MotionSample: Equatable, Sendable {
     let isWalking: Bool
     let isUnknown: Bool
     let isLowConfidence: Bool
+    /// The coprocessor's own "not going anywhere". Unlike GPS, this cannot be
+    /// fooled by a signal bouncing off a building, which is what `MotionGate`
+    /// uses it for. Defaulted so the walk-detection call sites, which have no
+    /// interest in it, stay as they were.
+    let isStationary: Bool
     let at: Date
+
+    init(isWalking: Bool, isUnknown: Bool, isLowConfidence: Bool,
+         isStationary: Bool = false, at: Date) {
+        self.isWalking = isWalking
+        self.isUnknown = isUnknown
+        self.isLowConfidence = isLowConfidence
+        self.isStationary = isStationary
+        self.at = at
+    }
 }
 
 /// A seam over `CMMotionActivityManager`, mirroring `LocationProviding`.

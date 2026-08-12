@@ -56,6 +56,7 @@ final class SystemMotionActivityProvider: MotionActivityProviding {
         return MotionSample(isWalking: activity.walking,
                             isUnknown: activity.unknown || !classified,
                             isLowConfidence: activity.confidence == .low,
+                            isStationary: activity.stationary,
                             at: activity.startDate)
     }
 }

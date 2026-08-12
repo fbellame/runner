@@ -494,10 +494,22 @@ final class AppModel {
         let checkpoints = CheckpointStore()
         let model = AppModel(store: store,
                              health: HealthStore(),
-                             recorder: WorkoutRecorder(provider: SystemLocationProvider(),
-                                                       checkpoints: checkpoints,
-                                                       announcer: RunAnnouncer(),
-                                                       liveActivity: LiveActivityController()),
+                             recorder: WorkoutRecorder(
+                                 provider: SystemLocationProvider(),
+                                 checkpoints: checkpoints,
+                                 announcer: RunAnnouncer(),
+                                 liveActivity: LiveActivityController(),
+                                 // Its own provider instance, not the auto-walk
+                                 // one: `startActivityUpdates` replaces the
+                                 // handler rather than adding one, so sharing
+                                 // would silently unsubscribe whichever wired up
+                                 // first.
+                                 motion: SystemMotionActivityProvider(),
+                                 makeTrace: { startedAt, activity in
+                                     SessionTrace(startedAt: startedAt,
+                                                  activity: String(describing: activity))
+                                 }
+                             ),
                              checkpoints: checkpoints)
         model.storeFailureMessage = storeFailure
         model.enableAutoWalk(motion: SystemMotionActivityProvider())

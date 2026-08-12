@@ -94,6 +94,14 @@ final class WorkoutRecorder: LocationProvidingDelegate {
     /// keep describing the present in exactly the states where no sample is
     /// ever accepted — while armed, and for the whole length of a pause.
     private var speedEstimator = SpeedEstimator()
+    /// Optional throughout: motion authorization is refusable, and the whole
+    /// veto is an enhancement over a GPS-only decision, never a prerequisite.
+    private let motion: MotionActivityProviding?
+    private var motionGate = MotionGate()
+    /// Injected rather than constructed so tests neither write files nor
+    /// depend on a Documents directory existing.
+    private let makeTrace: (Date, ActivityType) -> SessionTrace?
+    private var trace: SessionTrace?
     private var autoPause: AutoPauseDetector?
     private var lastCheckpointAt: Date?
     private var lastSplitMovingSeconds: Double = 0
@@ -129,7 +137,9 @@ final class WorkoutRecorder: LocationProvidingDelegate {
          armedTimeout: Duration = .seconds(600),
          clock: @escaping () -> Date = { Date() },
          announcer: any Announcing = SilentAnnouncer(),
-         liveActivity: any LiveActivityPresenting = SilentLiveActivityPresenter()) {
+         liveActivity: any LiveActivityPresenting = SilentLiveActivityPresenter(),
+         motion: MotionActivityProviding? = nil,
+         makeTrace: @escaping (Date, ActivityType) -> SessionTrace? = { _, _ in nil }) {
         self.provider = provider
         self.checkpoints = checkpoints
         self.checkpointInterval = checkpointInterval
@@ -137,6 +147,8 @@ final class WorkoutRecorder: LocationProvidingDelegate {
         self.clock = clock
         self.announcer = announcer
         self.liveActivity = liveActivity
+        self.motion = motion
+        self.makeTrace = makeTrace
         provider.delegate = self
     }
 
@@ -230,6 +242,17 @@ final class WorkoutRecorder: LocationProvidingDelegate {
         lastMovingAt = checkpoint?.route.last?.t
         lastKeptLocation = nil
         speedEstimator.reset()
+        // A classification from before this session says nothing about it.
+        motionGate.clear()
+        if let motion, motion.isAvailable, motion.isAuthorized {
+            motion.startUpdates { [weak self] sample in
+                self?.motionGate.observe(sample)
+            }
+        }
+        trace?.close()
+        // Auto-detected walks are silent and frequent; tracing them would evict
+        // the runs he actually wants to look at from the retention window.
+        trace = autoStarted ? nil : makeTrace(startedAt ?? now, activity)
         lastCheckpointAt = nil
         autoPause = AutoPauseDetector(activity: activity, startPaused: self.isArmed)
         timeAnchor = clock()
@@ -519,6 +542,12 @@ final class WorkoutRecorder: LocationProvidingDelegate {
         splitSeconds = []
         lastKeptLocation = nil
         speedEstimator.reset()
+        // The subscription and the trace both belong to the session, not to the
+        // recorder: neither may survive into the next one.
+        motion?.stopUpdates()
+        motionGate.clear()
+        trace?.close()
+        trace = nil
         lastCheckpointAt = nil
         autoPause = nil
         lastSplitMovingSeconds = 0
@@ -581,11 +610,19 @@ final class WorkoutRecorder: LocationProvidingDelegate {
             && location.horizontalAccuracy <= LocationFilter.maxHorizontalAccuracy
         let speed = accuracyUsable ? speedEstimator.estimate(from: location) : nil
 
+        // 2b. The coprocessor's veto. GPS cannot tell genuine travel from a
+        //     signal bouncing off a building; steps can. See `MotionGate` for
+        //     why this may only ever block a start, never force a pause.
+        let motionVetoesStart = motionGate.vetoesStart(at: location.timestamp)
+        let vetoed = state == .autoPaused && motionVetoesStart
+        var event = vetoed ? "motion-veto" : ""
+
         // 3. Feed the detector on EVERY sample it can judge, so standing still
         //    triggers a pause. A `nil` estimate means "no evidence yet", which
-        //    must not be read as stillness — it leaves the accumulators alone.
+        //    must not be read as stillness — it leaves the accumulators alone,
+        //    and so does a veto.
         //    A resume starts a fresh timer segment: the paused interval is never credited.
-        if let speed, var detector = autoPause {
+        if let speed, var detector = autoPause, !vetoed {
             let wasAutoPaused = state == .autoPaused
             let paused = detector.update(speed: speed, at: location.timestamp)
             autoPause = detector
@@ -601,14 +638,20 @@ final class WorkoutRecorder: LocationProvidingDelegate {
                 if !autoStarted, !wasArmed || announcesArmedStartOnMovement {
                     announcer.announce(wasArmed ? .runStarted : .resumed)
                 }
-            } else if !wasAutoPaused && paused && !autoStarted {
-                announcer.announce(.paused)
+                event = wasArmed ? "started" : "resumed"
+            } else if !wasAutoPaused && paused {
+                if !autoStarted { announcer.announce(.paused) }
+                event = "paused"
             }
             state = paused ? .autoPaused : .recording
             if presentsLiveActivity {
                 liveActivity.update(liveSnapshot())
             }
         }
+
+        trace?.record(location: location, usedSpeed: speed,
+                      state: String(describing: state), armed: isArmed,
+                      motion: motionVetoesStart ? "stationary" : "", event: event)
 
         // 4. Accept or reject the sample.
         let decision = LocationFilter.evaluate(candidate: location,
