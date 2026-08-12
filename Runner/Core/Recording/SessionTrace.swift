@@ -80,11 +80,12 @@ final class SessionTrace {
 
     private static func prune(in directory: URL) {
         guard let files = try? FileManager.default.contentsOfDirectory(
-            at: directory, includingPropertiesForKeys: [.creationDateKey]
+            at: directory, includingPropertiesForKeys: nil
         ) else { return }
-        let sorted = files.filter { $0.pathExtension == "csv" }.sorted {
-            ($0.lastPathComponent) > ($1.lastPathComponent)
-        }
+        // Names are ISO timestamps, so lexicographic order IS chronological
+        // order — no need to stat every file for a creation date.
+        let sorted = files.filter { $0.pathExtension == "csv" }
+            .sorted { $0.lastPathComponent > $1.lastPathComponent }
         for old in sorted.dropFirst(keepNewest) {
             try? FileManager.default.removeItem(at: old)
         }

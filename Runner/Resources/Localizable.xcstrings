@@ -1501,16 +1501,6 @@
         }
       }
     },
-    "Milestones": {
-      "localizations": {
-        "fr": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Jalons"
-          }
-        }
-      }
-    },
     "Month": {
       "localizations": {
         "fr": {
@@ -1687,16 +1677,6 @@
           "stringUnit": {
             "state": "translated",
             "value": "Allure (plus bas = plus rapide)"
-          }
-        }
-      }
-    },
-    "Pace by week (lower = faster)": {
-      "localizations": {
-        "fr": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Allure par semaine (plus bas = plus rapide)"
           }
         }
       }
