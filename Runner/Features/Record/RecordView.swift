@@ -72,7 +72,7 @@ struct RecordView: View {
                                isSaving: isSaving,
                                onSave: { Task { await save(workout) } },
                                onDiscard: {
-                                   model.checkpoints.clear()
+                                   recorder.discard()
                                    finished = nil
                                    dismiss()
                                })
@@ -144,7 +144,7 @@ struct RecordView: View {
             }
 
             Button {
-                recorder.start(activity: selectedActivity)
+                recorder.start(activity: selectedActivity, armed: true)
             } label: {
                 Text(String(localized: "GO"))
                     .font(.system(size: 24, weight: .black, design: .rounded))
@@ -173,7 +173,14 @@ struct RecordView: View {
             if recorder.reducedAccuracy {
                 reducedAccuracyBanner
             }
-            if recorder.state == .autoPaused {
+            if recorder.isArmed {
+                Label(String(localized: "Ready — start moving"), systemImage: "figure.run")
+                    .font(.system(size: 13, weight: .bold))
+                    .foregroundStyle(Color.rLime)
+                    .padding(.horizontal, 12)
+                    .padding(.vertical, 6)
+                    .background(Capsule().fill(Color.rLime.opacity(0.15)))
+            } else if recorder.state == .autoPaused {
                 Label(String(localized: "Auto-paused"), systemImage: "pause.circle.fill")
                     .font(.system(size: 13, weight: .bold))
                     .foregroundStyle(Color.rOrange)
@@ -202,15 +209,16 @@ struct RecordView: View {
                 } label: {
                     Image(systemName: recorder.state == .manuallyPaused ? "play.fill" : "pause.fill")
                         .font(.system(size: 20, weight: .bold))
-                        .foregroundStyle(.white)
+                        .foregroundStyle(recorder.isArmed ? Color.rTextSecondary : .white)
                         .frame(width: 56, height: 56)
                         .background(Circle().fill(Color.rSurface))
                         .overlay(Circle().stroke(Color.rBorder, lineWidth: 1))
                 }
                 .buttonStyle(.plain)
+                .disabled(recorder.isArmed)
 
                 SlideToFinish {
-                    finished = recorder.finish()
+                    finished = recorder.finish(endingAt: recorder.lastMovingAt)
                 }
             }
         }
@@ -233,7 +241,10 @@ struct RecordView: View {
             }
             .font(.system(size: 15, weight: .bold))
             .foregroundStyle(Color.rLime)
-            Button(String(localized: "Cancel")) { dismiss() }
+            Button(String(localized: "Cancel")) {
+                recorder.cancelAfterAuthorizationDenial()
+                dismiss()
+            }
                 .font(.system(size: 14))
                 .foregroundStyle(Color.rTextSecondary)
         }
@@ -270,10 +281,30 @@ struct RecordView: View {
         isSaving = true
         defer { isSaving = false }
         // One shared save path (local-first, then HealthKit) lives on the coordinator.
-        let failure = await model.sync.saveRecorded(workout)
+        let outcome = await model.sync.saveRecorded(workout)
+        // CRITICAL 5: the same "local write failed but we said it saved" bug the
+        // Lock-Screen path had. Until the durable copy exists, keep the recovery
+        // checkpoint, say nothing out loud, keep the summary sheet open with its
+        // Save button live, and show why.
+        guard outcome.isLocallyDurable else {
+            saveFailedMessage = outcome.durableFailure
+            return
+        }
         model.checkpoints.clear()
+        // IN-APP save path only. Confirms out loud that the run was actually
+        // captured — otherwise the last thing a hands-free user hears is
+        // whatever the recorder announced before finishing, which may be the
+        // opposite of what just happened (e.g. "Resumed"). `completeSave()`
+        // (Task 8) also ends the Live Activity here, using the final stats
+        // `finish()` captured; it speaks through the existing `announceSaved()`
+        // rather than announcing a second time, so this line does not say
+        // "Run saved. Run saved." Task 12's Lock-Screen intent save is a
+        // separate call site that needs its own cue, but exactly once.
+        model.recorder.completeSave()
         finished = nil
-        if let failure {
+        // A HealthKit-only failure still counts as saved: the local store is the
+        // durable copy and `retryPendingSaves` pushes it later.
+        if let failure = outcome.healthKitFailure {
             saveFailedMessage = failure
         } else {
             dismiss()

@@ -1,10 +1,18 @@
 import SwiftUI
 import SwiftData
+import AppIntents
 
 @main
 struct RunnerApp: App {
-    @State private var model = AppModel.live()
+    @State private var model: AppModel
     @Environment(\.scenePhase) private var scenePhase
+
+    init() {
+        let model = AppModel.live()
+        _model = State(initialValue: model)
+        AppDependencyManager.shared.add(dependency: model)
+        RunnerAppShortcuts.updateAppShortcutParameters()
+    }
 
     var body: some Scene {
         WindowGroup {

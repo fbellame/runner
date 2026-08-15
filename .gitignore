@@ -24,8 +24,9 @@ xcuserdata/
 
 # macOS
 .DS_Store
-Runner.xcodeproj/
 
 # XcodeGen-generated project (regenerate with `xcodegen generate`)
 Runner.xcodeproj/
+
+# Python
 __pycache__/

@@ -41,16 +41,6 @@
         }
       }
     },
-    "Active time": {
-      "localizations": {
-        "fr": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Temps actif"
-          }
-        }
-      }
-    },
     "Badges unlocked": {
       "localizations": {
         "fr": {
@@ -71,32 +61,12 @@
         }
       }
     },
-    "Best streak": {
-      "localizations": {
-        "fr": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Meilleure série"
-          }
-        }
-      }
-    },
     "Close": {
       "localizations": {
         "fr": {
           "stringUnit": {
             "state": "translated",
             "value": "Fermer"
-          }
-        }
-      }
-    },
-    "Consistency": {
-      "localizations": {
-        "fr": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Régularité"
           }
         }
       }
@@ -117,26 +87,6 @@
           "stringUnit": {
             "state": "translated",
             "value": "Ignorer"
-          }
-        }
-      }
-    },
-    "Fastest 1 km": {
-      "localizations": {
-        "fr": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "1 km le plus rapide"
-          }
-        }
-      }
-    },
-    "Fastest 5 km": {
-      "localizations": {
-        "fr": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "5 km les plus rapides"
           }
         }
       }
@@ -451,6 +401,16 @@
         }
       }
     },
+    "%lld kilometers": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%lld kilomètres"
+          }
+        }
+      }
+    },
     "%lld %@ to %lld lifetime %@": {
       "localizations": {
         "fr": {
@@ -551,6 +511,16 @@
         }
       }
     },
+    "1 kilometer": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "1 kilomètre"
+          }
+        }
+      }
+    },
     "1 pt per %lld steps (max %lld/day)": {
       "localizations": {
         "fr": {
@@ -641,12 +611,42 @@
         }
       }
     },
+    "Arm a run without unlocking Runner.": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Armez une course sans déverrouiller Runner."
+          }
+        }
+      }
+    },
     "Auto-paused": {
       "localizations": {
         "fr": {
           "stringUnit": {
             "state": "translated",
             "value": "Pause auto"
+          }
+        }
+      }
+    },
+    "Average %lld minutes %lld per kilometer": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Moyenne : %lld minutes %lld par kilomètre"
+          }
+        }
+      }
+    },
+    "Average %lld minutes per kilometer": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Moyenne : %lld minutes par kilomètre"
           }
         }
       }
@@ -1026,7 +1026,7 @@
         "fr": {
           "stringUnit": {
             "state": "translated",
-            "value": "Kilomètre le plus rapide"
+            "value": "1 km le plus rapide"
           }
         }
       }
@@ -1047,6 +1047,26 @@
           "stringUnit": {
             "state": "translated",
             "value": "Km le plus rapide"
+          }
+        }
+      }
+    },
+    "Finish": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Terminer"
+          }
+        }
+      }
+    },
+    "Finish run": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Terminer la course"
           }
         }
       }
@@ -1311,6 +1331,26 @@
         }
       }
     },
+    "Last kilometer %lld minutes %lld": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Dernier kilomètre : %lld minutes %lld"
+          }
+        }
+      }
+    },
+    "Last kilometer %lld minutes": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Dernier kilomètre : %lld minutes"
+          }
+        }
+      }
+    },
     "Last 52 weeks": {
       "localizations": {
         "fr": {
@@ -1391,6 +1431,16 @@
         }
       }
     },
+    "Location access is required": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "L’accès à la localisation est requis"
+          }
+        }
+      }
+    },
     "Longest": {
       "localizations": {
         "fr": {
@@ -1447,16 +1497,6 @@
           "stringUnit": {
             "state": "translated",
             "value": "Homme"
-          }
-        }
-      }
-    },
-    "Milestones": {
-      "localizations": {
-        "fr": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Jalons"
           }
         }
       }
@@ -1611,22 +1651,32 @@
         }
       }
     },
+    "Pace %lld minutes %lld per kilometer": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Rythme : %lld minutes %lld par kilomètre"
+          }
+        }
+      }
+    },
+    "Pace %lld minutes per kilometer": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Rythme : %lld minutes par kilomètre"
+          }
+        }
+      }
+    },
     "Pace (lower = faster)": {
       "localizations": {
         "fr": {
           "stringUnit": {
             "state": "translated",
             "value": "Allure (plus bas = plus rapide)"
-          }
-        }
-      }
-    },
-    "Pace by week (lower = faster)": {
-      "localizations": {
-        "fr": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Allure par semaine (plus bas = plus rapide)"
           }
         }
       }
@@ -1671,6 +1721,36 @@
         }
       }
     },
+    "Pause": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Pause"
+          }
+        }
+      }
+    },
+    "Pause or resume run": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Mettre la course en pause ou la reprendre"
+          }
+        }
+      }
+    },
+    "Paused": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "En pause"
+          }
+        }
+      }
+    },
     "Permissions": {
       "localizations": {
         "fr": {
@@ -1697,6 +1777,16 @@
           "stringUnit": {
             "state": "translated",
             "value": "Split positif"
+          }
+        }
+      }
+    },
+    "Precise Location is off": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "La localisation précise est désactivée"
           }
         }
       }
@@ -1771,6 +1861,16 @@
         }
       }
     },
+    "Ready — start moving": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Prêt — commencez à bouger"
+          }
+        }
+      }
+    },
     "Recent sessions": {
       "localizations": {
         "fr": {
@@ -1831,6 +1931,16 @@
         }
       }
     },
+    "Resumed": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Reprise"
+          }
+        }
+      }
+    },
     "Review your profile": {
       "localizations": {
         "fr": {
@@ -1877,6 +1987,56 @@
           "stringUnit": {
             "state": "translated",
             "value": "Course"
+          }
+        }
+      }
+    },
+    "Run cancelled": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Course annulée"
+          }
+        }
+      }
+    },
+    "Run finished": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Course terminée"
+          }
+        }
+      }
+    },
+    "Run in progress": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Course en cours"
+          }
+        }
+      }
+    },
+    "Run saved": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Course enregistrée"
+          }
+        }
+      }
+    },
+    "Run started": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Course démarrée"
           }
         }
       }
@@ -2067,6 +2227,16 @@
           "stringUnit": {
             "state": "translated",
             "value": "Intermédiaires"
+          }
+        }
+      }
+    },
+    "Start Run": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Démarrer la course"
           }
         }
       }
@@ -2517,6 +2687,226 @@
           "stringUnit": {
             "state": "translated",
             "value": "vs 4 semaines précédentes"
+          }
+        }
+      }
+    },
+    "%@ kilometers": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@ kilomètres"
+          }
+        }
+      }
+    },
+    "%lld minutes": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%lld minutes"
+          }
+        }
+      }
+    },
+    "%lld minutes %lld seconds": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%lld minutes %lld secondes"
+          }
+        }
+      }
+    },
+    "%lld seconds": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%lld secondes"
+          }
+        }
+      }
+    },
+    "1 minute": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "1 minute"
+          }
+        }
+      }
+    },
+    "1 second": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "1 seconde"
+          }
+        }
+      }
+    },
+    "A run is already in progress": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Une course est déjà en cours"
+          }
+        }
+      }
+    },
+    "Check Run Status": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Vérifier l'état de la course"
+          }
+        }
+      }
+    },
+    "Finish Run": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Terminer la course"
+          }
+        }
+      }
+    },
+    "No run in progress": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Aucune course en cours"
+          }
+        }
+      }
+    },
+    "Pace unavailable": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Rythme indisponible"
+          }
+        }
+      }
+    },
+    "Pause Run": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Mettre la course en pause"
+          }
+        }
+      }
+    },
+    "Resume Run": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Reprendre la course"
+          }
+        }
+      }
+    },
+    "Run could not be saved": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "La course n'a pas pu être enregistrée"
+          }
+        }
+      }
+    },
+    "Run has not started yet": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "La course n'a pas encore démarrée"
+          }
+        }
+      }
+    },
+    "Run is already in progress": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "La course est déjà en cours"
+          }
+        }
+      }
+    },
+    "Run is already paused": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "La course est déjà en pause"
+          }
+        }
+      }
+    },
+    "Run paused": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Course en pause"
+          }
+        }
+      }
+    },
+    "Run ready": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Course prête"
+          }
+        }
+      }
+    },
+    "Run resumed": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Course reprise"
+          }
+        }
+      }
+    },
+    "Run Status": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "État de la course"
+          }
+        }
+      }
+    },
+    "Run will resume when you start moving": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "La course reprendra quand vous recommencerez à bouger"
           }
         }
       }

@@ -79,7 +79,7 @@ struct WorkoutRecorderTests {
         rec.start(activity: .run)
         rec.didUpdate(locations: [loc(x: 0, t: 0)])
         rec.didUpdate(locations: [loc(x: 10, t: 4)])
-        // standing still until auto-pause engages (pauseAfter = 10 s for runs)
+        // standing still until auto-pause engages (pauseAfter = 6 s for runs)
         for i in 1...6 {
             rec.didUpdate(locations: [loc(x: 10.5, t: 4 + Double(i) * 2, speed: 0.0)])
         }
@@ -89,14 +89,13 @@ struct WorkoutRecorderTests {
         for i in 1...10 {
             rec.didUpdate(locations: [loc(x: 10.5, t: 16 + Double(i) * 10, speed: 0.0)])
         }
-        // movement resumes (resumeAfter = 3 s)
+        // A plausible running sample resumes immediately without crediting the
+        // paused interval.
         rec.didUpdate(locations: [loc(x: 20, t: 120)])
-        rec.didUpdate(locations: [loc(x: 26, t: 122)])
-        rec.didUpdate(locations: [loc(x: 30, t: 123)])
         #expect(rec.state == .recording)
-        // the paused interval credits nothing — no phantom 10 s from the stale fix
+        // The paused interval credits nothing.
         #expect(abs(rec.movingSeconds - atPause) < 0.01)
-        rec.didUpdate(locations: [loc(x: 40, t: 127)])
+        rec.didUpdate(locations: [loc(x: 40, t: 124)])
         #expect(abs(rec.movingSeconds - (atPause + 4)) < 0.01)
     }
 
@@ -134,7 +133,7 @@ struct WorkoutRecorderTests {
         }
         #expect(rec.state == .autoPaused)
         let frozen = rec.distanceMeters
-        // moving again: ≥3 s above threshold resumes; the first post-resume sample
+        // moving again: a plausible running sample resumes immediately; the first post-resume sample
         // arrives >15 s after the last kept one, so it is a gap point (no distance) —
         // distance grows again from the sample after it.
         rec.didUpdate(locations: [loc(x: 20, t: 20)])
@@ -156,6 +155,22 @@ struct WorkoutRecorderTests {
         #expect(rec.state == .recording)
     }
 
+    /// Regression: `pauseManually()` persists `isPaused = true` immediately, but
+    /// `resumeManually()` used to update only in-memory state — the checkpoint on
+    /// disk stayed paused until the next periodic write (up to 30 s later). A
+    /// crash inside that window rehydrated an actively-resumed run as paused.
+    /// Reload the checkpoint straight off disk, without feeding another location
+    /// sample, so a periodic checkpoint from `didUpdate` cannot mask the bug.
+    @Test func manualResumeImmediatelyPersistsUnpausedCheckpoint() {
+        let (rec, _, cp) = makeRecorder()
+        rec.start(activity: .run)
+        rec.didUpdate(locations: [loc(x: 0, t: 0)])
+        rec.pauseManually()
+        rec.resumeManually()
+        let saved = cp.load()
+        #expect(saved?.isPaused == false)
+    }
+
     @Test func recordsKmSplits() {
         let (rec, _, _) = makeRecorder()
         rec.start(activity: .run)
@@ -171,15 +186,15 @@ struct WorkoutRecorderTests {
     @Test func checkpointsPeriodicallyAndFinishKeepsCheckpoint() throws {
         let (rec, provider, cp) = makeRecorder(interval: 5)
         rec.start(activity: .walk)
-        for i in 0...3 { rec.didUpdate(locations: [loc(x: Double(i) * 10, t: Double(i) * 2)]) }
-        #expect(cp.load() != nil)                     // ≥5 s elapsed → checkpointed
+        for i in 0...3 {
+            rec.didUpdate(locations: [loc(x: Double(i) * 10, t: Double(i) * 2)])
+        }
+        #expect(cp.load() != nil)
         let saved = try #require(cp.load())
         #expect(saved.activity == .walk)
         #expect(saved.distanceMeters > 0)
-        let done = rec.finish()
+        let done = try #require(rec.finish())
         #expect(provider.stopped)
-        // The checkpoint survives finish(): the workout is only in memory until the
-        // user saves or discards the summary, so a kill here must stay recoverable.
         let final = try #require(cp.load())
         #expect(abs(final.distanceMeters - done.distanceMeters) < 0.01)
         #expect(rec.state == .idle)
@@ -187,6 +202,22 @@ struct WorkoutRecorderTests {
         #expect(done.type == .walk)
         cp.clear()
         #expect(cp.load() == nil)
+    }
+
+    /// Regression: `end` can be a GPS-derived timestamp (e.g. lastMovingAt)
+    /// delivered out of order relative to a rebased `startedAt`, since
+    /// SystemLocationProvider hops every delegate callback through an
+    /// unstructured Task with no FIFO guarantee. An unclamped `end < start`
+    /// would reach HKQuantitySample(start:end:), which raises an uncatchable
+    /// ObjC exception — a permanent launch crash loop via retryPendingSaves.
+    @Test func finishClampsEndBeforeStartToStart() {
+        let (rec, _, _) = makeRecorder()
+        rec.start(activity: .run)
+        let startedAt = rec.startedAt!
+        let earlierEnd = startedAt.addingTimeInterval(-100)
+        let workout = rec.finish(endingAt: earlierEnd)
+        #expect(workout?.start == startedAt)
+        #expect(workout?.end == startedAt)
     }
 
     @Test func resumeFromCheckpointRestoresProgress() {
@@ -199,6 +230,35 @@ struct WorkoutRecorderTests {
         #expect(rec.distanceMeters == 800)
         #expect(rec.movingSeconds == 120)
         #expect(rec.route.count == 1)
+        #expect(rec.state == .recording)
+    }
+
+    /// CRITICAL 2 regression: a checkpoint written while manually paused must
+    /// rehydrate back into `.manuallyPaused`. Before the fix, `start(resumeFrom:)`
+    /// always restored `.recording` regardless of the checkpoint's own state, so
+    /// a run that was paused when the process died came back as if actively
+    /// recording — the surviving Live Activity's "Resume" button then did the
+    /// opposite of what it said on the first tap.
+    @Test func resumeFromCheckpointRestoresPausedState() {
+        let (rec, _, _) = makeRecorder()
+        let checkpoint = SessionCheckpoint(activity: .run, startedAt: base,
+                                           movingSeconds: 120, distanceMeters: 800,
+                                           route: [RoutePoint(lat: 45.5, lon: -73.6, t: base, afterGap: false)],
+                                           splitSeconds: [], savedAt: base, isPaused: true)
+        rec.start(activity: .run, resumeFrom: checkpoint)
+        #expect(rec.state == .manuallyPaused)
+    }
+
+    /// Counterpart: a checkpoint written while actively recording (the common
+    /// case, and every checkpoint from before this fix) must still resume as
+    /// `.recording` — this fix must not flip the default.
+    @Test func resumeFromCheckpointWithoutPauseFlagStillRestoresRecording() {
+        let (rec, _, _) = makeRecorder()
+        let checkpoint = SessionCheckpoint(activity: .run, startedAt: base,
+                                           movingSeconds: 120, distanceMeters: 800,
+                                           route: [RoutePoint(lat: 45.5, lon: -73.6, t: base, afterGap: false)],
+                                           splitSeconds: [], savedAt: base)
+        rec.start(activity: .run, resumeFrom: checkpoint)
         #expect(rec.state == .recording)
     }
 

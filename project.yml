@@ -14,6 +14,9 @@ targets:
     platform: iOS
     sources:
       - Runner
+    dependencies:
+      - target: RunnerWidgets
+        embed: true
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.farid.runner
@@ -28,8 +31,8 @@ targets:
       path: Runner/Info.plist
       properties:
         CFBundleDisplayName: Runner
-        CFBundleShortVersionString: "1.8"
-        CFBundleVersion: "10"
+        CFBundleShortVersionString: "1.10"
+        CFBundleVersion: "21"
         CFBundleLocalizations: [en, fr]
         CFBundleDevelopmentRegion: en
         UILaunchScreen:
@@ -41,8 +44,43 @@ targets:
         NSLocationTemporaryUsageDescriptionDictionary:
           PreciseWorkout: "Precise location is needed to measure your distance and draw your route while recording a workout."
         NSMotionUsageDescription: "Runner uses motion activity to notice when you have been walking for a while, so it can record the walk for you."
-        UIBackgroundModes: [location]
+        NSSupportsLiveActivities: true
+        # Exposes Documents/Diagnostics (the auto-pause traces) in the Files app
+        # and in Finder, so a field test can be pulled off the phone without a
+        # cable, an export screen, or a rebuild.
+        UIFileSharingEnabled: true
+        LSSupportsOpeningDocumentsInPlace: true
+        UIBackgroundModes: [location, audio]
+        INAlternativeAppNames:
+          - INAlternativeAppName: Course
+          - INAlternativeAppName: Run
         ITSAppUsesNonExemptEncryption: false
+  RunnerWidgets:
+    type: app-extension
+    platform: iOS
+    sources:
+      - path: RunnerWidgets
+      - path: Runner/Core/Recording/RunAttributes.swift
+      - path: Runner/Core/Recording/RunActivityAttributes.swift
+      - path: Runner/Resources/Localizable.xcstrings
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.farid.runner.widgets
+        PRODUCT_NAME: RunnerWidgets
+        CODE_SIGN_STYLE: Automatic
+        TARGETED_DEVICE_FAMILY: "1"
+        APPLICATION_EXTENSION_API_ONLY: YES
+        SKIP_INSTALL: YES
+        SWIFT_STRICT_CONCURRENCY: complete
+    info:
+      path: RunnerWidgets/Info.plist
+      properties:
+        CFBundleDisplayName: Runner
+        CFBundleShortVersionString: "1.10"
+        CFBundleVersion: "21"
+        NSExtension:
+          NSExtensionPointIdentifier: com.apple.widgetkit-extension
+        NSSupportsLiveActivities: true
   RunnerTests:
     type: bundle.unit-test
     platform: iOS

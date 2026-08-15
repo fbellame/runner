@@ -4,13 +4,16 @@ import Foundation
 
 @MainActor
 struct AppModelTests {
-    private func makeModel() throws -> (AppModel, FakeHealthStore, CheckpointStore) {
+    private func makeModel(
+        liveActivity: any LiveActivityPresenting = SilentLiveActivityPresenter()
+    ) throws -> (AppModel, FakeHealthStore, CheckpointStore) {
         let health = FakeHealthStore()
         let store = try DataStore(inMemory: true)
         let dir = FileManager.default.temporaryDirectory
             .appendingPathComponent("appmodel-\(UUID().uuidString)")
         let checkpoints = CheckpointStore(directory: dir)
-        let recorder = WorkoutRecorder(provider: FakeLocationProvider(), checkpoints: checkpoints)
+        let recorder = WorkoutRecorder(provider: FakeLocationProvider(), checkpoints: checkpoints,
+                                       liveActivity: liveActivity)
         return (AppModel(store: store, health: health, recorder: recorder, checkpoints: checkpoints),
                 health, checkpoints)
     }
@@ -38,6 +41,21 @@ struct AppModelTests {
         #expect(model.storeFailureMessage == "disk full")
     }
 
+    /// Regression for the whole Phase 2 spoken-cues feature being silently wired
+    /// off: `WorkoutRecorder.init`'s `announcer:` parameter defaults to
+    /// `SilentAnnouncer()`, and `AppModel.live()` is the ONLY production
+    /// construction site. If that call site ever drops (or loses) its explicit
+    /// `announcer: RunAnnouncer()` argument, every cue Phase 2 computes goes
+    /// nowhere and the user hears nothing. This exercises the real production
+    /// path — not a fake — so it fails exactly when that wiring regresses.
+    /// `AppModel.live()` only constructs its HealthKit/SwiftData/CoreLocation
+    /// dependencies here; it never requests authorization or starts updates,
+    /// so this is safe to run in a unit test.
+    @Test func liveRecorderUsesARealAnnouncerNotSilence() {
+        let model = AppModel.live()
+        #expect(!(model.recorder.announcer is SilentAnnouncer))
+    }
+
     @Test func launchDetectsCheckpoint() async throws {
         let (model, _, checkpoints) = try makeModel()
         try checkpoints.save(SessionCheckpoint(activity: .run,
@@ -52,6 +70,33 @@ struct AppModelTests {
 
         #expect(model.pendingResume != nil)
         #expect(model.pendingResume?.activity == .run)
+    }
+
+    /// CRITICAL 1 regression: the checkpoint (and any pending celebration) must
+    /// be read synchronously, BEFORE `onLaunch()`'s first `await`. Every instant
+    /// where `pendingResume` is still nil is an instant where `canAutoStart`
+    /// reads true, so a cold `StartRunIntent` can arm a brand-new session that
+    /// then overwrites the unrecovered workout's checkpoint.
+    @Test func launchLoadsCheckpointBeforeItsFirstAwait() async throws {
+        let (model, health, checkpoints) = try makeModel()
+        try checkpoints.save(SessionCheckpoint(activity: .run,
+                                               startedAt: Date().addingTimeInterval(-600),
+                                               movingSeconds: 600,
+                                               distanceMeters: 2_000,
+                                               route: [],
+                                               splitSeconds: [300, 300],
+                                               savedAt: .now))
+        var canAutoStartDuringLaunch: Bool?
+        var pendingResumeDuringLaunch: Bool?
+        health.shouldRequestAuthorizationHook = {
+            canAutoStartDuringLaunch = model.canAutoStart
+            pendingResumeDuringLaunch = model.pendingResume != nil
+        }
+
+        await model.onLaunch()
+
+        #expect(pendingResumeDuringLaunch == true)
+        #expect(canAutoStartDuringLaunch == false)
     }
 
     @Test func saveAsIsPersistsCheckpointedWorkoutWithoutResuming() async throws {
@@ -76,6 +121,51 @@ struct AppModelTests {
         #expect(health.savedWorkouts.count == 1)
         #expect(model.pendingResume == nil)          // prompt dismissed
         #expect(checkpoints.load() == nil)           // nothing left to resume
+    }
+
+    /// CRITICAL 3 regression: orphan reconciliation lives only inside
+    /// `LiveActivityController.begin()`, which "Save as-is" never calls — it
+    /// builds the workout straight from the checkpoint, never resuming the
+    /// in-memory session. Without an explicit teardown, a Live Activity that
+    /// survived a pre-crash process would stay on the lock screen forever,
+    /// showing stale numbers for a run that is now saved.
+    @Test func saveAsIsEndsAnyStrandedLiveActivity() async throws {
+        let live = LiveActivityWiringTests.LiveActivitySpy()
+        let (model, _, checkpoints) = try makeModel(liveActivity: live)
+        let start = Date().addingTimeInterval(-1_800)
+        let checkpoint = SessionCheckpoint(activity: .run, startedAt: start,
+                                           movingSeconds: 900, distanceMeters: 3_000,
+                                           route: [], splitSeconds: [300, 300, 300],
+                                           savedAt: start.addingTimeInterval(900))
+        try checkpoints.save(checkpoint)
+        await model.onLaunch()
+        #expect(model.pendingResume != nil)
+
+        await model.saveCheckpointedWorkout()
+
+        #expect(live.endAllSurvivingActivitiesCallCount == 1)
+    }
+
+    /// CRITICAL 3 regression, Discard side: same reasoning as
+    /// `saveAsIsEndsAnyStrandedLiveActivity` above — Discard never resumes
+    /// the session either, so it must end any stranded activity itself.
+    @Test func discardPendingResumeEndsAnyStrandedLiveActivityAndClearsCheckpoint() async throws {
+        let live = LiveActivityWiringTests.LiveActivitySpy()
+        let (model, _, checkpoints) = try makeModel(liveActivity: live)
+        let start = Date().addingTimeInterval(-1_800)
+        let checkpoint = SessionCheckpoint(activity: .run, startedAt: start,
+                                           movingSeconds: 900, distanceMeters: 3_000,
+                                           route: [], splitSeconds: [300, 300, 300],
+                                           savedAt: start.addingTimeInterval(900))
+        try checkpoints.save(checkpoint)
+        await model.onLaunch()
+        #expect(model.pendingResume != nil)
+
+        model.discardPendingResume()
+
+        #expect(live.endAllSurvivingActivitiesCallCount == 1)
+        #expect(checkpoints.load() == nil)
+        #expect(model.pendingResume == nil)
     }
 
     @Test func storedWeeklyTargetDefaultsAndClamps() {
