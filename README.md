@@ -4,6 +4,10 @@ Personal iPhone fitness app: daily points from steps plus GPS-recorded
 runs/walks/rides, glowing route maps, streaks. Dark "Electric Night" UI,
 English and French. Apple Health is the system of record.
 
+**[docs/SPEC.md](docs/SPEC.md) is the current specification** — one document,
+kept up to date. Read section 15 (Invariants) before touching `Core/Recording`.
+The per-epic designs under `docs/superpowers/` are a historical log.
+
 ## Points
 
 1 pt / 100 steps (cap 200/day). Run 15/km. Walk 10/km. Bike 6/km.
