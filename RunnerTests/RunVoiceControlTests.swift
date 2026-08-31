@@ -35,6 +35,78 @@ struct RunVoiceControlTests {
         )
     }
 
+    private func stillLoc(t: TimeInterval) -> CLLocation {
+        CLLocation(coordinate: CLLocationCoordinate2D(latitude: 45.5, longitude: -73.6),
+                   altitude: 30, horizontalAccuracy: 5, verticalAccuracy: 10,
+                   course: 90, speed: 0, timestamp: Date().addingTimeInterval(-12 + t))
+    }
+
+    /// Stands the run still until the detector stops the clock on its own.
+    private func autoPause(_ model: AppModel) {
+        for i in 0...9 { model.recorder.didUpdate(locations: [stillLoc(t: Double(i))]) }
+    }
+
+    /// `liveActivityStatus` maps BOTH paused states to `.paused`, so the Lock Screen
+    /// renders "Resume ▶" over an auto-paused run. The toggle used to read only
+    /// `.manuallyPaused` as paused, so that first press did the opposite of its
+    /// label — and left the run manually paused, which no longer resumes on
+    /// movement: press once, pocket the phone, and the run stays frozen. Four field
+    /// sessions show the resulting double-press.
+    @Test func theLockScreenToggleResumesAnAutoPausedRunOnTheFirstPress() throws {
+        let (model, _) = try makeModel()
+        model.recorder.start(activity: .run)
+        autoPause(model)
+        #expect(model.recorder.state == .autoPaused)
+
+        model.togglePauseFromIntent()
+
+        #expect(model.recorder.state == .recording)
+    }
+
+    /// And the toggle stays a toggle from there, rather than needing two presses
+    /// to do anything again.
+    @Test func theToggleStaysCoherentAfterResumingAnAutoPause() throws {
+        let (model, _) = try makeModel()
+        model.recorder.start(activity: .run)
+        autoPause(model)
+
+        model.togglePauseFromIntent()
+        #expect(model.recorder.state == .recording)
+        model.togglePauseFromIntent()
+        #expect(model.recorder.state == .manuallyPaused)
+        model.togglePauseFromIntent()
+        #expect(model.recorder.state == .recording)
+    }
+
+    /// Saying "resume" is unambiguous about what the user wants; it no longer
+    /// answers "it will resume when you start moving" and then leave it frozen.
+    @Test func siriResumesAnAutoPausedRunToo() throws {
+        let (model, _) = try makeModel()
+        model.recorder.start(activity: .run)
+        autoPause(model)
+
+        #expect(model.resumeRunFromIntent(announcing: false) == .resumed)
+        #expect(model.recorder.state == .recording)
+    }
+
+    /// An armed session sits in `.autoPaused` with nothing to resume. Without a
+    /// `!isArmed` guard on `resumeManually`, widening it to accept `.autoPaused`
+    /// would let the Lock Screen re-enter `.recording` behind the one-shot armed
+    /// rebase in `ingest`.
+    @Test func neitherIntentCanResumeAnArmedSession() throws {
+        let (model, _) = try makeModel()
+        model.recorder.start(activity: .run, armed: true)
+        #expect(model.recorder.state == .autoPaused)
+
+        model.togglePauseFromIntent()
+        #expect(model.recorder.isArmed)
+        #expect(model.recorder.state == .autoPaused)
+
+        #expect(model.resumeRunFromIntent(announcing: false) == .ready)
+        #expect(model.recorder.isArmed)
+        #expect(model.recorder.state == .autoPaused)
+    }
+
     @Test func explicitPauseAndResumeNeverToggleTheOppositeWay() throws {
         let (model, announcements) = try makeModel()
         model.recorder.start(activity: .run)

@@ -257,7 +257,11 @@ final class AppModel {
         // guards already on every other announcement site.
         guard recorder.activity == .run, !recorder.autoStarted else { return }
         guard !recorder.isArmed else { return }
-        if recorder.state == .manuallyPaused {
+        // Both paused states must resume here. `liveActivityStatus` renders them
+        // identically ("Resume ▶"), so treating only `.manuallyPaused` as paused
+        // made the button do the opposite of its label on an auto-paused run — and
+        // left it in a state that no longer resumes on movement.
+        if recorder.state == .manuallyPaused || recorder.state == .autoPaused {
             recorder.resumeManually()
         } else {
             recorder.pauseManually()
@@ -280,10 +284,11 @@ final class AppModel {
         return recorder.state == .manuallyPaused ? .paused : .alreadyPaused
     }
 
-    /// Siri's explicit Resume command. It only resumes a manual pause; saying
-    /// "resume" while recording never calls the toggle and therefore can never
-    /// pause the run. An auto-paused run keeps the detector's established
-    /// movement-driven resume behavior.
+    /// Siri's explicit Resume command. Saying "resume" while recording never calls
+    /// the toggle and therefore can never pause the run. It resumes an auto-paused
+    /// run too: "resume" is unambiguous about what the user wants, and leaving the
+    /// detector to notice movement on its own is not what they asked for — the same
+    /// reasoning that fixed `togglePauseFromIntent()`.
     @discardableResult
     func resumeRunFromIntent(announcing: Bool = true) -> ResumeRunVoiceOutcome {
         guard resolveIntentSession() != .unavailable else { return .noRun }
@@ -292,13 +297,11 @@ final class AppModel {
         guard recorder.activity == .run else { return .noRun }
         guard !recorder.isArmed else { return .ready }
         switch recorder.state {
-        case .manuallyPaused:
+        case .manuallyPaused, .autoPaused:
             recorder.resumeManually(announcing: announcing)
             return .resumed
         case .recording:
             return .alreadyRunning
-        case .autoPaused:
-            return .waitingForMovement
         case .idle:
             return .noRun
         }

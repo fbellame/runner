@@ -117,8 +117,11 @@ struct AppModelRunIntentTests {
     @Test func healthFailureStillSavesLocallyAndAnnouncesSaved() async throws {
         let (model, pending, health, announcements) = try makeModel()
         health.saveError = NSError(domain: "HealthKit", code: 1)
-        let end = Date()
         model.recorder.start(activity: .run)
+        // After start, not before: a fix timestamped ahead of its own session is the
+        // out-of-order pathology `finish()` now refuses to turn into a 0.00 km row,
+        // and this test is about HealthKit failing, not about that.
+        let end = Date().addingTimeInterval(1)
         model.recorder.didUpdate(locations: [
             CLLocation(
                 coordinate: CLLocationCoordinate2D(latitude: 45.5, longitude: -73.6),

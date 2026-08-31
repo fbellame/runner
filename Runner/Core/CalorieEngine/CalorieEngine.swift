@@ -46,8 +46,13 @@ enum CalorieEngine {
         (6.4, 6.0), (8.0, 8.3), (9.7, 9.8), (11.3, 11.0),
         (12.9, 11.8), (14.5, 12.8), (16.1, 14.5), (19.3, 19.0),
     ]
+    // The (0.0, 1.3) anchor is "standing quietly" from the same Compendium. Without
+    // it the table clamped at 2.0 km/h, so a walk session that stayed open while the
+    // user stood still billed a genuine walking rate for the whole duration: one
+    // real auto-walk covering 501 m in 188 minutes claimed 476 kcal. Interpolating
+    // down to standing makes a stalled session cost roughly what standing costs.
     private static let walkTable: [(Double, Double)] = [
-        (2.0, 2.0), (3.2, 2.8), (4.0, 3.0), (4.8, 3.5),
+        (0.0, 1.3), (2.0, 2.0), (3.2, 2.8), (4.0, 3.0), (4.8, 3.5),
         (5.6, 4.3), (6.4, 5.0), (7.2, 6.3),
     ]
     private static let bikeTable: [(Double, Double)] = [

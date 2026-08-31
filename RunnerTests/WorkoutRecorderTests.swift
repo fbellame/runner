@@ -214,10 +214,30 @@ struct WorkoutRecorderTests {
         let (rec, _, _) = makeRecorder()
         rec.start(activity: .run)
         let startedAt = rec.startedAt!
+        // A session with something in it, so the empty-session guard below is not
+        // what is under test here: the subject is that a raced `end` can never
+        // produce end < start, whatever it claims.
+        rec.didUpdate(locations: [loc(x: 0, t: 0)])
+        rec.didUpdate(locations: [loc(x: 10, t: 4)])
         let earlierEnd = startedAt.addingTimeInterval(-100)
-        let workout = rec.finish(endingAt: earlierEnd)
-        #expect(workout?.start == startedAt)
-        #expect(workout?.end == startedAt)
+        let workout = try! #require(rec.finish(endingAt: earlierEnd))
+        #expect(workout.start == startedAt)
+        #expect(workout.end >= workout.start)
+        // The last route point is a better end than a raced one that predates start.
+        #expect(workout.end == base.addingTimeInterval(4))
+    }
+
+    /// The other half of the same clamp: with nothing recorded at all there is no
+    /// honest end to fall back on, and a start == end workout is not a workout. Two
+    /// such rows reached the real store and show in History as 0.00 km runs;
+    /// HealthKit rejects them outright, so they never even synced.
+    @Test func finishDiscardsASessionWithNoSpanAndNoDistance() {
+        let (rec, provider, _) = makeRecorder()
+        rec.start(activity: .run)
+        let startedAt = rec.startedAt!
+        #expect(rec.finish(endingAt: startedAt.addingTimeInterval(-100)) == nil)
+        #expect(rec.state == .idle)
+        #expect(provider.stopped)
     }
 
     @Test func resumeFromCheckpointRestoresProgress() {

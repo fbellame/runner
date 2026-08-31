@@ -68,6 +68,16 @@ final class SessionTrace {
         write(row + "\n")
     }
 
+    /// A state change that did not come from a GPS sample. `ingest` returns early
+    /// while `.manuallyPaused`, so without this the trace just stops for the length
+    /// of a manual pause — indistinguishable, on the way back in, from a dead
+    /// signal. One real 29-minute manual pause read exactly like a lost fix.
+    func mark(event: String, state: String, at time: Date) {
+        let row = [formatter.string(from: time), "", "", "", "", "",
+                   state, "", "", event].joined(separator: ",")
+        write(row + "\n")
+    }
+
     private func write(_ text: String) {
         guard let handle, let data = text.data(using: .utf8) else { return }
         try? handle.write(contentsOf: data)

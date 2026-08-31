@@ -17,6 +17,13 @@ struct RecordView: View {
 
     private var recorder: WorkoutRecorder { model.recorder }
     private var isActive: Bool { recorder.state != .idle }
+    /// Mirrors `resumeManually()`'s own guard so the icon can never promise
+    /// something the tap then refuses. An armed session sits in `.autoPaused` but
+    /// has nothing to resume, so it keeps showing "pause" exactly as it did.
+    private var canResume: Bool {
+        !recorder.isArmed
+            && (recorder.state == .manuallyPaused || recorder.state == .autoPaused)
+    }
 
     private var workoutSummaries: [ActivityWorkoutSummary] {
         workouts.map(ActivityWorkoutSummary.init(workout:))
@@ -201,13 +208,13 @@ struct RecordView: View {
 
             HStack(spacing: 12) {
                 Button {
-                    if recorder.state == .manuallyPaused {
+                    if canResume {
                         recorder.resumeManually()
                     } else {
                         recorder.pauseManually()
                     }
                 } label: {
-                    Image(systemName: recorder.state == .manuallyPaused ? "play.fill" : "pause.fill")
+                    Image(systemName: canResume ? "play.fill" : "pause.fill")
                         .font(.system(size: 20, weight: .bold))
                         .foregroundStyle(recorder.isArmed ? Color.rTextSecondary : .white)
                         .frame(width: 56, height: 56)

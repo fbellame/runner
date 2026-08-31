@@ -23,7 +23,14 @@ struct MotionGate {
 
     private var latest: MotionSample?
 
-    mutating func observe(_ sample: MotionSample) { latest = sample }
+    /// Newest wins. The recorder seeds the gate by replaying CoreMotion history
+    /// while the live stream is already attached, so samples can arrive out of
+    /// order; without this an old replayed classification could overwrite a
+    /// fresher live one.
+    mutating func observe(_ sample: MotionSample) {
+        if let latest, sample.at <= latest.at { return }
+        latest = sample
+    }
 
     /// Dropped when the stream stops, so a classification can never outlive the
     /// subscription that produced it.
@@ -33,9 +40,29 @@ struct MotionGate {
     /// no sample, unknown, low confidence, stale, or from the future — abstains,
     /// because "we don't know" must never read as "he is standing still".
     func vetoesStart(at time: Date) -> Bool {
-        guard let latest, latest.isStationary,
-              !latest.isUnknown, !latest.isLowConfidence else { return false }
+        reason(at: time) == .stationary
+    }
+
+    /// Why the gate answered the way it did. `vetoesStart` collapses all five
+    /// outcomes into one Bool, which is the right shape for the state machine and
+    /// the wrong shape for a trace: seven real sessions logged 8760 samples that
+    /// all said "no veto" without ever saying whether that meant "he is moving" or
+    /// "CoreMotion never sent us anything". `SessionTrace` records this instead.
+    enum Reason: String {
+        case noSample = ""
+        case unknown
+        case lowConfidence = "lowconf"
+        case stale
+        case moving
+        case stationary
+    }
+
+    func reason(at time: Date) -> Reason {
+        guard let latest else { return .noSample }
+        if latest.isUnknown { return .unknown }
+        if latest.isLowConfidence { return .lowConfidence }
         let age = time.timeIntervalSince(latest.at)
-        return age >= 0 && age <= Self.maxSampleAge
+        guard age >= 0, age <= Self.maxSampleAge else { return .stale }
+        return latest.isStationary ? .stationary : .moving
     }
 }
