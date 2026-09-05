@@ -272,7 +272,8 @@ final class SyncCoordinator {
 
             let metrics = metricsProvider()
 
-            // Cache external workouts for the UI (ours are already cached at record time).
+            // Cache external workouts for the UI (ours are already cached at record
+            // time). Written as one transaction: see `upsertWorkout(save:)`.
             for w in hkWorkouts where !w.isFromThisApp {
                 let estKcal = workoutCalories(type: w.type, distanceMeters: w.distanceMeters,
                                               movingSeconds: w.movingSeconds, metrics: metrics)
@@ -290,8 +291,10 @@ final class SyncCoordinator {
                                         calories: kcal,
                                         caloriesFromHealth: w.activeEnergyKcal != nil,
                                         co2SavedGrams: co2,
-                                        co2FromHealth: w.co2SavedGrams != nil)
+                                        co2FromHealth: w.co2SavedGrams != nil,
+                                        save: false)
             }
+            try store.save()
 
             // Day inputs: HK workouts + local workouts that never reached HK.
             var workoutsByDay = HealthMappers.groupByDay(hkWorkouts, calendar: cal)

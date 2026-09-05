@@ -90,6 +90,37 @@ struct DataStoreTests {
         #expect(try store.workouts(onDay: .now).count == 1)
     }
 
+    /// `save: false` is what lets the sync commit a whole HealthKit window in one
+    /// transaction instead of one per workout. Two things have to hold: the write
+    /// really is deferred, and a deferred row is still visible to the next
+    /// upsert's dedupe fetch — otherwise batching would duplicate rows.
+    @Test func deferredUpsertBatchesIntoOneCommit() throws {
+        let store = try makeStore()
+        let first = UUID()
+        let second = UUID()
+
+        try store.upsertWorkout(id: first, type: .bike, start: .now, end: .now,
+                                movingSeconds: 600, distanceMeters: 3000, points: 20,
+                                routeData: nil, splitSeconds: [], source: "external",
+                                hkSynced: true, save: false)
+        #expect(store.hasPendingChanges)
+
+        // Same id again, still deferred: must update the pending row, not insert.
+        try store.upsertWorkout(id: first, type: .bike, start: .now, end: .now,
+                                movingSeconds: 600, distanceMeters: 4000, points: 20,
+                                routeData: nil, splitSeconds: [], source: "external",
+                                hkSynced: true, save: false)
+        try store.upsertWorkout(id: second, type: .walk, start: .now, end: .now,
+                                movingSeconds: 900, distanceMeters: 1000, points: 10,
+                                routeData: nil, splitSeconds: [], source: "external",
+                                hkSynced: true, save: false)
+
+        try store.save()
+        #expect(store.hasPendingChanges == false)
+        #expect(try store.allWorkouts().count == 2)
+        #expect(try store.workout(id: first)?.distanceMeters == 4000)
+    }
+
     @Test func upsertNormalizesDateToStartOfDay() throws {
         let store = try makeStore()
         let cal = Calendar.current

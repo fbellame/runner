@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Report token consumption from local Claude Code and Codex CLI transcripts."""
+"""Report token consumption from Claude Code, Codex CLI, and OpenCode/Ollama."""
 
 from __future__ import annotations
 
@@ -7,9 +7,10 @@ import argparse
 import glob
 import json
 import os
+import sqlite3
 import sys
 from collections import defaultdict
-from datetime import date
+from datetime import date, datetime
 from typing import Any, Iterable
 
 
@@ -18,6 +19,13 @@ CODEX_GLOBS = (
     "/Users/farid/.codex/sessions/**/*.jsonl",
     "/Users/farid/.codex/archived_sessions/*.jsonl",
 )
+OPENCODE_DB = "/Users/farid/.local/share/opencode/opencode.db"
+
+# OpenCode provider IDs that run on Farid's own hardware and therefore cost $0.
+# "ollama" was the original local provider; "vllm" is the Qwen3.8 FP8 server on
+# system-ai. Hosted providers reached through OpenCode (e.g. "openai") are
+# deliberately excluded so they don't get mixed in with Codex usage.
+LOCAL_PROVIDERS = {"ollama", "vllm"}
 
 # USD per million tokens. Claude rates come from the claude-api skill's cached
 # pricing table (SKILL.md "Current Models") plus its cache-economics multipliers
@@ -87,6 +95,13 @@ PRICING = {
         "cache_read": 0.00,
         "output": 0.00,
     },
+    "qwen3.8:27b-mtp-q8_0": {
+        # Local Ollama inference has no per-token API charge.
+        "fresh_input": 0.00,
+        "cache_created": 0.00,
+        "cache_read": 0.00,
+        "output": 0.00,
+    },
 }
 
 TOKEN_FIELDS = ("fresh_input", "cache_created", "cache_read", "output")
@@ -148,7 +163,9 @@ def read_json_lines(paths: Iterable[str]) -> Iterable[tuple[str, dict[str, Any]]
 def derive_claude_glob(project_dir: str) -> str:
     """Derive the Claude Code transcript glob from a project directory path."""
     abs_path = os.path.abspath(project_dir)
-    encoded_path = abs_path.replace("/", "-")
+    # Claude Code encodes both path separators and dots as dashes, so a repo
+    # like /Users/farid/projects/test-qwen.3.8 lands in -...-test-qwen-3-8.
+    encoded_path = abs_path.replace("/", "-").replace(".", "-")
     return f"/Users/farid/.claude/projects/{encoded_path}/*.jsonl"
 
 
@@ -243,6 +260,74 @@ def codex_totals(since: str | None, until: str | None) -> dict[str, dict[str, in
     return dict(totals)
 
 
+def opencode_totals(
+    since: str | None,
+    until: str | None,
+    project_dir: str,
+    db_path: str = OPENCODE_DB,
+) -> dict[str, dict[str, int]]:
+    """Sum per-message usage for local Ollama models in OpenCode sessions."""
+    if not os.path.isfile(db_path):
+        return {}
+
+    project_path = os.path.realpath(os.path.abspath(project_dir))
+    try:
+        connection = sqlite3.connect(f"file:{db_path}?mode=ro", uri=True)
+        try:
+            rows = connection.execute(
+                """
+                SELECT message.time_created, message.data, session.directory
+                FROM message
+                JOIN session ON session.id = message.session_id
+                """
+            ).fetchall()
+        finally:
+            connection.close()
+    except sqlite3.Error:
+        return {}
+
+    totals: dict[str, dict[str, int]] = defaultdict(empty_totals)
+    for timestamp_ms, raw_data, directory in rows:
+        if not isinstance(timestamp_ms, int) or not isinstance(raw_data, str) or not isinstance(directory, str):
+            continue
+        session_path = os.path.realpath(os.path.abspath(directory))
+        try:
+            if os.path.commonpath((project_path, session_path)) != project_path:
+                continue
+        except ValueError:
+            continue
+        day = datetime.fromtimestamp(timestamp_ms / 1000).date().isoformat()
+        if not in_range(day, since, until):
+            continue
+        try:
+            message = json.loads(raw_data)
+        except json.JSONDecodeError:
+            continue
+        # Local runtimes: "ollama" historically, "vllm" since the Qwen3.8 FP8 setup.
+        # Anything else (e.g. "openai") is billed elsewhere and must stay excluded.
+        if not isinstance(message, dict) or message.get("role") != "assistant" or message.get("providerID") not in LOCAL_PROVIDERS:
+            continue
+        tokens = message.get("tokens", {})
+        if not isinstance(tokens, dict):
+            continue
+        cache = tokens.get("cache", {})
+        if not isinstance(cache, dict):
+            cache = {}
+        usage = {
+            "fresh_input": number(tokens.get("input")),
+            "cache_created": number(cache.get("write")),
+            "cache_read": number(cache.get("read")),
+            # OpenCode reports reasoning separately; it is still output usage.
+            "output": number(tokens.get("output")) + number(tokens.get("reasoning")),
+            "messages": 1,
+        }
+        if not any(usage[field] for field in TOKEN_FIELDS):
+            continue
+        model = message.get("modelID") if isinstance(message.get("modelID"), str) else "unknown"
+        add(totals[model], usage)
+    return dict(totals)
+
+
 def estimated_cost(model: str, values: dict[str, int]) -> float:
     return sum(cost_components(model, values).values())
 
@@ -266,23 +351,36 @@ def serialise_groups(groups: dict[str, dict[str, int]]) -> dict[str, dict[str, A
     }
 
 
-def report_data(since: str | None, until: str | None, claude_glob: str = CLAUDE_GLOB) -> dict[str, Any]:
+def report_data(
+    since: str | None,
+    until: str | None,
+    claude_glob: str = CLAUDE_GLOB,
+    project_dir: str | None = None,
+    opencode_db: str = OPENCODE_DB,
+) -> dict[str, Any]:
     claude = claude_totals(since, until, claude_glob)
     codex = codex_totals(since, until)
+    opencode = opencode_totals(since, until, project_dir or os.getcwd(), opencode_db)
     claude_total = all_totals(claude)
     codex_total = all_totals(codex)
-    grand = {field: claude_total[field] + codex_total[field] for field in (*TOKEN_FIELDS, "messages")}
+    opencode_total = all_totals(opencode)
+    grand = {
+        field: claude_total[field] + codex_total[field] + opencode_total[field]
+        for field in (*TOKEN_FIELDS, "messages")
+    }
     grand_tokens = sum(grand[field] for field in TOKEN_FIELDS)
     return {
         "filters": {"since": since, "until": until},
         "pricing_usd_per_million_tokens": PRICING,
         "claude": serialise_groups(claude),
         "codex": serialise_groups(codex),
+        "opencode": serialise_groups(opencode),
         "grand_totals": {
             **grand,
             "total_tokens": grand_tokens,
             "claude_share_percent": (sum(claude_total[field] for field in TOKEN_FIELDS) / grand_tokens * 100) if grand_tokens else 0.0,
             "codex_share_percent": (sum(codex_total[field] for field in TOKEN_FIELDS) / grand_tokens * 100) if grand_tokens else 0.0,
+            "opencode_share_percent": (sum(opencode_total[field] for field in TOKEN_FIELDS) / grand_tokens * 100) if grand_tokens else 0.0,
         },
     }
 
@@ -317,9 +415,11 @@ def markdown_report(data: dict[str, Any]) -> str:
     lines.extend(markdown_table(data["claude"]))
     lines.extend(["", "## Codex CLI", ""])
     lines.extend(markdown_table(data["codex"]))
+    lines.extend(["", "## OpenCode / Ollama (local)", ""])
+    lines.extend(markdown_table(data["opencode"]))
     lines.extend(["", "## Combined estimated cost", "", "Placeholder rates from `PRICING`; adjust them before treating estimates as spend. Cache-read has its own rate.", "", "| Source / model | Fresh input | Cache-created | Cache-read | Output | Total (USD) |", "|---|---:|---:|---:|---:|---:|"])
     combined_rows = []
-    for source in ("claude", "codex"):
+    for source in ("claude", "codex", "opencode"):
         for model, values in data[source].items():
             combined_rows.append((source, model, values["estimated_cost_usd"]))
     if not combined_rows:
@@ -327,13 +427,14 @@ def markdown_report(data: dict[str, Any]) -> str:
     for source, model, cost in combined_rows:
         values = data[source][model]
         costs = cost_components(model, values)
+        source_name = "OpenCode" if source == "opencode" else source.title()
         lines.append(
-            f"| {source.title()} / {model} | ${costs['fresh_input']:,.4f} | "
+            f"| {source_name} / {model} | ${costs['fresh_input']:,.4f} | "
             f"${costs['cache_created']:,.4f} | ${costs['cache_read']:,.4f} | "
             f"${costs['output']:,.4f} | ${cost:,.4f} |"
         )
     grand = data["grand_totals"]
-    lines.extend(["", "## Grand totals", "", f"- Total tokens: {format_number(grand['total_tokens'])}", f"- Claude share: {grand['claude_share_percent']:.1f}%", f"- Codex share: {grand['codex_share_percent']:.1f}%"])
+    lines.extend(["", "## Grand totals", "", f"- Total tokens: {format_number(grand['total_tokens'])}", f"- Claude share: {grand['claude_share_percent']:.1f}%", f"- Codex share: {grand['codex_share_percent']:.1f}%", f"- OpenCode/Ollama share: {grand['opencode_share_percent']:.1f}%"])
     return "\n".join(lines)
 
 
@@ -354,7 +455,7 @@ def main() -> int:
     if args.since and args.until and args.since > args.until:
         parser.error("--since must not be after --until")
     claude_glob = derive_claude_glob(args.project_dir)
-    data = report_data(args.since, args.until, claude_glob)
+    data = report_data(args.since, args.until, claude_glob, args.project_dir)
     if args.json:
         json.dump(data, sys.stdout, indent=2, sort_keys=True)
         print()

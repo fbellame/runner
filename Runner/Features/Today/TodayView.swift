@@ -9,8 +9,11 @@ struct TodayView: View {
     @Query(sort: \WorkoutRec.start, order: .reverse) private var workouts: [WorkoutRec]
     @State private var celebrate = false
     @State private var selectedWrapped: MonthWrapped?
-    // Decoded once when today's workouts change, not twice per body pass.
+    // Decoded once when today's route changes, not twice per body pass.
     @State private var latestRoute: [RoutePoint] = []
+    /// Which workout `latestRoute` was decoded from, so an appear that changes
+    /// nothing does not write `@State` and cost a second body pass.
+    @State private var latestRouteKey: UUID?
     @State private var trendMode = 0   // 0 = points, 1 = calories
     private let wrappedSeenStore = WrappedSeenStore()
 
@@ -35,8 +38,19 @@ struct TodayView: View {
             calendar: .current)
     }
 
+    /// The workout whose route the mini-map is showing. Cheap enough to read on
+    /// every pass, and it is the only thing `latestRoute` depends on — a route is
+    /// written once with its workout and never edited afterwards.
+    private var todayRouteKey: UUID? {
+        todayWorkouts.first(where: { $0.routeData != nil })?.id
+    }
+
     private func rebuildLatestRoute() {
-        guard let data = todayWorkouts.first(where: { $0.routeData != nil })?.routeData else {
+        let key = todayRouteKey
+        guard key != latestRouteKey else { return }
+        latestRouteKey = key
+        guard let key,
+              let data = todayWorkouts.first(where: { $0.id == key })?.routeData else {
             latestRoute = []
             return
         }
@@ -45,21 +59,30 @@ struct TodayView: View {
 
     var body: some View {
         @Bindable var model = model
+        // Derived once per pass and handed down. As computed properties these
+        // ran two (`weeklyStatus`, 36 ms over 3,090 ledger days) and four
+        // (`workoutSummaries`, over 766 workouts) times per body pass, and the
+        // body itself runs ten times during a cold launch.
+        let summaries = workoutSummaries
+        let status = weeklyStatus
+        let todays = todayWorkouts
+        let recap = weeklyRecap(summaries: summaries)
+        let trend = last7
         return ScrollView {
             VStack(alignment: .leading, spacing: 16) {
                 header
-                pointsBlock
-                breakdown
+                pointsBlock(status: status, summaries: summaries)
+                breakdown(todayWorkouts: todays)
                 statStrip
                 if model.profile.currentMetrics().weightKg != nil {
-                    caloriesCard
+                    caloriesCard(todayWorkouts: todays)
                 } else {
                     addWeightCard
                 }
-                weeklyRecapCard
-                distanceGoalsRollup
-                wrappedBanner
-                trendCard
+                weeklyRecapCard(recap: recap)
+                distanceGoalsRollup(summaries: summaries)
+                wrappedBanner(summaries: summaries)
+                trendCard(last7: trend)
                 if !latestRoute.isEmpty {
                     miniMap
                 }
@@ -93,7 +116,7 @@ struct TodayView: View {
             WrappedStoryView(wrapped: wrapped)
         }
         .onAppear(perform: rebuildLatestRoute)
-        .onChange(of: workouts.map(\.id)) { _, _ in rebuildLatestRoute() }
+        .onChange(of: todayRouteKey) { _, _ in rebuildLatestRoute() }
         .overlay {
             if celebrate {
                 CelebrationBurst()
@@ -108,7 +131,7 @@ struct TodayView: View {
                 }
             }
         }
-        .onChange(of: weeklyStatus.isMet) { was, isNow in
+        .onChange(of: status.isMet) { was, isNow in
             if !was && isNow && !celebrate {
                 celebrate = true
                 Task {
@@ -140,7 +163,8 @@ struct TodayView: View {
         .padding(.top, 10)
     }
 
-    private var pointsBlock: some View {
+    private func pointsBlock(status: WeeklyGoalStatus,
+                             summaries: [ActivityWorkoutSummary]) -> some View {
         VStack(alignment: .leading, spacing: 10) {
             HStack(alignment: .firstTextBaseline) {
                 GlowNumber(value: today?.totalPoints ?? 0, unitLabel: "PTS")
@@ -160,8 +184,8 @@ struct TodayView: View {
             Text(String(localized: "Goal: \(model.dailyGoal) pts"))
                 .font(.caption)
                 .foregroundStyle(Color.rTextSecondary)
-            WeeklyGoalRow(status: weeklyStatus)
-            if let milestone = TrophyMath.nextMilestone(workoutSummaries) {
+            WeeklyGoalRow(status: status)
+            if let milestone = TrophyMath.nextMilestone(summaries) {
                 nextMilestoneTicker(milestone)
             }
         }
@@ -171,21 +195,24 @@ struct TodayView: View {
         workouts.map(ActivityWorkoutSummary.init(workout:))
     }
 
-    private var weeklyDistanceProgress: [ActivityDistanceGoalProgress] {
-        GoalsMath.currentWeekDistance(workoutSummaries,
+    private func weeklyDistanceProgress(
+        _ summaries: [ActivityWorkoutSummary]
+    ) -> [ActivityDistanceGoalProgress] {
+        GoalsMath.currentWeekDistance(summaries,
                                       goals: model.weeklyDistanceGoals,
                                       asOf: .now,
                                       calendar: .current)
     }
 
     @ViewBuilder
-    private var distanceGoalsRollup: some View {
-        if !weeklyDistanceProgress.isEmpty {
+    private func distanceGoalsRollup(summaries: [ActivityWorkoutSummary]) -> some View {
+        let progressRings = weeklyDistanceProgress(summaries)
+        if !progressRings.isEmpty {
             SurfaceCard {
                 VStack(alignment: .leading, spacing: 12) {
                     MicroLabel(text: String(localized: "Weekly distance goals"))
                     HStack(alignment: .top, spacing: 10) {
-                        ForEach(weeklyDistanceProgress, id: \.type) { progress in
+                        ForEach(progressRings, id: \.type) { progress in
                             WeeklyDistanceGoalMiniRing(progress: progress)
                         }
                     }
@@ -194,18 +221,18 @@ struct TodayView: View {
         }
     }
 
-    private var latestClosedWrapped: MonthWrapped? {
-        guard let month = WrappedMath.availableMonths(workoutSummaries,
+    private func latestClosedWrapped(_ summaries: [ActivityWorkoutSummary]) -> MonthWrapped? {
+        guard let month = WrappedMath.availableMonths(summaries,
                                                       asOf: .now,
                                                       calendar: .current).first else {
             return nil
         }
-        return WrappedMath.monthWrapped(workoutSummaries, month: month, calendar: .current)
+        return WrappedMath.monthWrapped(summaries, month: month, calendar: .current)
     }
 
     @ViewBuilder
-    private var wrappedBanner: some View {
-        if let wrapped = latestClosedWrapped, !wrappedSeenStore.isSeen(wrapped.month) {
+    private func wrappedBanner(summaries: [ActivityWorkoutSummary]) -> some View {
+        if let wrapped = latestClosedWrapped(summaries), !wrappedSeenStore.isSeen(wrapped.month) {
             HStack(spacing: 10) {
                 Button {
                     wrappedSeenStore.markSeen(wrapped.month)
@@ -298,7 +325,7 @@ struct TodayView: View {
         }
     }
 
-    private var breakdown: some View {
+    private func breakdown(todayWorkouts: [WorkoutRec]) -> some View {
         SurfaceCard {
             VStack(spacing: 0) {
                 breakdownRow(emoji: "👟",
@@ -370,7 +397,7 @@ struct TodayView: View {
         }
     }
 
-    private var todayEnergyInputs: [WorkoutEnergyInput] {
+    private func todayEnergyInputs(_ todayWorkouts: [WorkoutRec]) -> [WorkoutEnergyInput] {
         todayWorkouts.map { WorkoutEnergyInput(type: $0.type, distanceMeters: $0.distanceMeters,
                                                movingSeconds: $0.movingSeconds) }
     }
@@ -398,9 +425,9 @@ struct TodayView: View {
         .overlay(RoundedRectangle(cornerRadius: 14).stroke(Color.rBorder, lineWidth: 1))
     }
 
-    private var caloriesCard: some View {
+    private func caloriesCard(todayWorkouts: [WorkoutRec]) -> some View {
         let breakdown = CalorieEngine.dayCalories(steps: today?.steps ?? 0,
-                                                  workouts: todayEnergyInputs,
+                                                  workouts: todayEnergyInputs(todayWorkouts),
                                                   metrics: model.profile.currentMetrics())
         return SurfaceCard {
             VStack(spacing: 0) {
@@ -450,17 +477,16 @@ struct TodayView: View {
         }
     }
 
-    private var weeklyRecap: WeeklyRecap {
+    private func weeklyRecap(summaries: [ActivityWorkoutSummary]) -> WeeklyRecap {
         WeeklyRecapMath.recap(
             ledgers: ledgers.map { RecapLedgerDay(date: $0.date, totalPoints: $0.totalPoints, isGold: $0.isGold) },
-            workouts: workouts.map(ActivityWorkoutSummary.init(workout:)),
+            workouts: summaries,
             now: .now,
             calendar: .current)
     }
 
     @ViewBuilder
-    private var weeklyRecapCard: some View {
-        let recap = weeklyRecap
+    private func weeklyRecapCard(recap: WeeklyRecap) -> some View {
         if recap.hasActivity {
             SurfaceCard {
                 VStack(alignment: .leading, spacing: 12) {
@@ -538,7 +564,7 @@ struct TodayView: View {
         return ledgers.filter { $0.date >= start }.sorted { $0.date < $1.date }
     }
 
-    private var trendCard: some View {
+    private func trendCard(last7: [DayLedger]) -> some View {
         VStack(alignment: .leading, spacing: 10) {
             HStack {
                 MicroLabel(text: String(localized: "Last 7 days"))

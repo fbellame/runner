@@ -28,6 +28,11 @@ final class DataStore {
 
     func save() throws { try context.save() }
 
+    /// True while the context holds writes that have not been committed. Exists
+    /// so the batched sync path can be tested for what it actually claims —
+    /// that it defers its commit — rather than only for its end state.
+    var hasPendingChanges: Bool { context.hasChanges }
+
     func profileCount() throws -> Int {
         try context.fetchCount(FetchDescriptor<UserProfile>())
     }
@@ -119,7 +124,7 @@ final class DataStore {
                        splitSeconds: [Double], source: String, hkSynced: Bool,
                        calories: Double = 0, caloriesFromHealth: Bool = false,
                        co2SavedGrams: Double = 0, co2FromHealth: Bool = false,
-                       autoStarted: Bool = false) throws -> WorkoutRec {
+                       autoStarted: Bool = false, save: Bool = true) throws -> WorkoutRec {
         #if DEBUG
         // Test-only seam. SwiftData's write cannot be made to fail on demand,
         // and the branch that matters most — a failed durable write must never
@@ -170,7 +175,15 @@ final class DataStore {
                              autoStarted: autoStarted)
             context.insert(rec)
         }
-        try context.save()
+        // `save: false` lets a caller writing many rows at once commit them in a
+        // single transaction. Every commit invalidates every `@Query` in the view
+        // tree, so a per-row commit made the sync redraw the visible tab once per
+        // workout — 718 times on a full backfill. The durable single-workout
+        // paths (`saveRecorded`, `retryPendingSaves`) keep committing immediately:
+        // their whole contract is that the row exists before the call returns.
+        if save {
+            try context.save()
+        }
         return rec
     }
 
