@@ -11,7 +11,15 @@ struct RecordView: View {
     @State private var selectedActivity: ActivityType = .run
     @State private var camera: MapCameraPosition = .userLocation(fallback: .automatic)
     @State private var finished: RecordedWorkout?
-    @State private var saveFailedMessage: String?
+    /// Apple Health refused, but the run IS durably in Runner. Informational.
+    @State private var healthKitFailureMessage: String?
+    /// The durable local write itself failed — the run is NOT saved. These were
+    /// one `@State` and one alert, so a run that had been persisted nowhere was
+    /// announced to the user under the title "Saved locally" with the body
+    /// "The workout is kept in Runner and will retry automatically", and
+    /// dismissing it tore down the only screen that could still retry the save.
+    /// Two different facts need two different sentences.
+    @State private var durableFailureMessage: String?
     @State private var isSaving = false
     @Query(sort: \WorkoutRec.start, order: .reverse) private var workouts: [WorkoutRec]
 
@@ -85,12 +93,22 @@ struct RecordView: View {
                                })
         }
         .alert(String(localized: "Saved locally"),
-               isPresented: Binding(get: { saveFailedMessage != nil },
-                                    set: { if !$0 { saveFailedMessage = nil; dismiss() } })) {
+               isPresented: Binding(get: { healthKitFailureMessage != nil },
+                                    set: { if !$0 { healthKitFailureMessage = nil; dismiss() } })) {
             Button(String(localized: "Done"), role: .cancel) {}
         } message: {
-            let detail = saveFailedMessage ?? ""
+            let detail = healthKitFailureMessage ?? ""
             Text(String(localized: "Apple Health refused the save (\(detail)). The workout is kept in Runner and will retry automatically."))
+        }
+        // Stays on this screen deliberately: the summary sheet underneath keeps
+        // its Save button live, and the recovery checkpoint is still on disk.
+        .alert(String(localized: "Not saved"),
+               isPresented: Binding(get: { durableFailureMessage != nil },
+                                    set: { if !$0 { durableFailureMessage = nil } })) {
+            Button(String(localized: "Try again"), role: .cancel) {}
+        } message: {
+            let detail = durableFailureMessage ?? ""
+            Text(String(localized: "Runner could not store this workout (\(detail)). It has not been saved anywhere yet — tap Save again. Your progress is still recoverable if you leave now."))
         }
     }
 
@@ -225,7 +243,15 @@ struct RecordView: View {
                 .disabled(recorder.isArmed)
 
                 SlideToFinish {
-                    finished = recorder.finish(endingAt: recorder.lastMovingAt)
+                    // nil means there was nothing to keep — a session that
+                    // covered no distance. The recorder has already reset
+                    // itself and spoken `.runCancelled`; close the screen
+                    // rather than silently dropping back to the setup panel.
+                    guard let workout = recorder.finish(endingAt: recorder.lastMovingAt) else {
+                        dismiss()
+                        return
+                    }
+                    finished = workout
                 }
             }
         }
@@ -294,7 +320,7 @@ struct RecordView: View {
         // checkpoint, say nothing out loud, keep the summary sheet open with its
         // Save button live, and show why.
         guard outcome.isLocallyDurable else {
-            saveFailedMessage = outcome.durableFailure
+            durableFailureMessage = outcome.durableFailure
             return
         }
         model.checkpoints.clear()
@@ -312,7 +338,7 @@ struct RecordView: View {
         // A HealthKit-only failure still counts as saved: the local store is the
         // durable copy and `retryPendingSaves` pushes it later.
         if let failure = outcome.healthKitFailure {
-            saveFailedMessage = failure
+            healthKitFailureMessage = failure
         } else {
             dismiss()
         }

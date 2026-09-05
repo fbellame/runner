@@ -6,7 +6,11 @@ struct RecapLedgerDay {
     let isGold: Bool
 }
 
-struct BestRun: Equatable {
+/// The week's longest single effort, of any activity type — the recap's
+/// distance and session counts span every type too, so scoping this one field
+/// to running would make it disagree with the numbers beside it. Named for
+/// what it is: a 30 km ride is not a "best run".
+struct BestEffort: Equatable {
     let type: ActivityType
     let distanceMeters: Double
     let date: Date
@@ -14,12 +18,17 @@ struct BestRun: Equatable {
 
 struct WeeklyRecap: Equatable {
     let points: Int
+    /// Points in the same slice of last week — Monday through the weekday we
+    /// are on now, so a Wednesday compares against a Wednesday. Not rendered:
+    /// the card shows `pointsDeltaFraction`. Kept because that shifted window
+    /// is the one non-obvious rule in this file and the tests pin it directly;
+    /// the fraction alone cannot tell an empty previous week from a mis-sliced one.
     let pointsPrevious: Int
     let pointsDeltaFraction: Double?
     let distanceMeters: Double
     let sessions: Int
     let goldDays: Int
-    let bestRun: BestRun?
+    let bestEffort: BestEffort?
 
     var hasActivity: Bool { points > 0 || sessions > 0 || distanceMeters > 0 }
 }
@@ -60,21 +69,21 @@ enum WeeklyRecapMath {
         let distanceMeters = currentWorkouts.reduce(0.0) { $0 + $1.distanceMeters }
         let sessions = currentWorkouts.count
 
-        // Greatest distance wins; ties resolve to the earliest run, independent of
+        // Greatest distance wins; ties resolve to the earliest effort, independent of
         // the input order.
-        var bestRun: BestRun?
+        var bestEffort: BestEffort?
         for workout in currentWorkouts {
             let isBetter: Bool
-            if let current = bestRun {
+            if let current = bestEffort {
                 isBetter = workout.distanceMeters > current.distanceMeters
                     || (workout.distanceMeters == current.distanceMeters && workout.date < current.date)
             } else {
                 isBetter = true
             }
             if isBetter {
-                bestRun = BestRun(type: workout.type,
-                                  distanceMeters: workout.distanceMeters,
-                                  date: workout.date)
+                bestEffort = BestEffort(type: workout.type,
+                                        distanceMeters: workout.distanceMeters,
+                                        date: workout.date)
             }
         }
 
@@ -84,6 +93,6 @@ enum WeeklyRecapMath {
                            distanceMeters: distanceMeters,
                            sessions: sessions,
                            goldDays: goldDays,
-                           bestRun: bestRun)
+                           bestEffort: bestEffort)
     }
 }

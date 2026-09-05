@@ -29,7 +29,12 @@ enum SplitStats {
     private static let negativeSplitBandSecPerKm = 2.0
 
     static func analyze(_ splitSeconds: [Double]) -> SplitAnalysis {
-        let valid = splitSeconds.filter { $0 > 0 }
+        // Enumerate BEFORE filtering: the label is the kilometre this split
+        // actually is, not its position among the survivors. Dropping split 3
+        // used to renumber every later one down by a kilometre, in the list,
+        // on the chart's x-axis and in the "Fastest km · Km N" highlight.
+        let kept = splitSeconds.enumerated().filter { $0.element > 0 }
+        let valid = kept.map(\.element)
         guard !valid.isEmpty else {
             return SplitAnalysis(splits: [],
                                  fastestKmIndex: nil,
@@ -50,10 +55,10 @@ enum SplitStats {
             }
         }
 
-        let splits = valid.enumerated().map { index, seconds in
-            SplitDetail(km: index + 1,
-                        seconds: seconds,
-                        deltaFromAverage: seconds - average,
+        let splits = kept.enumerated().map { index, entry in
+            SplitDetail(km: entry.offset + 1,
+                        seconds: entry.element,
+                        deltaFromAverage: entry.element - average,
                         isFastest: index == fastestIndex,
                         isSlowest: index == slowestIndex)
         }

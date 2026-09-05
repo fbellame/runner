@@ -1,6 +1,6 @@
 # Runner — Unified Specification
 
-**Current as of v1.10 (build 21), 2026-08-15.** This is the single description
+**Current as of v1.11 (build 24), 2026-09-05.** This is the single description
 of what the app does today. It replaces reading fifteen epic designs to answer
 one question.
 
@@ -82,6 +82,15 @@ so SwiftData lightweight-migrates existing stores.
 ("runner" | "external"), `hkSynced`, calories (+`caloriesFromHealth`), CO₂
 (+`co2FromHealth`), `autoStarted`.
 
+**A workout with no distance is not stored.** `finish()` refuses to produce one
+on every manual path, the import loop skips them, and `purgeZeroDistanceWorkouts()`
+runs on every sync to clear anything a past build left behind. A "0.00 km run"
+earns no points, draws no route and carries no pace — it is always the residue of
+a session that failed, never one that happened. The auto-walk path is the single
+exception *during* finish (`requiringDistance: false`), because a detected walk
+legitimately has zero GPS metres until the Health backfill runs; it then applies
+its own, stricter 100 m floor.
+
 **`UserProfile`** — height, weight, birth date, sex, each with a manual-override
 flag so a Health value never silently overwrites a typed one.
 
@@ -100,6 +109,16 @@ Real Health values are preferred over estimates and marked as such
 (`caloriesFromHealth`, `co2FromHealth`, `distanceEstimated`). Rides imported
 without distance get an estimate; Bixi rides carry CO₂ in workout metadata,
 with `CO2Estimator` as the fallback. Settings has a HealthKit diagnostics screen.
+
+Workouts whose HealthKit source is Runner itself are imported **only when no
+local row already claims that `(type, start)`** — normally never, since the app
+wrote that row at record time, but after a delete-and-reinstall the HealthKit
+samples survive and the SwiftData rows do not. Skipping them outright used to
+make every run Runner ever recorded vanish from History, Routes, records and
+badges while still counting toward points and streaks.
+
+The import is one transaction (`upsertWorkout(save: false)` + a single commit),
+and rolls the context back if any row throws.
 
 ## 7. Recording pipeline
 
@@ -175,7 +194,9 @@ auto-walk one.
   the timer running; only pauses stop it.
 - **Checkpoints** every **30 s** to `CheckpointStore`, including whether the
   session was manually paused, so a relaunch rehydrates the real state.
-- **Finish** trims the tail to the last genuinely-moving sample.
+- **Finish** trims the tail to the last genuinely-moving sample, and refuses a
+  session that covered no distance — announcing `.runCancelled` rather than
+  going silent, since silence reads as a save.
 
 ### 7.6 Session trace (diagnostics)
 
@@ -242,6 +263,9 @@ All pure math, all unit-tested:
 walking at MET 3.0 / 4.5 km/h, stride estimated from height and sex, calories
 per step from weight. Health's `activeEnergyBurned` wins when available.
 `CO2Estimator` + `Co2Metadata` produce CO₂ avoided, preferring workout metadata.
+Both write paths apply it: a ride Runner recorded itself gets the same estimate
+as one imported from Bixi, and a HealthKit retry preserves it rather than
+resetting the column.
 
 ## 12. Design & i18n
 
@@ -253,7 +277,14 @@ so once produced five duplicate keys.
 
 ## 13. Testing
 
-386 tests, Swift Testing (`@Test` / `#expect`), no compiler warnings.
+413 tests, Swift Testing (`@Test` / `#expect`), no compiler warnings. Shared
+test doubles live in `Fixtures.swift`, `FakeHealthStore.swift` and
+`FakeMotionActivityProvider.swift` — not inside whichever test file happened to
+need them first.
+
+Release contract tests assert **floors, not literals**: a test that pinned the
+exact marketing version failed on every bump and trained everyone to ignore a
+red suite.
 
 All engines are pure and tested directly. Seams (`LocationProviding`,
 `MotionActivityProviding`, `HealthStoring`, `Announcing`,
@@ -308,6 +339,17 @@ Each of these was paid for with a bug or an explicit decision.
 8. **Never JSON-round-trip `Localizable.xcstrings`.**
 9. **Bump the build number in `project.yml`**, not in the generated plists.
 10. **Timer keeps running through GPS gaps** (tunnels); only pauses stop it.
+11. **A workout with no distance is never stored.** See section 5.
+12. **A split faster than `ActivityStats.minimumPlausibleSplitSeconds` did not
+    happen.** One re-acquired fix can close several kilometre boundaries at
+    once; the zero-second splits that produces used to become the all-time
+    "Fastest 1 km" and fire a bogus achievement.
+13. **Every `upsertWorkout` call passes every column it wants kept.** The method
+    assigns `co2SavedGrams` and `autoStarted` unconditionally, so an omitted
+    argument is a reset, not a no-op.
+14. **A save that did not become durable is never described as saved** — in the
+    return value (`isLocallyDurable`) *and* in the UI copy the user reads.
+15. **Localized format strings use `%lld` with `Int64`**, never `%d` with `Int`.
 
 ## 16. Open and unverified
 
@@ -315,6 +357,8 @@ Each of these was paid for with a bug or an explicit decision.
   ask before building anything on top of it.
 - **The motion gate and session traces have never run through a real workout.**
   They shipped in build 21 and were merged before field validation.
+- **The 2026-09-05 audit fixes are unverified in the field.** They ship in
+  build 24 and were proven only against the test suite.
 - No sharing for Monthly Wrapped (deferred, not dropped).
 - `autoStarted` on `WorkoutRec` is surfaced in no UI; it exists so "why is this
   walk here" has an answer.
@@ -334,6 +378,11 @@ Each of these was paid for with a bug or an explicit decision.
 | v1.8 | Monthly Wrapped | `2026-07-10-monthly-wrapped-design.md` |
 | v1.9 | Goals | `2026-07-10-runner-goals-design.md` |
 | v1.10 | Hands-free recording | `2026-07-24-hands-free-recording-design.md` |
+
+The labels the code comments cite (`CRITICAL 3`, `IMPORTANT 6`, `Task 8`,
+`fix wave 3`) are indexed in [`REVIEW-LOG.md`](REVIEW-LOG.md). The full-codebase
+audit of 2026-09-05 and the fixes that came out of it are in that commit's
+message; don't add new numbered labels.
 
 The auto-pause rebuild that followed the v1.10 field tests has no design
 document of its own — it was debugging, and its reasoning is in commits

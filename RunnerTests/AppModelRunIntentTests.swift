@@ -5,10 +5,6 @@ import CoreLocation
 
 @MainActor
 struct AppModelRunIntentTests {
-    private final class AnnouncementSpy: Announcing {
-        var events: [RunAnnouncement] = []
-        func announce(_ event: RunAnnouncement) { events.append(event) }
-    }
 
     private func makeModel() throws -> (
         AppModel,
@@ -121,18 +117,23 @@ struct AppModelRunIntentTests {
         // After start, not before: a fix timestamped ahead of its own session is the
         // out-of-order pathology `finish()` now refuses to turn into a 0.00 km row,
         // and this test is about HealthKit failing, not about that.
-        let end = Date().addingTimeInterval(1)
-        model.recorder.didUpdate(locations: [
+        // Two fixes, not one: a single accepted sample has nothing to measure
+        // against, so the session covers 0 m and `finish()` now refuses to make
+        // a 0.00 km row out of it. This test is about HealthKit failing.
+        let start = Date()
+        let end = start.addingTimeInterval(1)
+        func fix(_ lon: Double, _ at: Date) -> CLLocation {
             CLLocation(
-                coordinate: CLLocationCoordinate2D(latitude: 45.5, longitude: -73.6),
+                coordinate: CLLocationCoordinate2D(latitude: 45.5, longitude: lon),
                 altitude: 30,
                 horizontalAccuracy: 5,
                 verticalAccuracy: 10,
                 course: 90,
                 speed: 2,
-                timestamp: end
+                timestamp: at
             )
-        ])
+        }
+        model.recorder.didUpdate(locations: [fix(-73.6, start), fix(-73.5999, end)])
 
         await model.finishRunFromIntent()
 

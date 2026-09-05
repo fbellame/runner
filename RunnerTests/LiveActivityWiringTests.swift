@@ -117,10 +117,6 @@ struct LiveActivityWiringTests {
     /// announcement must fire regardless; only the (here, no-op) Live
     /// Activity teardown stays conditional.
     @Test func completeSaveAnnouncesRunSavedForAManualWalkWithNoLiveActivity() throws {
-        final class AnnouncementSpy: Announcing {
-            var events: [RunAnnouncement] = []
-            func announce(_ event: RunAnnouncement) { events.append(event) }
-        }
         let live = LiveActivitySpy()
         let spy = AnnouncementSpy()
         let recorder = WorkoutRecorder(
@@ -248,10 +244,6 @@ struct LiveActivityWiringTests {
     /// `announceSaved()` rather than announcing a second time, so the in-app
     /// save path never says "Run saved. Run saved."
     @Test func completeSaveAnnouncesRunSavedExactlyOnce() throws {
-        final class AnnouncementSpy: Announcing {
-            var events: [RunAnnouncement] = []
-            func announce(_ event: RunAnnouncement) { events.append(event) }
-        }
         let live = LiveActivitySpy()
         let spy = AnnouncementSpy()
         let recorder = WorkoutRecorder(

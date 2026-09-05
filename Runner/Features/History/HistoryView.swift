@@ -340,9 +340,13 @@ struct HistoryView: View {
 
     private func trophyRoomEntryCard(summaries: [ActivityWorkoutSummary],
                                      goalWeeks: [CompletedWeek]) -> some View {
-        let badges = TrophyMath.allBadges(summaries) + TrophyMath.weeklyBadges(goalWeeks, calendar: .current)
+        // One `allBadges` pass, reused for the next milestone. Asking
+        // `TrophyMath.nextMilestone(summaries)` here ran the whole ladder a
+        // second time over all 766 workouts, for the same answer.
+        let activityBadges = TrophyMath.allBadges(summaries)
+        let badges = activityBadges + TrophyMath.weeklyBadges(goalWeeks, calendar: .current)
         let earnedCount = badges.filter(\.earned).count
-        let next = TrophyMath.nextMilestone(summaries)
+        let next = TrophyMath.nextMilestone(from: activityBadges, hasHistory: !summaries.isEmpty)
 
         return NavigationLink {
             TrophyRoomView(summaries: summaries, goalWeeks: goalWeeks)
@@ -357,7 +361,8 @@ struct HistoryView: View {
                         Text(String(localized: "Trophy Room"))
                             .font(.system(size: 17, weight: .bold, design: .rounded))
                             .foregroundStyle(.white)
-                        Text(String(format: String(localized: "%d of %d earned"), earnedCount, badges.count))
+                        Text(String(format: String(localized: "%lld of %lld earned"),
+                                    Int64(earnedCount), Int64(badges.count)))
                             .font(.system(size: 13, weight: .semibold))
                             .foregroundStyle(Color.rTextSecondary)
                         if let next {

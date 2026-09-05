@@ -134,7 +134,12 @@ final class AutoWalkCoordinator {
         let gpsBeganAt = recorder.gpsBeganAt
         let walkBeganAt = recorder.startedAt
         // The stationary tail that triggered this stop is not part of the walk.
-        guard var workout = recorder.finish(endingAt: lastWalkingAt) else {
+        // `requiringDistance: false`: a detected walk routinely finishes with
+        // zero GPS metres because the walk started before GPS did — the Health
+        // backfill below is what gives it its distance. The 100 m floor further
+        // down is this path's own, stricter version of the same rule.
+        guard var workout = recorder.finish(endingAt: lastWalkingAt,
+                                            requiringDistance: false) else {
             recorder.discard()
             return
         }

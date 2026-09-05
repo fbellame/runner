@@ -28,7 +28,7 @@ struct ActivitySpecificBlock: View {
         let yearByKind = Dictionary(uniqueKeysWithValues: thisYear.map { ($0.kind, $0) })
 
         return VStack(alignment: .leading, spacing: 10) {
-            MicroLabel(text: String(format: String(localized: "%d vs all-time"), year))
+            MicroLabel(text: String(format: String(localized: "%lld vs all-time"), Int64(year)))
             if allTime.isEmpty {
                 notEnoughData
             } else {
@@ -88,13 +88,13 @@ struct ActivitySpecificBlock: View {
                 notEnoughData
             } else {
                 LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 10) {
-                    StatTile(label: String(format: String(localized: "Rides in %d"), review.year),
+                    StatTile(label: String(format: String(localized: "Rides in %lld"), Int64(review.year)),
                              value: "\(review.sessions.current)",
                              accent: type.accent)
                     StatTile(label: String(localized: "Rides lifetime"),
                              value: "\(stats.sessions)",
                              accent: .white)
-                    StatTile(label: String(format: String(localized: "CO₂ avoided in %d"), review.year),
+                    StatTile(label: String(format: String(localized: "CO₂ avoided in %lld"), Int64(review.year)),
                              value: Format.co2(grams: review.co2SavedGrams.current),
                              accent: .rLime)
                     StatTile(label: String(localized: "CO₂ avoided lifetime"),
@@ -126,13 +126,13 @@ struct ActivitySpecificBlock: View {
                 notEnoughData
             } else {
                 LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 10) {
-                    StatTile(label: String(format: String(localized: "Hours in %d"), review.year),
+                    StatTile(label: String(format: String(localized: "Hours in %lld"), Int64(review.year)),
                              value: hours(review.movingSeconds.current),
                              accent: type.accent)
                     StatTile(label: String(localized: "Hours lifetime"),
                              value: hours(stats.totalMovingSeconds),
                              accent: .white)
-                    StatTile(label: String(format: String(localized: "Distance in %d"), review.year),
+                    StatTile(label: String(format: String(localized: "Distance in %lld"), Int64(review.year)),
                              value: Format.km(review.distanceMeters.current),
                              accent: .rLime)
                     StatTile(label: String(localized: "Distance lifetime"),

@@ -226,6 +226,11 @@ final class WorkoutRecorder: LocationProvidingDelegate {
         armedTimeoutTask = nil
         sessionToken += 1
         let session = sessionToken
+        // A `.finished` snapshot belongs to the session that produced it.
+        // `finish()` sets it and then calls `reset()`, so it cannot be cleared
+        // there without breaking the finish -> `completeSave()`/`discard()`
+        // handoff; clearing it here is what stops it reaching the next session.
+        lastFinishedSnapshot = nil
 
         self.activity = activity
         self.autoStarted = autoStarted
@@ -391,7 +396,13 @@ final class WorkoutRecorder: LocationProvidingDelegate {
     /// `endingAt` supplies the true end when the caller knows it — an auto-stop
     /// fires five minutes after the walking actually stopped, and that stationary
     /// tail must not be baked into the workout.
-    func finish(endingAt end: Date? = nil) -> RecordedWorkout? {
+    /// - Parameter requiringDistance: when true (every manual path), a session
+    ///   that covered no distance yields nil instead of a 0.00 km workout.
+    ///   `AutoWalkCoordinator` passes false: a detected walk legitimately
+    ///   finishes with zero GPS metres — the stretch before GPS was running is
+    ///   backfilled from Health afterwards — and it applies its own, stricter
+    ///   100 m floor once that has happened.
+    func finish(endingAt end: Date? = nil, requiringDistance: Bool = true) -> RecordedWorkout? {
         // A session that has already been reset (e.g. the armed timeout fired
         // in the same MainActor turn a slide-to-finish landed) has no real
         // span to report; building a workout here would offer the user a
@@ -415,10 +426,24 @@ final class WorkoutRecorder: LocationProvidingDelegate {
         // rejects outright — one field row carried 868 m of route and 0 moving
         // seconds and stayed an un-synced local orphan because of exactly this.
         let finishedAt = max(start, end ?? clock(), route.last?.t ?? start)
-        // And with an honest end in hand, a session that still has no span and no
-        // distance never happened. Two such rows reached the store in the field and
-        // show up in History as 0.00 km runs. `discardArmedSession()` is the right
-        // cleanup: same "nothing to report" outcome, same Live Activity teardown.
+        // And with an honest end in hand: a session that covered no distance
+        // never happened, however long it ran. The previous rule only rejected a
+        // session with no span AND no distance, which still let through the run
+        // that has a duration but never got a usable fix — it lands in History as
+        // a "0.00 km run" that earns no points, draws no route and carries no
+        // pace. `discardArmedSession()` is the right cleanup: same "nothing to
+        // report" outcome, same Live Activity teardown.
+        //
+        // Say so out loud. A hands-free user who slid to finish is owed an
+        // answer, and `.runCancelled` is the existing cue for "there was
+        // nothing to keep" — silence would read as a save.
+        guard distanceMeters > 0 || !requiringDistance else {
+            if !autoStarted { announcer.announce(.runCancelled) }
+            discardArmedSession()
+            return nil
+        }
+        // The original rule, still needed for the backfilled path: no span and
+        // no distance means the session never happened at all.
         guard finishedAt > start || distanceMeters > 0 else {
             discardArmedSession()
             return nil
@@ -738,9 +763,12 @@ final class WorkoutRecorder: LocationProvidingDelegate {
                       motion: motionReason.rawValue, event: event)
 
         // 4. Accept or reject the sample.
+        // `clock()`, not `Date()`: every other timestamp in this type routes
+        // through the injected clock, and this was the one place a test's fake
+        // clock could not reach — the sample-age check silently used wall time.
         let decision = LocationFilter.evaluate(candidate: location,
                                                lastKept: lastKeptLocation,
-                                               now: Date())
+                                               now: clock())
         if decision.accepted, state == .recording {
             lastMovingAt = location.timestamp
 

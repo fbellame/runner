@@ -53,15 +53,12 @@ struct InsightSummary {
     let sessionsPerWeekPrevious: Double
     let paceTrend: TrendDirection
     let paceDeltaSecPerKm: Double?
-    let distanceTrend: TrendDirection
     let hasEnoughData: Bool
 }
 
 enum InsightsMath {
     private static let paceTrendBandSecPerKm = 3.0
-    private static let distanceTrendBandFraction = 0.10
     private static let summaryWeeksPerPeriod = 4
-    private static let chartWindowWeeks = 12
 
     static func weeklySeries(_ summaries: [ActivityWorkoutSummary], type: ActivityType,
                              weeks: Int, endingAt: Date,
@@ -168,24 +165,11 @@ enum InsightsMath {
             paceTrend = .insufficientData
         }
 
-        let distanceTrend: TrendDirection
-        if let delta = comparison.distanceDeltaFraction {
-            if delta > distanceTrendBandFraction {
-                distanceTrend = .improving
-            } else if delta < -distanceTrendBandFraction {
-                distanceTrend = .declining
-            } else {
-                distanceTrend = .steady
-            }
-        } else {
-            distanceTrend = .insufficientData
-        }
 
         return InsightSummary(sessionsPerWeek: comparison.sessionsPerWeekCurrent,
                               sessionsPerWeekPrevious: comparison.sessionsPerWeekPrevious,
                               paceTrend: paceTrend,
                               paceDeltaSecPerKm: paceDelta,
-                              distanceTrend: distanceTrend,
                               hasEnoughData: comparison.sessions.current > 0)
     }
 

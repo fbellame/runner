@@ -2,6 +2,7 @@ import SwiftUI
 
 struct ProfileView: View {
     @Environment(AppModel.self) private var model
+    @Environment(\.scenePhase) private var scenePhase
     @State private var heightText = ""
     @State private var weightText = ""
     @State private var birthDate = Date()
@@ -78,6 +79,13 @@ struct ProfileView: View {
         .preferredColorScheme(.dark)
         .onAppear(perform: load)
         .onDisappear(perform: save)
+        // `onDisappear` alone meant a jetsam kill or a force-quit with this
+        // screen open lost the edit silently — and weight is the input that
+        // gates every calorie number in the app. `save()` is idempotent: it
+        // only touches fields that differ from what `load()` showed.
+        .onChange(of: scenePhase) { _, phase in
+            if phase != .active { save() }
+        }
         .alert(String(localized: "History re-imported"), isPresented: $reimportDone) {
             Button(String(localized: "OK"), role: .cancel) {}
         } message: {

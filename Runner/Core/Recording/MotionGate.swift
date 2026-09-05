@@ -36,18 +36,19 @@ struct MotionGate {
     /// subscription that produced it.
     mutating func clear() { latest = nil }
 
-    /// True only on a confident, current "stationary". Every other case —
-    /// no sample, unknown, low confidence, stale, or from the future — abstains,
+    /// Why the gate answered the way it did.
+    ///
+    /// The state machine only needs one bit — `reason(at:) == .stationary` — and
+    /// there used to be a `vetoesStart(at:)` that collapsed these five outcomes
+    /// into exactly that Bool. It was the wrong shape for a trace: seven real
+    /// sessions logged 8760 samples that all said "no veto" without ever saying
+    /// whether that meant "he is moving" or "CoreMotion never sent us anything".
+    /// `SessionTrace` records this instead, and the recorder compares against
+    /// `.stationary` directly, so nothing needs the Bool any more.
+    ///
+    /// Only a confident, current "stationary" vetoes. Every other case — no
+    /// sample, unknown, low confidence, stale, or from the future — abstains,
     /// because "we don't know" must never read as "he is standing still".
-    func vetoesStart(at time: Date) -> Bool {
-        reason(at: time) == .stationary
-    }
-
-    /// Why the gate answered the way it did. `vetoesStart` collapses all five
-    /// outcomes into one Bool, which is the right shape for the state machine and
-    /// the wrong shape for a trace: seven real sessions logged 8760 samples that
-    /// all said "no veto" without ever saying whether that meant "he is moving" or
-    /// "CoreMotion never sent us anything". `SessionTrace` records this instead.
     enum Reason: String {
         case noSample = ""
         case unknown

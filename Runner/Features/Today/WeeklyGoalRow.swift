@@ -10,8 +10,8 @@ struct WeeklyGoalRow: View {
                     dotView(dot)
                 }
             }
-            Text(String(format: String(localized: "%d of %d this week"),
-                        status.goldDays, status.target))
+            Text(String(format: String(localized: "%lld of %lld this week"),
+                        Int64(status.goldDays), Int64(status.target)))
                 .font(.caption)
                 .foregroundStyle(status.isMet ? Color.rLime : Color.rTextSecondary)
             Spacer()

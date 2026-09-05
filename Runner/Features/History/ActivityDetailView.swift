@@ -6,23 +6,23 @@ struct ActivityDetailView: View {
     @Environment(AppModel.self) private var model
     let type: ActivityType
     @Query(sort: \WorkoutRec.start, order: .reverse) private var workouts: [WorkoutRec]
-    @State private var chartRange = 7
+    /// In weeks — this chart buckets by week. It used to hold 7 or 30 and be
+    /// subtracted as DAYS from today, so "Week" kept only the buckets whose
+    /// Monday fell inside the last seven days: one bar, occasionally two.
+    @State private var chartWeeks = 12
     @State private var showsGoalEditor = false
 
     init(type: ActivityType) {
         self.type = type
     }
 
-    private var typeWorkouts: [WorkoutRec] {
-        workouts.filter { $0.type == type }
-    }
-
-    private var typeSummaries: [ActivityWorkoutSummary] {
-        typeWorkouts.map(ActivityWorkoutSummary.init(workout:))
-    }
-
     var body: some View {
-        let summaries = typeSummaries
+        // Derived once per pass. As computed properties, `typeWorkouts` and
+        // `typeSummaries` were each read several times — `body` for the
+        // summaries and the id map, `recentSessions` twice more — so every
+        // render filtered and mapped the full workout set four times over.
+        let typeWorkouts = workouts.filter { $0.type == type }
+        let summaries = typeWorkouts.map(ActivityWorkoutSummary.init(workout:))
         let stats = ActivityStats.typeStats(summaries, type: type, calendar: .current)
         let records = ActivityStats.typeRecords(summaries, type: type)
         let workoutByID = Dictionary(uniqueKeysWithValues: typeWorkouts.map { ($0.id, $0) })
@@ -35,7 +35,7 @@ struct ActivityDetailView: View {
                 paceGrid(stats: stats)
                 distanceChart(stats: stats)
                 recordsSection(records: records, workoutByID: workoutByID)
-                recentSessions
+                recentSessions(typeWorkouts)
                 Spacer(minLength: 60)
             }
             .padding(18)
@@ -141,9 +141,9 @@ struct ActivityDetailView: View {
 
         return VStack(alignment: .leading, spacing: 10) {
             MicroLabel(text: String(localized: "Distance by week"))
-            Picker(String(localized: "Range"), selection: $chartRange) {
-                Text(String(localized: "Week")).tag(7)
-                Text(String(localized: "Month")).tag(30)
+            Picker(String(localized: "Range"), selection: $chartWeeks) {
+                Text(String(localized: "12 wk")).tag(12)
+                Text(String(localized: "1 yr")).tag(52)
             }
             .pickerStyle(.segmented)
 
@@ -181,7 +181,7 @@ struct ActivityDetailView: View {
         }
     }
 
-    private var recentSessions: some View {
+    private func recentSessions(_ typeWorkouts: [WorkoutRec]) -> some View {
         VStack(alignment: .leading, spacing: 8) {
             MicroLabel(text: String(localized: "Recent sessions"))
             if typeWorkouts.isEmpty {
@@ -206,7 +206,7 @@ struct ActivityDetailView: View {
     -> [WeeklyDistancePoint] {
         let calendar = Calendar.current
         let today = calendar.startOfDay(for: .now)
-        let cutoff = calendar.date(byAdding: .day, value: -chartRange, to: today) ?? today
+        let cutoff = calendar.date(byAdding: .weekOfYear, value: -(chartWeeks - 1), to: today) ?? today
         return weeklyDistance
             .filter { $0.weekStart >= cutoff }
             .map { WeeklyDistancePoint(weekStart: $0.weekStart, meters: $0.meters) }

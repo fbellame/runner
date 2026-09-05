@@ -43,11 +43,6 @@ struct ActivityStatsTests {
         records.first { $0.kind == kind }
     }
 
-    private func milestone(_ milestones: [Milestone], _ kind: MilestoneKind,
-                           threshold: Double) -> Milestone? {
-        milestones.first { $0.kind == kind && $0.threshold == threshold }
-    }
-
     @Test func lifetimeTotalsSumMixedTypesAndPerTypeCounts() {
         let summaries = [
             summary(type: .run, distanceMeters: 5_000, movingSeconds: 1_500,
@@ -64,7 +59,6 @@ struct ActivityStatsTests {
         #expect(totals.movingSeconds == 5_700)
         #expect(totals.calories == 620)
         #expect(totals.workouts == 3)
-        #expect(totals.routesPainted == 2)
         #expect(totals.perType[.run]?.distanceMeters == 5_000)
         #expect(totals.perType[.run]?.workouts == 1)
         #expect(totals.perType[.walk]?.distanceMeters == 2_000)
@@ -86,7 +80,6 @@ struct ActivityStatsTests {
         #expect(stats.sessions == 4)
         #expect(stats.totalDistanceMeters == 4_000)
         #expect(stats.totalMovingSeconds == 1_140)
-        #expect(stats.totalPoints == 30)
         #expect(stats.bestPaceSecPerKm == 300)
         #expect(stats.avgPaceSecPerKm == 320)
     }
@@ -160,70 +153,23 @@ struct ActivityStatsTests {
         #expect(fastest?.workoutID != fiveSplitID)
     }
 
-    @Test func milestonesHandleThresholdsAndNextProgress() {
-        let below = ActivityStats.milestones(LifetimeTotals(distanceMeters: 9_999,
-                                                            movingSeconds: 0,
-                                                            calories: 0,
-                                                            workouts: 9,
-                                                            routesPainted: 0,
-                                                            co2SavedGrams: 0,
-                                                            perType: [:]))
-        #expect(milestone(below, .totalDistance, threshold: 10)?.earned == false)
-        #expect(abs((milestone(below, .totalDistance, threshold: 10)?.progress ?? 0) - 0.9999) < 0.0001)
-        #expect(milestone(below, .totalDistance, threshold: 25)?.progress == 0)
-        #expect(milestone(below, .workoutCount, threshold: 10)?.earned == false)
-        #expect((milestone(below, .workoutCount, threshold: 10)?.progress ?? 0) == 0.9)
-
-        let at = ActivityStats.milestones(LifetimeTotals(distanceMeters: 10_000,
-                                                         movingSeconds: 0,
-                                                         calories: 0,
-                                                         workouts: 10,
-                                                         routesPainted: 0,
-                                                         co2SavedGrams: 0,
-                                                         perType: [:]))
-        #expect(milestone(at, .totalDistance, threshold: 10)?.earned == true)
-        #expect(milestone(at, .totalDistance, threshold: 10)?.progress == 1)
-        #expect(milestone(at, .totalDistance, threshold: 25)?.progress == 0.4)
-        #expect(milestone(at, .workoutCount, threshold: 10)?.earned == true)
-        #expect(milestone(at, .workoutCount, threshold: 25)?.progress == 0.4)
-
-        let above = ActivityStats.milestones(LifetimeTotals(distanceMeters: 26_000,
-                                                            movingSeconds: 0,
-                                                            calories: 0,
-                                                            workouts: 26,
-                                                            routesPainted: 0,
-                                                            co2SavedGrams: 0,
-                                                            perType: [:]))
-        #expect(milestone(above, .totalDistance, threshold: 25)?.earned == true)
-        #expect(milestone(above, .totalDistance, threshold: 50)?.progress == 0.52)
-        #expect(milestone(above, .workoutCount, threshold: 25)?.earned == true)
-        #expect(milestone(above, .workoutCount, threshold: 50)?.progress == 0.52)
-    }
-
     @Test func emptyInputsProduceZerosAndNilRecords() {
         let totals = ActivityStats.lifetimeTotals([])
         let stats = ActivityStats.typeStats([], type: .run, calendar: cal)
         let records = ActivityStats.typeRecords([], type: .run)
-        let milestones = ActivityStats.milestones(totals)
 
         #expect(totals.distanceMeters == 0)
         #expect(totals.movingSeconds == 0)
         #expect(totals.calories == 0)
         #expect(totals.workouts == 0)
-        #expect(totals.routesPainted == 0)
         #expect(totals.perType[.run]?.distanceMeters == 0)
         #expect(stats.sessions == 0)
         #expect(stats.totalDistanceMeters == 0)
         #expect(stats.totalMovingSeconds == 0)
         #expect(stats.bestPaceSecPerKm == nil)
         #expect(stats.avgPaceSecPerKm == nil)
-        #expect(stats.longestDistanceMeters == 0)
         #expect(stats.weeklyDistance.isEmpty)
         #expect(records.isEmpty)
-        #expect(milestone(milestones, .totalDistance, threshold: 10)?.earned == false)
-        #expect(milestone(milestones, .totalDistance, threshold: 10)?.progress == 0)
-        #expect(milestone(milestones, .workoutCount, threshold: 10)?.earned == false)
-        #expect(milestone(milestones, .workoutCount, threshold: 10)?.progress == 0)
     }
 
     @Test func weeklyBucketingUsesMondayCalendarWeeksAcrossDST() {

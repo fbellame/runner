@@ -50,25 +50,25 @@ final class AppModel {
 
     @ObservationIgnored nonisolated(unsafe) private var dayChangeObserver: (any NSObjectProtocol)?
 
+    /// The early `return` on the clamp path used to skip the persistence below
+    /// it. Swift does not re-enter an observer for an assignment made inside that
+    /// observer, so an out-of-range value was clamped in memory and never written
+    /// — it reverted on the next launch. Clamp, then always persist whatever the
+    /// property now holds.
     var dailyGoal: Int {
         didSet {
             let clamped = min(max(dailyGoal, Self.goalRange.lowerBound), Self.goalRange.upperBound)
-            if clamped != dailyGoal {
-                dailyGoal = clamped
-                return
-            }
+            if clamped != dailyGoal { dailyGoal = clamped }
             UserDefaults.standard.set(dailyGoal, forKey: Self.goalKey)
             Task { await sync.syncNow() }
         }
     }
 
+    /// Same clamp-then-persist shape as `dailyGoal`, for the same reason.
     var weeklyGoldTarget: Int {
         didSet {
             let clamped = min(max(weeklyGoldTarget, Self.weeklyTargetRange.lowerBound), Self.weeklyTargetRange.upperBound)
-            if clamped != weeklyGoldTarget {
-                weeklyGoldTarget = clamped
-                return
-            }
+            if clamped != weeklyGoldTarget { weeklyGoldTarget = clamped }
             UserDefaults.standard.set(weeklyGoldTarget, forKey: Self.weeklyTargetKey)
             Task { await sync.syncNow() }
         }
@@ -598,6 +598,13 @@ final class AppModel {
     /// saved. End it explicitly.
     func saveCheckpointedWorkout() async {
         guard let checkpoint = pendingResume else { return }
+        // "Save as-is" on a checkpoint that never covered any distance would
+        // write exactly the 0.00 km row `WorkoutRecorder.finish()` now refuses
+        // to produce. There is nothing to credit, so treat it as Discard.
+        guard checkpoint.distanceMeters > 0 else {
+            discardPendingResume()
+            return
+        }
         let workout = RecordedWorkout(type: checkpoint.activity,
                                       start: checkpoint.startedAt,
                                       end: checkpoint.savedAt,

@@ -14,7 +14,7 @@ struct MotionGateTests {
     }
 
     @Test func withoutAnySampleTheGateAbstains() {
-        #expect(MotionGate().vetoesStart(at: t(0)) == false)
+        #expect(MotionGate().reason(at: t(0)) != .stationary)
     }
 
     /// The recorder seeds the gate by replaying CoreMotion history while the live
@@ -23,11 +23,11 @@ struct MotionGateTests {
         var gate = MotionGate()
         gate.observe(sample(stationary: false, at: t(10)))
         gate.observe(sample(stationary: true, at: t(2)))   // replayed history, late
-        #expect(gate.vetoesStart(at: t(12)) == false)
+        #expect(gate.reason(at: t(12)) != .stationary)
         #expect(gate.reason(at: t(12)) == .moving)
     }
 
-    /// `vetoesStart` collapses five outcomes into one Bool. Seven field sessions
+    /// The recorder only needs one bit (`reason(at:) == .stationary`). Seven field sessions
     /// logged 8760 samples that all said "no veto" without ever saying why.
     @Test func reasonDistinguishesEveryWayTheGateCanAbstain() {
         #expect(MotionGate().reason(at: t(0)) == .noSample)
@@ -56,14 +56,14 @@ struct MotionGateTests {
     @Test func confidentStationaryVetoesAStart() {
         var gate = MotionGate()
         gate.observe(sample(stationary: true, at: t(0)))
-        #expect(gate.vetoesStart(at: t(5)))
+        #expect(gate.reason(at: t(5)) == .stationary)
     }
 
     @Test func movementLiftsTheVeto() {
         var gate = MotionGate()
         gate.observe(sample(stationary: true, at: t(0)))
         gate.observe(sample(stationary: false, at: t(3)))
-        #expect(gate.vetoesStart(at: t(5)) == false)
+        #expect(gate.reason(at: t(5)) != .stationary)
     }
 
     /// "We don't know" must never be read as "he is standing still" — the same
@@ -71,11 +71,11 @@ struct MotionGateTests {
     @Test func unknownOrLowConfidenceNeverVetoes() {
         var unknown = MotionGate()
         unknown.observe(sample(stationary: true, unknown: true, at: t(0)))
-        #expect(unknown.vetoesStart(at: t(1)) == false)
+        #expect(unknown.reason(at: t(1)) != .stationary)
 
         var unsure = MotionGate()
         unsure.observe(sample(stationary: true, lowConfidence: true, at: t(0)))
-        #expect(unsure.vetoesStart(at: t(1)) == false)
+        #expect(unsure.reason(at: t(1)) != .stationary)
     }
 
     /// The backstop against a dead stream: a classification that old cannot be
@@ -83,15 +83,15 @@ struct MotionGateTests {
     @Test func aStaleClassificationStopsVetoing() {
         var gate = MotionGate()
         gate.observe(sample(stationary: true, at: t(0)))
-        #expect(gate.vetoesStart(at: t(MotionGate.maxSampleAge)))
-        #expect(gate.vetoesStart(at: t(MotionGate.maxSampleAge + 1)) == false)
+        #expect(gate.reason(at: t(MotionGate.maxSampleAge)) == .stationary)
+        #expect(gate.reason(at: t(MotionGate.maxSampleAge + 1)) != .stationary)
     }
 
     @Test func clearingDropsTheVeto() {
         var gate = MotionGate()
         gate.observe(sample(stationary: true, at: t(0)))
         gate.clear()
-        #expect(gate.vetoesStart(at: t(1)) == false)
+        #expect(gate.reason(at: t(1)) != .stationary)
     }
 }
 

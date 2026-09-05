@@ -15,6 +15,12 @@ struct TodayView: View {
     /// nothing does not write `@State` and cost a second body pass.
     @State private var latestRouteKey: UUID?
     @State private var trendMode = 0   // 0 = points, 1 = calories
+    /// The ✕ on the Wrapped banner used to call `markSeen` and nothing else.
+    /// That writes UserDefaults, which SwiftUI does not observe, so the body was
+    /// never re-evaluated and the banner stayed on screen — the one control whose
+    /// entire job is immediate feedback did nothing visible. `markSeen` is still
+    /// the durable record for later launches; this is what makes it disappear now.
+    @State private var dismissedWrappedMonth: WrappedMonth?
     private let wrappedSeenStore = WrappedSeenStore()
 
     private var today: DayLedger? {
@@ -221,29 +227,42 @@ struct TodayView: View {
         }
     }
 
-    private func latestClosedWrapped(_ summaries: [ActivityWorkoutSummary]) -> MonthWrapped? {
+    /// The month the banner would offer, or nil when there is nothing to offer.
+    ///
+    /// Deliberately cheap: `availableMonths` is one pass and a sort, and both
+    /// dismissal checks happen here. Building the story is not cheap —
+    /// `WrappedMath.monthWrapped` runs `TrophyMath.allBadges` twice and
+    /// `ActivityStats.typeRecords` twelve times over all history, plus a per-day
+    /// heat strip — and it used to run on every single Today body pass (ten of
+    /// them on a cold launch) purely to decide whether to draw a banner the user
+    /// had dismissed months earlier.
+    private func pendingWrappedMonth(_ summaries: [ActivityWorkoutSummary]) -> WrappedMonth? {
         guard let month = WrappedMath.availableMonths(summaries,
                                                       asOf: .now,
-                                                      calendar: .current).first else {
+                                                      calendar: .current).first,
+              month != dismissedWrappedMonth,
+              !wrappedSeenStore.isSeen(month) else {
             return nil
         }
-        return WrappedMath.monthWrapped(summaries, month: month, calendar: .current)
+        return month
     }
 
     @ViewBuilder
     private func wrappedBanner(summaries: [ActivityWorkoutSummary]) -> some View {
-        if let wrapped = latestClosedWrapped(summaries), !wrappedSeenStore.isSeen(wrapped.month) {
+        if let month = pendingWrappedMonth(summaries) {
             HStack(spacing: 10) {
                 Button {
-                    wrappedSeenStore.markSeen(wrapped.month)
-                    selectedWrapped = wrapped
+                    wrappedSeenStore.markSeen(month)
+                    dismissedWrappedMonth = month
+                    selectedWrapped = WrappedMath.monthWrapped(summaries, month: month,
+                                                               calendar: .current)
                 } label: {
                     HStack(spacing: 10) {
                         Text("✨")
                             .font(.system(size: 23))
                         VStack(alignment: .leading, spacing: 2) {
                             Text(String(format: String(localized: "Your %@ Wrapped is ready"),
-                                        wrapped.month.startDate(calendar: .current)
+                                        month.startDate(calendar: .current)
                                             .formatted(.dateTime.month(.wide))))
                                 .font(.system(size: 15, weight: .bold, design: .rounded))
                                 .foregroundStyle(.white)
@@ -260,7 +279,8 @@ struct TodayView: View {
                 .buttonStyle(.plain)
 
                 Button {
-                    wrappedSeenStore.markSeen(wrapped.month)
+                    wrappedSeenStore.markSeen(month)
+                    dismissedWrappedMonth = month
                 } label: {
                     Image(systemName: "xmark")
                         .font(.system(size: 11, weight: .bold))
@@ -511,9 +531,9 @@ struct TodayView: View {
                         recapStat(Format.km(recap.distanceMeters), String(localized: "distance"))
                         recapStat("\(recap.sessions)", String(localized: "sessions"))
                     }
-                    if let best = recap.bestRun {
+                    if let best = recap.bestEffort {
                         HStack {
-                            MicroLabel(text: String(localized: "Best run"))
+                            MicroLabel(text: String(localized: "Best effort"))
                             Spacer()
                             Text("\(best.type.emoji) \(Format.km(best.distanceMeters)) · \(best.date.formatted(.dateTime.weekday(.abbreviated)))")
                                 .font(.system(size: 13, weight: .semibold, design: .rounded))

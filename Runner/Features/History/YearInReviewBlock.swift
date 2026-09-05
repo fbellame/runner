@@ -35,7 +35,7 @@ struct YearInReviewBlock: View {
                     Text(Format.km(review.distanceMeters.current))
                         .font(.system(size: 28, weight: .heavy, design: .rounded))
                         .foregroundStyle(type.accent)
-                    Text(String(format: String(localized: "in %d"), review.year))
+                    Text(String(format: String(localized: "in %lld"), Int64(review.year)))
                         .font(.system(size: 15, weight: .bold, design: .rounded))
                         .foregroundStyle(Color.rTextSecondary)
                 }
@@ -56,9 +56,9 @@ struct YearInReviewBlock: View {
     }
 
     private func comparisonSentence(_ review: YearInReview) -> String {
-        var sentence = String(format: String(localized: "vs %@ by this time in %d"),
+        var sentence = String(format: String(localized: "vs %@ by this time in %lld"),
                               Format.km(review.distanceMeters.previous),
-                              review.year - 1)
+                              Int64(review.year - 1))
         if let delta = review.distanceDeltaFraction {
             let arrow = delta >= 0 ? "▲" : "▼"
             let percent = abs(delta).formatted(.percent.precision(.fractionLength(0)))
@@ -68,9 +68,9 @@ struct YearInReviewBlock: View {
     }
 
     private func sessionsSentence(_ review: YearInReview) -> String {
-        String(format: String(localized: "%d sessions (vs %d) · %@ (vs %@)"),
-               review.sessions.current,
-               review.sessions.previous,
+        String(format: String(localized: "%lld sessions (vs %lld) · %@ (vs %@)"),
+               Int64(review.sessions.current),
+               Int64(review.sessions.previous),
                Format.duration(review.movingSeconds.current),
                Format.duration(review.movingSeconds.previous))
     }

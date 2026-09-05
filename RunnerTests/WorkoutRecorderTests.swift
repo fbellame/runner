@@ -4,19 +4,6 @@ import CoreLocation
 @testable import Runner
 
 @MainActor
-final class FakeLocationProvider: LocationProviding {
-    weak var delegate: LocationProvidingDelegate?
-    var accuracyAuthorization: CLAccuracyAuthorization = .fullAccuracy
-    var fullAccuracyRequests: [String] = []
-    var started = false
-    var stopped = false
-    func requestWhenInUseAuthorization() {}
-    func requestTemporaryFullAccuracy(purposeKey: String) { fullAccuracyRequests.append(purposeKey) }
-    func startUpdates() { started = true }
-    func stopUpdates() { stopped = true }
-}
-
-@MainActor
 struct WorkoutRecorderTests {
     // Synthetic clock anchored near now so LocationFilter's age check passes.
     private let base = Date().addingTimeInterval(-2)

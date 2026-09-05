@@ -12,23 +12,36 @@ import CoreLocation
 /// hands-free string deleted from the catalog — not proving something new today.
 struct HandsFreeReleaseContractTests {
 
-    @Test func runnerMarketingVersionIsOnePointTen() {
-        let version = Bundle.main.object(
+    /// The marketing version must be a well-formed `major.minor` that does not
+    /// walk backwards.
+    ///
+    /// This used to assert `version == "1.10"` outright, so it failed the moment
+    /// 1.11 shipped — a red suite that everyone knew to ignore, which is the
+    /// failure mode that lets a real regression through. Its sibling below had
+    /// the right shape all along: pin a floor, not a literal. XcodeGen generates
+    /// both Info.plists from `project.yml`, so the contract worth guarding is
+    /// "the version is real and only moves forward", not "the version is the one
+    /// I happened to be on when I wrote this".
+    @Test func runnerMarketingVersionHasNotRegressed() throws {
+        let raw = try #require(Bundle.main.object(
             forInfoDictionaryKey: "CFBundleShortVersionString"
-        ) as? String
-        #expect(version == "1.10")
+        ) as? String)
+        let parts = raw.split(separator: ".").compactMap { Int($0) }
+        #expect(parts.count >= 2, "expected major.minor, got \(raw)")
+        let major = try #require(parts.first)
+        let minor = try #require(parts.dropFirst().first)
+        #expect(major > 1 || (major == 1 && minor >= 11))
     }
 
     /// The build number must be a positive integer that only ever moves forward.
-    /// It was bumped twice during the device-spike cycle (13 -> 14 -> 15); this
-    /// pins the floor so a stale plan step can't silently walk it backwards and
-    /// make the build un-installable over what is already on the device.
+    /// This pins the floor so a stale plan step can't silently walk it backwards
+    /// and make the build un-installable over what is already on the device.
     @Test func runnerBuildNumberHasNotRegressed() throws {
         let raw = Bundle.main.object(
             forInfoDictionaryKey: "CFBundleVersion"
         ) as? String
         let build = try #require(raw.flatMap(Int.init))
-        #expect(build >= 15)
+        #expect(build >= 23)
     }
 
     /// Every user-facing string introduced by the hands-free epic has a real

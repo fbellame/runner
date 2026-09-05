@@ -6,10 +6,6 @@ import AppIntents
 
 @MainActor
 struct RunVoiceControlTests {
-    private final class AnnouncementSpy: Announcing {
-        var events: [RunAnnouncement] = []
-        func announce(_ event: RunAnnouncement) { events.append(event) }
-    }
 
     private func makeModel(
         clock: @escaping () -> Date = { Date() }
