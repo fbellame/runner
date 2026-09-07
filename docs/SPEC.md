@@ -1,6 +1,6 @@
 # Runner — Unified Specification
 
-**Current as of v1.11 (build 24), 2026-09-05.** This is the single description
+**Current as of v1.11 (build 25), 2026-09-07.** This is the single description
 of what the app does today. It replaces reading fifteen epic designs to answer
 one question.
 
