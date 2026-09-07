@@ -99,7 +99,10 @@ schemes:
       targets:
         Runner: all
     test:
-      gatherCoverageData: false
+      # On by default so `xcodebuild test` always reports the number.
+      # It was off, which is why the app target's 36.9% line coverage
+      # went unmeasured through four releases.
+      gatherCoverageData: true
       targets:
         - RunnerTests
     run:

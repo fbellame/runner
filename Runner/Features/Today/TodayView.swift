@@ -227,24 +227,12 @@ struct TodayView: View {
         }
     }
 
-    /// The month the banner would offer, or nil when there is nothing to offer.
-    ///
-    /// Deliberately cheap: `availableMonths` is one pass and a sort, and both
-    /// dismissal checks happen here. Building the story is not cheap —
-    /// `WrappedMath.monthWrapped` runs `TrophyMath.allBadges` twice and
-    /// `ActivityStats.typeRecords` twelve times over all history, plus a per-day
-    /// heat strip — and it used to run on every single Today body pass (ten of
-    /// them on a cold launch) purely to decide whether to draw a banner the user
-    /// had dismissed months earlier.
+    /// See `WrappedBannerState.pendingMonth`, which holds the rule and the
+    /// reasoning; this only supplies the view's own two pieces of state.
     private func pendingWrappedMonth(_ summaries: [ActivityWorkoutSummary]) -> WrappedMonth? {
-        guard let month = WrappedMath.availableMonths(summaries,
-                                                      asOf: .now,
-                                                      calendar: .current).first,
-              month != dismissedWrappedMonth,
-              !wrappedSeenStore.isSeen(month) else {
-            return nil
-        }
-        return month
+        WrappedBannerState.pendingMonth(summaries, asOf: .now, calendar: .current,
+                                        dismissedThisSession: dismissedWrappedMonth,
+                                        isSeen: wrappedSeenStore.isSeen)
     }
 
     @ViewBuilder

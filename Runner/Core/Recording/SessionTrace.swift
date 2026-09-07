@@ -38,6 +38,7 @@ final class SessionTrace {
         fileURL = directory.appendingPathComponent("\(stamp)-\(activity).csv")
         do {
             try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+            Self.excludeFromBackup(directory)
             try Self.header.write(to: fileURL, atomically: true, encoding: .utf8)
             handle = try FileHandle(forWritingTo: fileURL)
             try handle?.seekToEnd()
@@ -51,6 +52,21 @@ final class SessionTrace {
         try? FileManager.default.url(for: .documentDirectory, in: .userDomainMask,
                                      appropriateFor: nil, create: true)
             .appendingPathComponent("Diagnostics", isDirectory: true)
+    }
+
+    /// Keeps traces out of iCloud and iTunes backups.
+    ///
+    /// A trace is a CSV of raw lat/lon — the first row of a run trace is the
+    /// front door. `UIFileSharingEnabled` already exposes this folder in the
+    /// Files app on purpose, which is the point of the diagnostic; silently
+    /// copying it into every backup is not, and the data is disposable by
+    /// construction (only the newest `keepNewest` survive anyway). Best-effort:
+    /// a failure here must never stop a run from being traced.
+    static func excludeFromBackup(_ directory: URL) {
+        var url = directory
+        var values = URLResourceValues()
+        values.isExcludedFromBackup = true
+        try? url.setResourceValues(values)
     }
 
     /// `event` carries the state transitions — the rows worth grepping for.

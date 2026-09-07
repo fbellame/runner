@@ -42,4 +42,60 @@ struct HealthMappersTests {
         #expect(grouped[cal.startOfDay(for: yesterdayNoon)] ==
                 [WorkoutSummary(type: .walk, distanceMeters: 2000)])
     }
+
+    // MARK: Which distance statistic wins
+    //
+    // This chain exists because of a real field defect: Bixi rides carried no
+    // `distanceCycling` statistic and imported as 0.00 km. Until it was lifted
+    // out of `HealthStore` it sat on an `HKWorkout`, which cannot be
+    // constructed outside HealthKit — so it was verified only by running
+    // outside with a phone.
+
+    @Test func distancePrefersThePerTypeStatisticForTheActivity() {
+        #expect(HealthMappers.resolvedDistanceMeters(
+            type: .bike, cyclingMeters: 10_000, walkRunMeters: 42, totalMeters: 7) == 10_000)
+        #expect(HealthMappers.resolvedDistanceMeters(
+            type: .run, cyclingMeters: 42, walkRunMeters: 5_000, totalMeters: 7) == 5_000)
+        #expect(HealthMappers.resolvedDistanceMeters(
+            type: .walk, cyclingMeters: 42, walkRunMeters: 2_000, totalMeters: 7) == 2_000)
+    }
+
+    /// The Bixi case. An indoor or third-party ride exposes no cycling
+    /// statistic at all, and the ride used to import as 0.00 km — no points, no
+    /// CO₂, no distance in the hub.
+    @Test func distanceFallsBackToTheOtherTypeThenTheAggregate() {
+        #expect(HealthMappers.resolvedDistanceMeters(
+            type: .bike, cyclingMeters: nil, walkRunMeters: 9_000, totalMeters: 3) == 9_000)
+        #expect(HealthMappers.resolvedDistanceMeters(
+            type: .bike, cyclingMeters: nil, walkRunMeters: nil, totalMeters: 8_500) == 8_500)
+        #expect(HealthMappers.resolvedDistanceMeters(
+            type: .run, cyclingMeters: nil, walkRunMeters: nil, totalMeters: 4_200) == 4_200)
+    }
+
+    /// A statistic that is present but zero carries no more information than an
+    /// absent one, so it must not win over a real number further down the chain.
+    @Test func aZeroStatisticIsTreatedAsAbsent() {
+        #expect(HealthMappers.resolvedDistanceMeters(
+            type: .bike, cyclingMeters: 0, walkRunMeters: 6_000, totalMeters: 0) == 6_000)
+        #expect(HealthMappers.resolvedDistanceMeters(
+            type: .bike, cyclingMeters: 0, walkRunMeters: 0, totalMeters: 6_000) == 6_000)
+    }
+
+    @Test func distanceIsZeroOnlyWhenTheSourceRecordedNone() {
+        #expect(HealthMappers.resolvedDistanceMeters(
+            type: .run, cyclingMeters: nil, walkRunMeters: nil, totalMeters: nil) == 0)
+    }
+
+    // MARK: Which energy statistic wins
+
+    /// `nil` and `0` are different answers and the caller depends on it: `nil`
+    /// means "no source value, estimate it", while `0` would assert the workout
+    /// burned nothing and freeze that into the row.
+    @Test func energyDistinguishesNoValueFromZero() {
+        #expect(HealthMappers.resolvedEnergyKcal(activeEnergyKcal: 420, totalEnergyKcal: 99) == 420)
+        #expect(HealthMappers.resolvedEnergyKcal(activeEnergyKcal: nil, totalEnergyKcal: 310) == 310)
+        #expect(HealthMappers.resolvedEnergyKcal(activeEnergyKcal: 0, totalEnergyKcal: 310) == 310)
+        #expect(HealthMappers.resolvedEnergyKcal(activeEnergyKcal: nil, totalEnergyKcal: nil) == nil)
+        #expect(HealthMappers.resolvedEnergyKcal(activeEnergyKcal: 0, totalEnergyKcal: 0) == nil)
+    }
 }

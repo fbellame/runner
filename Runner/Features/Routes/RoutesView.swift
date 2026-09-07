@@ -27,17 +27,22 @@ struct RoutesView: View {
     /// routes at all; it was invisible only because that fallback is Montreal.
     @State private var camera: MapCameraPosition = .region(RouteMapView.fittingRegion(for: []))
 
+    /// Thin wrapper over `RouteSelection.visible`: the filtering, decoding,
+    /// caching and two-point rule are pure and tested there, and only the
+    /// mapping back onto `WorkoutRec` (for `navigationDestination`) and the
+    /// camera assignment need to happen here.
     private func rebuild() {
-        var cache = decoded
-        routed = workouts.compactMap { rec in
-            guard filter == nil || rec.type == filter,
-                  let data = rec.routeData else { return nil }
-            let points = cache[rec.id] ?? [RoutePoint].decode(data)
-            cache[rec.id] = points
-            return points.count >= 2 ? (rec, points) : nil
+        let byID = Dictionary(uniqueKeysWithValues: workouts.map { ($0.id, $0) })
+        let result = RouteSelection.visible(
+            workouts.map { (id: $0.id, type: $0.type, routeData: $0.routeData) },
+            filter: filter,
+            cache: decoded)
+
+        routed = result.items.compactMap { item in
+            byID[item.id].map { (rec: $0, points: item.points) }
         }
-        decoded = cache
-        camera = .region(RouteMapView.fittingRegion(for: routed.flatMap(\.points),
+        decoded = result.cache
+        camera = .region(RouteMapView.fittingRegion(for: result.allPoints,
                                                     paddingFactor: 1.3,
                                                     minSpan: 0.01))
     }

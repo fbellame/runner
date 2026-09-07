@@ -72,28 +72,7 @@ struct HubProgressionCharts: View {
     }
 
     private func chartPoints() -> [HubChartPoint] {
-        switch range {
-        case .twelveWeeks:
-            return InsightsMath.weeklySeries(summaries, type: type, weeks: 12,
-                                             endingAt: .now, calendar: .current)
-                .map { HubChartPoint(date: $0.weekStart,
-                                     distanceMeters: $0.distanceMeters,
-                                     avgPaceSecPerKm: $0.avgPaceSecPerKm) }
-        case .year:
-            return monthly(months: 12)
-        case .all:
-            return monthly(months: HubMath.monthsSpanningAll(summaries,
-                                                             endingAt: .now,
-                                                             calendar: .current))
-        }
-    }
-
-    private func monthly(months: Int) -> [HubChartPoint] {
-        HubMath.monthlySeries(summaries, type: type, months: months,
-                              endingAt: .now, calendar: .current)
-            .map { HubChartPoint(date: $0.monthStart,
-                                 distanceMeters: $0.distanceMeters,
-                                 avgPaceSecPerKm: $0.avgPaceSecPerKm) }
+        range.series(summaries, type: type, asOf: .now, calendar: .current)
     }
 }
 
@@ -116,9 +95,50 @@ enum HubChartRange: CaseIterable {
     var calendarUnit: Calendar.Component {
         self == .twelveWeeks ? .weekOfYear : .month
     }
+
+    /// The points this range draws.
+    ///
+    /// Lifted out of the view because the bucket size and the window size have
+    /// to agree and once did not: "12 wk" asked `weeklySeries` for weekly
+    /// buckets and then filtered them with a *daily* cutoff, so the chart drew a
+    /// single bar. The pairing is the whole content of this method, and it is
+    /// only checkable where a test can call it.
+    func series(_ summaries: [ActivityWorkoutSummary],
+                type: ActivityType,
+                asOf: Date,
+                calendar: Calendar) -> [HubChartPoint] {
+        switch self {
+        case .twelveWeeks:
+            return InsightsMath.weeklySeries(summaries, type: type, weeks: 12,
+                                             endingAt: asOf, calendar: calendar)
+                .map { HubChartPoint(date: $0.weekStart,
+                                     distanceMeters: $0.distanceMeters,
+                                     avgPaceSecPerKm: $0.avgPaceSecPerKm) }
+        case .year:
+            return Self.monthly(summaries, type: type, months: 12,
+                                asOf: asOf, calendar: calendar)
+        case .all:
+            return Self.monthly(summaries, type: type,
+                                months: HubMath.monthsSpanningAll(summaries, endingAt: asOf,
+                                                                  calendar: calendar),
+                                asOf: asOf, calendar: calendar)
+        }
+    }
+
+    private static func monthly(_ summaries: [ActivityWorkoutSummary],
+                                type: ActivityType, months: Int,
+                                asOf: Date, calendar: Calendar) -> [HubChartPoint] {
+        HubMath.monthlySeries(summaries, type: type, months: months,
+                              endingAt: asOf, calendar: calendar)
+            .map { HubChartPoint(date: $0.monthStart,
+                                 distanceMeters: $0.distanceMeters,
+                                 avgPaceSecPerKm: $0.avgPaceSecPerKm) }
+    }
 }
 
-private struct HubChartPoint: Identifiable {
+/// Internal, not private: the range's own `series(...)` returns these, and a
+/// test has to be able to read what it produced.
+struct HubChartPoint: Identifiable, Equatable {
     let date: Date
     let distanceMeters: Double
     let avgPaceSecPerKm: Double?
