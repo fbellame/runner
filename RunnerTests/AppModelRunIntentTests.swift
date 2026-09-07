@@ -27,7 +27,8 @@ struct AppModelRunIntentTests {
                 announcer: announcements
             ),
             checkpoints: checkpoints,
-            pendingCelebrations: pending
+            pendingCelebrations: pending,
+            defaults: isolatedDefaults("AppModelRunIntentTests")
         )
         return (model, pending, health, announcements)
     }
@@ -336,7 +337,8 @@ struct AppModelRunIntentTests {
         let firstProcess = AppModel(
             store: try DataStore(inMemory: true), health: FakeHealthStore(),
             recorder: WorkoutRecorder(provider: FakeLocationProvider(), checkpoints: checkpoints),
-            checkpoints: checkpoints, pendingCelebrations: firstProcessPending
+            checkpoints: checkpoints, pendingCelebrations: firstProcessPending,
+            defaults: isolatedDefaults("firstProcess")
         )
         let lastMovingAt = Date().addingTimeInterval(-30)
         try checkpoints.save(checkpoint(lastMovingAt: lastMovingAt))
@@ -354,7 +356,8 @@ struct AppModelRunIntentTests {
         let secondProcess = AppModel(
             store: try DataStore(inMemory: true), health: FakeHealthStore(),
             recorder: WorkoutRecorder(provider: FakeLocationProvider(), checkpoints: checkpoints),
-            checkpoints: checkpoints, pendingCelebrations: secondProcessPending
+            checkpoints: checkpoints, pendingCelebrations: secondProcessPending,
+            defaults: isolatedDefaults("secondProcess")
         )
         secondProcess.pendingResume = checkpoints.load()
 
@@ -414,8 +417,8 @@ struct AppModelRunIntentTests {
                                       route: [], splitSeconds: [])
         try pending.save(workout)
         model.pendingCelebration = workout
-        UserDefaults.standard.set(workout.start.timeIntervalSince1970,
-                                  forKey: AppModel.acknowledgedCelebrationKey)
+        model.defaults.set(workout.start.timeIntervalSince1970,
+                           forKey: AppModel.acknowledgedCelebrationKey)
         model.pendingCelebration = nil
         // The file survived the dismissal (a failed delete).
         try pending.save(workout)
@@ -423,7 +426,6 @@ struct AppModelRunIntentTests {
         await model.onLaunch()
 
         #expect(model.pendingCelebration == nil)
-        UserDefaults.standard.removeObject(forKey: AppModel.acknowledgedCelebrationKey)
     }
 
     /// IMPORTANT 7: the widget only renders Finish on manual-run Live

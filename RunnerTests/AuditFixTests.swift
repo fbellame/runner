@@ -11,13 +11,6 @@ import CoreLocation
 @MainActor
 struct AuditFixTests {
 
-    private func freshDefaults() -> UserDefaults {
-        let name = "AuditFixTests-\(UUID().uuidString)"
-        let defaults = UserDefaults(suiteName: name)!
-        defaults.removePersistentDomain(forName: name)
-        return defaults
-    }
-
     private func make(metrics: BodyMetrics = BodyMetrics(weightKg: 70, heightCm: 180,
                                                          sex: .male, age: 30))
         throws -> (SyncCoordinator, FakeHealthStore, DataStore) {
@@ -25,7 +18,7 @@ struct AuditFixTests {
         let store = try DataStore(inMemory: true)
         let sync = SyncCoordinator(health: health, store: store, currentGoal: { 100 },
                                    currentWeeklyTarget: { 3 },
-                                   metricsProvider: { metrics }, defaults: freshDefaults())
+                                   metricsProvider: { metrics }, defaults: isolatedDefaults("AuditFixTests"))
         return (sync, health, store)
     }
 
@@ -219,7 +212,7 @@ struct AuditFixTests {
         let honest = summary(splitSeconds: [305, 300, 298, 302])
 
         let records = ActivityStats.typeRecords([glitched, honest], type: .run)
-        let fastest = try? #require(records.first { $0.kind == .fastestOneKilometer })
+        let fastest = records.first { $0.kind == .fastestOneKilometer }
 
         // A single GPS jump that closes several kilometre boundaries at once
         // used to pin this at 0 s forever — `Format.pace(0)` renders "—", so the
@@ -245,21 +238,20 @@ struct AuditFixTests {
     // MARK: Settings that clamp must still persist
 
     @Test func clampingADailyGoalStillWritesIt() throws {
-        let defaults = UserDefaults.standard
-        defaults.removeObject(forKey: AppModel.goalKey)
-        defer { defaults.removeObject(forKey: AppModel.goalKey) }
+        let defaults = isolatedDefaults("clampingADailyGoal")
 
         let model = try AppModel(store: DataStore(inMemory: true),
                                  health: FakeHealthStore(),
                                  recorder: WorkoutRecorder(provider: FakeLocationProvider()),
-                                 checkpoints: CheckpointStore(directory: tempDirectory()))
+                                 checkpoints: CheckpointStore(directory: tempDirectory()),
+                                 defaults: defaults)
         model.dailyGoal = 10_000
 
         // Swift does not re-enter an observer for an assignment made inside it,
         // so the early `return` on the clamp path skipped the persistence below
         // it: the value was clamped in memory and reverted on the next launch.
         #expect(model.dailyGoal == AppModel.goalRange.upperBound)
-        #expect(AppModel.storedGoal() == AppModel.goalRange.upperBound)
+        #expect(AppModel.storedGoal(in: defaults) == AppModel.goalRange.upperBound)
     }
 
     // MARK: The cheap next-milestone path agrees with the expensive one

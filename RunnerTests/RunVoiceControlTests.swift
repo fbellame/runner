@@ -25,7 +25,8 @@ struct RunVoiceControlTests {
                     announcer: announcements
                 ),
                 checkpoints: checkpoints,
-                pendingCelebrations: PendingCelebrationStore(directory: directory)
+                pendingCelebrations: PendingCelebrationStore(directory: directory),
+                defaults: isolatedDefaults("RunVoiceControlTests")
             ),
             announcements
         )

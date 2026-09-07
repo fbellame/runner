@@ -30,3 +30,17 @@ final class AnnouncementSpy: Announcing {
     var events: [RunAnnouncement] = []
     func announce(_ event: RunAnnouncement) { events.append(event) }
 }
+
+/// A `UserDefaults` suite nobody else can see.
+///
+/// `AppModel` and `SyncCoordinator` both persist through an injected store, but
+/// only `SyncCoordinator`'s tests used to isolate it — the five test files that
+/// build `AppModel`s all shared `UserDefaults.standard`, in parallel, since
+/// Swift Testing does not serialize suites. Every one of them is now given its
+/// own suite through this.
+func isolatedDefaults(_ label: String) -> UserDefaults {
+    let name = "\(label)-\(UUID().uuidString)"
+    let defaults = UserDefaults(suiteName: name)!
+    defaults.removePersistentDomain(forName: name)
+    return defaults
+}

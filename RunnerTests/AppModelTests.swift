@@ -5,7 +5,8 @@ import Foundation
 @MainActor
 struct AppModelTests {
     private func makeModel(
-        liveActivity: any LiveActivityPresenting = SilentLiveActivityPresenter()
+        liveActivity: any LiveActivityPresenting = SilentLiveActivityPresenter(),
+        defaults: UserDefaults? = nil
     ) throws -> (AppModel, FakeHealthStore, CheckpointStore) {
         let health = FakeHealthStore()
         let store = try DataStore(inMemory: true)
@@ -14,24 +15,24 @@ struct AppModelTests {
         let checkpoints = CheckpointStore(directory: dir)
         let recorder = WorkoutRecorder(provider: FakeLocationProvider(), checkpoints: checkpoints,
                                        liveActivity: liveActivity)
-        return (AppModel(store: store, health: health, recorder: recorder, checkpoints: checkpoints),
+        return (AppModel(store: store, health: health, recorder: recorder, checkpoints: checkpoints,
+                         defaults: defaults ?? isolatedDefaults("AppModelTests")),
                 health, checkpoints)
     }
 
     @Test func goalPersistsAndClamps() throws {
-        UserDefaults.standard.removeObject(forKey: AppModel.goalKey)
-        let (model, _, _) = try makeModel()
+        let defaults = isolatedDefaults("goalPersistsAndClamps")
+        let (model, _, _) = try makeModel(defaults: defaults)
         #expect(model.dailyGoal == 100)
 
         model.dailyGoal = 130
-        #expect(AppModel.storedGoal() == 130)
+        #expect(AppModel.storedGoal(in: defaults) == 130)
 
         model.dailyGoal = 20
         #expect(model.dailyGoal == 50)
 
         model.dailyGoal = 9_999
         #expect(model.dailyGoal == 500)
-        UserDefaults.standard.removeObject(forKey: AppModel.goalKey)
     }
 
     @Test func storeFailureMessageSurfacesDegradedMode() throws {
@@ -169,46 +170,39 @@ struct AppModelTests {
     }
 
     @Test func storedWeeklyTargetDefaultsAndClamps() {
-        let defaults = UserDefaults.standard
-        defaults.removeObject(forKey: AppModel.weeklyTargetKey)
-        #expect(AppModel.storedWeeklyTarget() == 3)
+        let defaults = isolatedDefaults("storedWeeklyTarget")
+        #expect(AppModel.storedWeeklyTarget(in: defaults) == 3)
 
         defaults.set(99, forKey: AppModel.weeklyTargetKey)
-        #expect(AppModel.storedWeeklyTarget() == 7)
+        #expect(AppModel.storedWeeklyTarget(in: defaults) == 7)
 
         defaults.set(0, forKey: AppModel.weeklyTargetKey)
-        #expect(AppModel.storedWeeklyTarget() == 1)
+        #expect(AppModel.storedWeeklyTarget(in: defaults) == 1)
 
         defaults.set(5, forKey: AppModel.weeklyTargetKey)
-        #expect(AppModel.storedWeeklyTarget() == 5)
-        defaults.removeObject(forKey: AppModel.weeklyTargetKey)
+        #expect(AppModel.storedWeeklyTarget(in: defaults) == 5)
     }
 
     @Test func weeklyDistanceGoalsAreOptionalAndPersistPerActivity() throws {
-        let defaults = UserDefaults.standard
+        let defaults = isolatedDefaults("weeklyDistanceGoals")
         for type in ActivityType.allCases {
-            defaults.removeObject(forKey: AppModel.weeklyDistanceGoalKey(for: type))
-            #expect(AppModel.storedWeeklyDistanceGoal(for: type) == nil)
+            #expect(AppModel.storedWeeklyDistanceGoal(for: type, in: defaults) == nil)
         }
 
-        let (model, _, _) = try makeModel()
+        let (model, _, _) = try makeModel(defaults: defaults)
         model.setWeeklyDistanceGoal(15, for: .run)
         model.setWeeklyDistanceGoal(42.5, for: .bike)
 
         #expect(model.weeklyDistanceGoal(for: .run) == 15)
         #expect(model.weeklyDistanceGoal(for: .walk) == nil)
         #expect(model.weeklyDistanceGoal(for: .bike) == 42.5)
-        #expect(AppModel.storedWeeklyDistanceGoal(for: .run) == 15)
-        #expect(AppModel.storedWeeklyDistanceGoal(for: .bike) == 42.5)
+        #expect(AppModel.storedWeeklyDistanceGoal(for: .run, in: defaults) == 15)
+        #expect(AppModel.storedWeeklyDistanceGoal(for: .bike, in: defaults) == 42.5)
 
         model.setWeeklyDistanceGoal(nil, for: .run)
         model.setWeeklyDistanceGoal(0, for: .bike)
         #expect(model.weeklyDistanceGoal(for: .run) == nil)
         #expect(model.weeklyDistanceGoal(for: .bike) == nil)
-
-        for type in ActivityType.allCases {
-            defaults.removeObject(forKey: AppModel.weeklyDistanceGoalKey(for: type))
-        }
     }
 
     @Test func dayChangeNotificationTriggersSync() async throws {
