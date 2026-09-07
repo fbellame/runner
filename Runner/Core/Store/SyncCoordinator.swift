@@ -234,13 +234,23 @@ final class SyncCoordinator {
         if !alreadyInHealth {
             do {
                 _ = try await health.saveWorkout(workout, points: points)
-                try? store.upsertWorkout(id: id, type: workout.type, start: workout.start,
-                                         end: workout.end, movingSeconds: workout.movingSeconds,
-                                         distanceMeters: workout.distanceMeters,
-                                         distanceEstimated: workout.distanceEstimated, points: points,
-                                         routeData: routeData, splitSeconds: workout.splitSeconds,
-                                         source: "runner", hkSynced: true, calories: kcal,
-                                         co2SavedGrams: co2, autoStarted: workout.autoStarted)
+                // The flip to `hkSynced: true` is the record that Health already
+                // has this workout. Swallowing its failure with `try?` left the
+                // row claiming `hkSynced == false` for a workout that IS in
+                // Health, so the next sync handed it to `retryPendingSaves`,
+                // which pushed it a second time — a duplicate in Health, from
+                // the same silent-`try?` family CRITICAL 5 exists to eliminate.
+                // Reported as `.savedLocallyOnly`: the durable local copy above
+                // succeeded, so the run is safe and announcing the save is still
+                // correct.
+                _ = try store.upsertWorkout(id: id, type: workout.type, start: workout.start,
+                                            end: workout.end, movingSeconds: workout.movingSeconds,
+                                            distanceMeters: workout.distanceMeters,
+                                            distanceEstimated: workout.distanceEstimated,
+                                            points: points,
+                                            routeData: routeData, splitSeconds: workout.splitSeconds,
+                                            source: "runner", hkSynced: true, calories: kcal,
+                                            co2SavedGrams: co2, autoStarted: workout.autoStarted)
             } catch {
                 failure = error.localizedDescription
             }

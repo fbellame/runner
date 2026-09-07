@@ -157,7 +157,11 @@ struct HistoryView: View {
                 GeometryReader { geo in
                     Rectangle().fill(.clear).contentShape(Rectangle())
                         .onTapGesture { location in
-                            let originX = geo[proxy.plotAreaFrame].origin.x
+                            // `plotAreaFrame` was renamed `plotFrame` in iOS 17
+                            // and is optional: Charts has no plot area until the
+                            // chart has been laid out at least once.
+                            guard let plotFrame = proxy.plotFrame else { return }
+                            let originX = geo[plotFrame].origin.x
                             if let date: Date = proxy.value(atX: location.x - originX) {
                                 selectedDay = SelectedDay(date: Calendar.current.startOfDay(for: date))
                             }
