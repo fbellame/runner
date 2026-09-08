@@ -45,11 +45,19 @@ targets:
           PreciseWorkout: "Precise location is needed to measure your distance and draw your route while recording a workout."
         NSMotionUsageDescription: "Runner uses motion activity to notice when you have been walking for a while, so it can record the walk for you."
         NSSupportsLiveActivities: true
-        # Exposes Documents/Diagnostics (the auto-pause traces) in the Files app
-        # and in Finder, so a field test can be pulled off the phone without a
-        # cable, an export screen, or a rebuild.
-        UIFileSharingEnabled: true
-        LSSupportsOpeningDocumentsInPlace: true
+        # Documents/Diagnostics holds the auto-pause traces: CSVs of raw lat/lon
+        # whose first row is the front door. UIFileSharingEnabled and
+        # LSSupportsOpeningDocumentsInPlace used to expose that folder in the
+        # Files app and Finder, which is a standing disclosure to every app the
+        # user ever hands a document picker to — not just to the field test it
+        # was added for. Pulling a trace does not need them: devicectl reads the
+        # app data container directly on a development build.
+        #
+        #   xcrun devicectl device copy from --device <UDID> \
+        #     --domain-type appDataContainer --domain-identifier com.farid.runner \
+        #     --source Documents/Diagnostics --destination ./pull/
+        #
+        # SessionTrace.excludeFromBackup keeps the same folder out of backups.
         UIBackgroundModes: [location, audio]
         INAlternativeAppNames:
           - INAlternativeAppName: Course
