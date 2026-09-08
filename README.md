@@ -23,6 +23,14 @@ xcodebuild test -project Runner.xcodeproj -scheme Runner \
   DEVELOPMENT_TEAM=QPX8CS262Z CODE_SIGNING_ALLOWED=NO
 ```
 
+## CI
+
+Every pull request into `main` runs the whole suite on a simulator
+([`.github/workflows/ci.yml`](.github/workflows/ci.yml)): XcodeGen regenerates
+the project, `xcodebuild test` runs it unsigned on the newest iPhone simulator
+of the runner, and per-target line coverage is printed in the run summary. A
+failing run uploads `TestResults.xcresult` as an artifact.
+
 ## Deploy to iPhone
 
 ```bash

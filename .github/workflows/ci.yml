@@ -1,0 +1,91 @@
+name: CI
+
+# Every pull request into main runs the full unit-test suite on a simulator
+# before the merge button is trusted. Pushes to main re-run it so the default
+# branch always has a green (or visibly red) head.
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+# A new push to the same branch cancels the run it supersedes.
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  test:
+    name: Unit tests (iOS Simulator)
+    runs-on: macos-26
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Toolchain
+        run: xcodebuild -version
+
+      # Runner.xcodeproj is not committed — XcodeGen builds it from project.yml.
+      - name: Install XcodeGen
+        run: brew install xcodegen
+
+      - name: Generate Runner.xcodeproj
+        run: xcodegen generate
+
+      # Any available iPhone on the newest installed iOS runtime; the image's
+      # exact device lineup changes with every Xcode bump, so never hardcode it.
+      - name: Choose a simulator
+        id: sim
+        run: |
+          udid=$(xcrun simctl list devices available --json \
+            | jq -r '.devices | to_entries
+                     | map(select(.key | test("SimRuntime.iOS")))
+                     | sort_by(.key) | last.value
+                     | map(select(.name | startswith("iPhone"))) | first | .udid')
+          if [ -z "$udid" ] || [ "$udid" = "null" ]; then
+            echo "No iPhone simulator available:" >&2
+            xcrun simctl list devices available >&2
+            exit 1
+          fi
+          echo "udid=$udid" >> "$GITHUB_OUTPUT"
+
+      # CODE_SIGNING_ALLOWED=NO keeps the app + widget extension buildable
+      # without the Apple ID that scripts/deploy.sh needs for a real device.
+      - name: Test
+        env:
+          NSUnbufferedIO: YES
+        run: |
+          set -o pipefail
+          xcodebuild test \
+            -project Runner.xcodeproj \
+            -scheme Runner \
+            -destination "platform=iOS Simulator,id=${{ steps.sim.outputs.udid }}" \
+            -derivedDataPath DerivedData \
+            -resultBundlePath TestResults.xcresult \
+            CODE_SIGNING_ALLOWED=NO \
+            | xcbeautify --renderer github-actions
+
+      # The scheme gathers coverage, so report it rather than let it go unread
+      # again — the app target is the stratum that has historically lagged.
+      - name: Coverage
+        if: always()
+        run: |
+          [ -d TestResults.xcresult ] || exit 0
+          {
+            echo "### Line coverage"
+            echo
+            echo "| Target | Coverage | Lines |"
+            echo "| --- | --- | --- |"
+            xcrun xccov view --report --json TestResults.xcresult \
+              | jq -r '.targets[]
+                       | "| \(.name) | \((.lineCoverage * 100 * 10 | round) / 10)% | \(.coveredLines)/\(.executableLines) |"'
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Upload test results
+        if: failure()
+        uses: actions/upload-artifact@v7
+        with:
+          name: TestResults
+          path: TestResults.xcresult
+          retention-days: 7
