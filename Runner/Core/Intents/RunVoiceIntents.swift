@@ -56,7 +56,6 @@ struct ResumeRunIntent: LiveActivityIntent {
         let dialog: IntentDialog = switch outcome {
         case .resumed: "Run resumed"
         case .alreadyRunning: "Run is already in progress"
-        case .waitingForMovement: "Run will resume when you start moving"
         case .ready: "Run has not started yet"
         case .noRun: "No run in progress"
         case .silent: IntentDialog(LocalizedStringResource(stringLiteral: ""))

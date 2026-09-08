@@ -5,12 +5,6 @@ import CoreLocation
 
 @MainActor
 struct RecorderAnnouncementTests {
-    private final class AnnouncementSpy: Announcing {
-        var events: [RunAnnouncement] = []
-        func announce(_ event: RunAnnouncement) {
-            events.append(event)
-        }
-    }
 
     private let base = Date().addingTimeInterval(-2)
 

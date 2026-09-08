@@ -5,10 +5,6 @@ import CoreLocation
 
 @MainActor
 struct AppModelRunIntentTests {
-    private final class AnnouncementSpy: Announcing {
-        var events: [RunAnnouncement] = []
-        func announce(_ event: RunAnnouncement) { events.append(event) }
-    }
 
     private func makeModel() throws -> (
         AppModel,
@@ -31,7 +27,8 @@ struct AppModelRunIntentTests {
                 announcer: announcements
             ),
             checkpoints: checkpoints,
-            pendingCelebrations: pending
+            pendingCelebrations: pending,
+            defaults: isolatedDefaults("AppModelRunIntentTests")
         )
         return (model, pending, health, announcements)
     }
@@ -117,19 +114,27 @@ struct AppModelRunIntentTests {
     @Test func healthFailureStillSavesLocallyAndAnnouncesSaved() async throws {
         let (model, pending, health, announcements) = try makeModel()
         health.saveError = NSError(domain: "HealthKit", code: 1)
-        let end = Date()
         model.recorder.start(activity: .run)
-        model.recorder.didUpdate(locations: [
+        // After start, not before: a fix timestamped ahead of its own session is the
+        // out-of-order pathology `finish()` now refuses to turn into a 0.00 km row,
+        // and this test is about HealthKit failing, not about that.
+        // Two fixes, not one: a single accepted sample has nothing to measure
+        // against, so the session covers 0 m and `finish()` now refuses to make
+        // a 0.00 km row out of it. This test is about HealthKit failing.
+        let start = Date()
+        let end = start.addingTimeInterval(1)
+        func fix(_ lon: Double, _ at: Date) -> CLLocation {
             CLLocation(
-                coordinate: CLLocationCoordinate2D(latitude: 45.5, longitude: -73.6),
+                coordinate: CLLocationCoordinate2D(latitude: 45.5, longitude: lon),
                 altitude: 30,
                 horizontalAccuracy: 5,
                 verticalAccuracy: 10,
                 course: 90,
                 speed: 2,
-                timestamp: end
+                timestamp: at
             )
-        ])
+        }
+        model.recorder.didUpdate(locations: [fix(-73.6, start), fix(-73.5999, end)])
 
         await model.finishRunFromIntent()
 
@@ -332,7 +337,8 @@ struct AppModelRunIntentTests {
         let firstProcess = AppModel(
             store: try DataStore(inMemory: true), health: FakeHealthStore(),
             recorder: WorkoutRecorder(provider: FakeLocationProvider(), checkpoints: checkpoints),
-            checkpoints: checkpoints, pendingCelebrations: firstProcessPending
+            checkpoints: checkpoints, pendingCelebrations: firstProcessPending,
+            defaults: isolatedDefaults("firstProcess")
         )
         let lastMovingAt = Date().addingTimeInterval(-30)
         try checkpoints.save(checkpoint(lastMovingAt: lastMovingAt))
@@ -350,7 +356,8 @@ struct AppModelRunIntentTests {
         let secondProcess = AppModel(
             store: try DataStore(inMemory: true), health: FakeHealthStore(),
             recorder: WorkoutRecorder(provider: FakeLocationProvider(), checkpoints: checkpoints),
-            checkpoints: checkpoints, pendingCelebrations: secondProcessPending
+            checkpoints: checkpoints, pendingCelebrations: secondProcessPending,
+            defaults: isolatedDefaults("secondProcess")
         )
         secondProcess.pendingResume = checkpoints.load()
 
@@ -410,8 +417,8 @@ struct AppModelRunIntentTests {
                                       route: [], splitSeconds: [])
         try pending.save(workout)
         model.pendingCelebration = workout
-        UserDefaults.standard.set(workout.start.timeIntervalSince1970,
-                                  forKey: AppModel.acknowledgedCelebrationKey)
+        model.defaults.set(workout.start.timeIntervalSince1970,
+                           forKey: AppModel.acknowledgedCelebrationKey)
         model.pendingCelebration = nil
         // The file survived the dismissal (a failed delete).
         try pending.save(workout)
@@ -419,7 +426,6 @@ struct AppModelRunIntentTests {
         await model.onLaunch()
 
         #expect(model.pendingCelebration == nil)
-        UserDefaults.standard.removeObject(forKey: AppModel.acknowledgedCelebrationKey)
     }
 
     /// IMPORTANT 7: the widget only renders Finish on manual-run Live

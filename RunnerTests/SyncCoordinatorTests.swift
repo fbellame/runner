@@ -9,12 +9,7 @@ struct SyncCoordinatorTests {
         return cal.date(byAdding: .day, value: offset, to: cal.startOfDay(for: .now))!
     }
 
-    private func freshDefaults() -> UserDefaults {
-        let name = "SyncCoordinatorTests-\(UUID().uuidString)"
-        let defaults = UserDefaults(suiteName: name)!
-        defaults.removePersistentDomain(forName: name)
-        return defaults
-    }
+    private func freshDefaults() -> UserDefaults { isolatedDefaults("SyncCoordinatorTests") }
 
     private func make(goal: Int = 100,
                       metrics: BodyMetrics = BodyMetrics(weightKg: nil, heightCm: nil,

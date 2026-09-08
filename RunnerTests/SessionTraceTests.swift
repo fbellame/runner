@@ -67,6 +67,32 @@ struct SessionTraceTests {
         #expect(csv.contains("stationary"))
     }
 
+    /// `ingest` returns early while `.manuallyPaused`, so a manual pause used to
+    /// make the trace simply stop — indistinguishable, on the way back in, from a
+    /// dead signal. One real 29-minute manual pause read exactly like a lost fix.
+    /// The mark rows carry no coordinate, so `TraceReplay` drops them and a replay
+    /// still sees only real samples.
+    @Test func marksRecordAStateChangeThatNoSampleWouldShow() throws {
+        let dir = tempDir()
+        let trace = try #require(SessionTrace(directory: dir, startedAt: Date(), activity: "run"))
+        trace.record(location: loc(x: 0, t: 0, speed: 3), usedSpeed: 3,
+                     state: "recording", armed: false, motion: "moving")
+        trace.mark(event: "manual-pause", state: "manuallyPaused", at: Date())
+        trace.mark(event: "manual-resume", state: "recording", at: Date())
+        trace.record(location: loc(x: 3, t: 1, speed: 3), usedSpeed: 3,
+                     state: "recording", armed: false, motion: "moving")
+        trace.close()
+
+        let file = try #require(try FileManager.default
+            .contentsOfDirectory(at: dir, includingPropertiesForKeys: nil).first)
+        let csv = try String(contentsOf: file, encoding: .utf8)
+
+        #expect(csv.contains("manual-pause"))
+        #expect(csv.contains("manual-resume"))
+        #expect(csv.split(separator: "\n").count == 5)   // header + 2 samples + 2 marks
+        #expect(TraceReplay.locations(from: csv, anchoredTo: Date()).count == 2)
+    }
+
     /// Round-trip: what the recorder writes must be replayable back through the
     /// recorder and produce the same verdicts.
     @Test func aWrittenTraceReplaysThroughTheRecorder() throws {

@@ -193,6 +193,14 @@ final class SyncCoordinator {
                                                 distanceMeters: workout.distanceMeters)
         let kcal = workoutCalories(type: workout.type, distanceMeters: workout.distanceMeters,
                                    movingSeconds: workout.movingSeconds, metrics: metricsProvider())
+        // The import loop below has always run this for workouts that arrived
+        // from Health; a ride Runner recorded ITSELF used to fall through to
+        // `upsertWorkout`'s `co2SavedGrams` default of 0 and stay at zero
+        // forever — no CO2 tile on the workout, nothing added to the lifetime
+        // total, the bike hub's green-impact card and Wrapped's impact card
+        // both under-counting. Same estimator, same rule, both directions.
+        let co2 = CO2Estimator.avoidedGrams(type: workout.type,
+                                            distanceMeters: workout.distanceMeters)
         let routeData = try? workout.route.encoded()
         // IMPORTANT 6: a checkpoint written by a pre-upgrade build corresponds,
         // if it was ever saved at all, to a row under a random UUID — recovery
@@ -215,7 +223,7 @@ final class SyncCoordinator {
                                     distanceEstimated: workout.distanceEstimated, points: points,
                                     routeData: routeData, splitSeconds: workout.splitSeconds,
                                     source: "runner", hkSynced: alreadyInHealth, calories: kcal,
-                                    autoStarted: workout.autoStarted)
+                                    co2SavedGrams: co2, autoStarted: workout.autoStarted)
         } catch {
             // Surface it the same way a failed sync is surfaced (TodayView reads
             // `lastError`), and skip the `syncNow()` below that would clear it.
@@ -226,13 +234,23 @@ final class SyncCoordinator {
         if !alreadyInHealth {
             do {
                 _ = try await health.saveWorkout(workout, points: points)
-                try? store.upsertWorkout(id: id, type: workout.type, start: workout.start,
-                                         end: workout.end, movingSeconds: workout.movingSeconds,
-                                         distanceMeters: workout.distanceMeters,
-                                         distanceEstimated: workout.distanceEstimated, points: points,
-                                         routeData: routeData, splitSeconds: workout.splitSeconds,
-                                         source: "runner", hkSynced: true, calories: kcal,
-                                         autoStarted: workout.autoStarted)
+                // The flip to `hkSynced: true` is the record that Health already
+                // has this workout. Swallowing its failure with `try?` left the
+                // row claiming `hkSynced == false` for a workout that IS in
+                // Health, so the next sync handed it to `retryPendingSaves`,
+                // which pushed it a second time — a duplicate in Health, from
+                // the same silent-`try?` family CRITICAL 5 exists to eliminate.
+                // Reported as `.savedLocallyOnly`: the durable local copy above
+                // succeeded, so the run is safe and announcing the save is still
+                // correct.
+                _ = try store.upsertWorkout(id: id, type: workout.type, start: workout.start,
+                                            end: workout.end, movingSeconds: workout.movingSeconds,
+                                            distanceMeters: workout.distanceMeters,
+                                            distanceEstimated: workout.distanceEstimated,
+                                            points: points,
+                                            routeData: routeData, splitSeconds: workout.splitSeconds,
+                                            source: "runner", hkSynced: true, calories: kcal,
+                                            co2SavedGrams: co2, autoStarted: workout.autoStarted)
             } catch {
                 failure = error.localizedDescription
             }
@@ -272,8 +290,28 @@ final class SyncCoordinator {
 
             let metrics = metricsProvider()
 
-            // Cache external workouts for the UI (ours are already cached at record time).
-            for w in hkWorkouts where !w.isFromThisApp {
+            // Cache HealthKit workouts for the UI. Written as one transaction:
+            // see `upsertWorkout(save:)`.
+            //
+            // Workouts whose source is Runner itself were skipped outright,
+            // on the assumption that this app had already written the local
+            // row at record time. After a delete-and-reinstall — or a store
+            // failure that dropped us onto the in-memory fallback — that is
+            // false: the HealthKit samples survive, the SwiftData rows do not.
+            // The result was asymmetric rather than merely lossy: those runs
+            // still flowed into `workoutsByDay`, so points and streaks stayed
+            // complete, while the workouts list, Routes, records, badges and
+            // Wrapped all behaved as if they had never happened. Import them
+            // too, but only when nothing local claims that `(type, start)` —
+            // otherwise every sync would overwrite the richer local row
+            // (route, splits) with Health's flattened copy.
+            //
+            // A workout with no distance is not a workout: it shows up as a
+            // "0.00 km run" that earns no points and says nothing. Neither
+            // direction stores one.
+            for w in hkWorkouts where w.distanceMeters > 0 {
+                if w.isFromThisApp,
+                   (try? store.workout(type: w.type, start: w.start)) != nil { continue }
                 let estKcal = workoutCalories(type: w.type, distanceMeters: w.distanceMeters,
                                               movingSeconds: w.movingSeconds, metrics: metrics)
                 let kcal = w.activeEnergyKcal ?? estKcal
@@ -286,12 +324,34 @@ final class SyncCoordinator {
                                         points: PointsEngine.workoutPoints(type: w.type,
                                                                            distanceMeters: w.distanceMeters),
                                         routeData: nil, splitSeconds: [],
-                                        source: "external", hkSynced: true,
+                                        // Provenance stays honest for a row
+                                        // recovered after a reinstall; it can
+                                        // never re-enter `pendingSync`, which
+                                        // requires `hkSynced == false`.
+                                        source: w.isFromThisApp ? "runner" : "external",
+                                        hkSynced: true,
                                         calories: kcal,
                                         caloriesFromHealth: w.activeEnergyKcal != nil,
                                         co2SavedGrams: co2,
-                                        co2FromHealth: w.co2SavedGrams != nil)
+                                        co2FromHealth: w.co2SavedGrams != nil,
+                                        save: false)
             }
+            // A throw anywhere above (or here) leaves inserted-but-uncommitted
+            // objects in the context, which the next unrelated `save()` would
+            // then commit half-applied. Roll back instead, and let the catch
+            // below report it.
+            do {
+                try store.save()
+            } catch {
+                store.rollback()
+                throw error
+            }
+            // Field rows that predate the guards above: two 0.00 km runs
+            // reached the store before `finish()` learned to refuse a session
+            // with no span and no distance, and they are still in History
+            // saying nothing. Cheap, idempotent, and self-healing — it also
+            // catches anything a future path lets through.
+            try store.purgeZeroDistanceWorkouts()
 
             // Day inputs: HK workouts + local workouts that never reached HK.
             var workoutsByDay = HealthMappers.groupByDay(hkWorkouts, calendar: cal)
@@ -376,12 +436,24 @@ final class SyncCoordinator {
                                           splitSeconds: rec.splitSeconds)
             do {
                 _ = try await health.saveWorkout(workout, points: rec.points)
+                // Every column, from the row itself. This call used to pass six
+                // of eleven and let the rest fall to their defaults —
+                // `upsertWorkout` assigns `co2SavedGrams` and `autoStarted`
+                // unconditionally (unlike `calories`, which is deliberately
+                // frozen), so a HealthKit retry silently reset them. An
+                // auto-detected walk lost the flag that answers "why is this
+                // walk here", and now that recorded rides carry real CO2 the
+                // same path would erase that too.
                 try store.upsertWorkout(id: rec.id, type: rec.type, start: rec.start, end: rec.end,
                                         movingSeconds: rec.movingSeconds,
                                         distanceMeters: rec.distanceMeters,
                                         distanceEstimated: rec.distanceEstimated, points: rec.points,
                                         routeData: rec.routeData, splitSeconds: rec.splitSeconds,
-                                        source: rec.source, hkSynced: true, calories: rec.calories)
+                                        source: rec.source, hkSynced: true, calories: rec.calories,
+                                        caloriesFromHealth: rec.caloriesFromHealth,
+                                        co2SavedGrams: rec.co2SavedGrams,
+                                        co2FromHealth: rec.co2FromHealth,
+                                        autoStarted: rec.autoStarted)
             } catch {
                 lastError = error.localizedDescription
             }

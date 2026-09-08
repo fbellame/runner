@@ -5,29 +5,27 @@ struct TrophyRoomView: View {
     let goalWeeks: [CompletedWeek]
     private let seenStore = TrophySeenStore()
 
-    private var activityBadges: [Badge] {
-        TrophyMath.allBadges(summaries)
-    }
-
-    private var weeklyBadges: [Badge] {
-        TrophyMath.weeklyBadges(goalWeeks, calendar: .current)
-    }
-
-    private var badges: [Badge] {
-        activityBadges + weeklyBadges
-    }
-
+    /// Derived once per pass and handed down.
+    ///
+    /// These were computed properties, and a computed property is not a cache:
+    /// `activityBadges` was read once in each of four `badgeSection` calls and
+    /// again via `badges` in `onAppear`, so `TrophyMath.allBadges` — ~43k
+    /// iterations over a 766-workout history — ran five times per render.
     var body: some View {
-        ScrollView {
+        let activityBadges = TrophyMath.allBadges(summaries)
+        let weeklyBadges = TrophyMath.weeklyBadges(goalWeeks, calendar: .current)
+
+        return ScrollView {
             VStack(alignment: .leading, spacing: 22) {
-                weeklyGoalsSection
-                badgeSection(title: String(localized: "Global"), scope: .global, accent: .rLime)
-                badgeSection(title: ActivityType.run.localizedName, scope: .perType(.run),
-                             accent: ActivityType.run.accent)
-                badgeSection(title: ActivityType.walk.localizedName, scope: .perType(.walk),
-                             accent: ActivityType.walk.accent)
-                badgeSection(title: ActivityType.bike.localizedName, scope: .perType(.bike),
-                             accent: ActivityType.bike.accent)
+                weeklyGoalsSection(weeklyBadges)
+                badgeSection(activityBadges, title: String(localized: "Global"),
+                             scope: .global, accent: .rLime)
+                badgeSection(activityBadges, title: ActivityType.run.localizedName,
+                             scope: .perType(.run), accent: ActivityType.run.accent)
+                badgeSection(activityBadges, title: ActivityType.walk.localizedName,
+                             scope: .perType(.walk), accent: ActivityType.walk.accent)
+                badgeSection(activityBadges, title: ActivityType.bike.localizedName,
+                             scope: .perType(.bike), accent: ActivityType.bike.accent)
             }
             .padding(18)
         }
@@ -35,11 +33,11 @@ struct TrophyRoomView: View {
         .navigationTitle(String(localized: "Trophy Room"))
         .navigationBarTitleDisplayMode(.large)
         .onAppear {
-            seenStore.markSeen(badges.filter(\.earned).map(\.id))
+            seenStore.markSeen((activityBadges + weeklyBadges).filter(\.earned).map(\.id))
         }
     }
 
-    private var weeklyGoalsSection: some View {
+    private func weeklyGoalsSection(_ weeklyBadges: [Badge]) -> some View {
         VStack(alignment: .leading, spacing: 10) {
             MicroLabel(text: String(localized: "Weekly goals"))
             LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 10), count: 3), spacing: 10) {
@@ -52,7 +50,8 @@ struct TrophyRoomView: View {
         }
     }
 
-    private func badgeSection(title: String, scope: BadgeScope, accent: Color) -> some View {
+    private func badgeSection(_ activityBadges: [Badge], title: String,
+                              scope: BadgeScope, accent: Color) -> some View {
         VStack(alignment: .leading, spacing: 10) {
             MicroLabel(text: title)
             LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 10), count: 3), spacing: 10) {

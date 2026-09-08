@@ -253,34 +253,28 @@ final class HealthStore: HealthStoring {
         }
     }
 
-    /// Distance for an imported workout, resilient to how the source stored it.
-    /// Cycling workouts frequently expose no per-type `distanceCycling` statistic
-    /// (indoor rides, some third-party sources), which previously read as 0 km; fall
-    /// back to the other distance type and finally to the workout's aggregate total.
+    /// Reads the three distance statistics off the sample and hands the choice
+    /// between them to `HealthMappers.resolvedDistanceMeters`, which is pure and
+    /// tested. Only the reading is left here, because only the reading needs a
+    /// real `HKWorkout`.
     private func workoutDistanceMeters(_ workout: HKWorkout, type: ActivityType) -> Double {
-        let primary = (type == .bike) ? distanceCycling : distanceWalkRun
-        let secondary = (type == .bike) ? distanceWalkRun : distanceCycling
-        for distanceType in [primary, secondary] {
-            if let meters = workout.statistics(for: distanceType)?.sumQuantity()?
-                .doubleValue(for: .meter()), meters > 0 {
-                return meters
-            }
+        func meters(_ quantityType: HKQuantityType) -> Double? {
+            workout.statistics(for: quantityType)?.sumQuantity()?.doubleValue(for: .meter())
         }
-        return workout.totalDistance?.doubleValue(for: .meter()) ?? 0
+        return HealthMappers.resolvedDistanceMeters(
+            type: type,
+            cyclingMeters: meters(distanceCycling),
+            walkRunMeters: meters(distanceWalkRun),
+            totalMeters: workout.totalDistance?.doubleValue(for: .meter()))
     }
 
-    /// Real active energy (kcal) for an imported workout, or nil when the source
-    /// recorded none. Prefer the per-type statistic; fall back to the aggregate.
+    /// Same split as `workoutDistanceMeters`: read here, decide in `HealthMappers`.
     private func workoutEnergyKcal(_ workout: HKWorkout) -> Double? {
         let unit = HKUnit.kilocalorie()
-        if let kcal = workout.statistics(for: activeEnergyType)?.sumQuantity()?
-            .doubleValue(for: unit), kcal > 0 {
-            return kcal
-        }
-        if let kcal = workout.totalEnergyBurned?.doubleValue(for: unit), kcal > 0 {
-            return kcal
-        }
-        return nil
+        return HealthMappers.resolvedEnergyKcal(
+            activeEnergyKcal: workout.statistics(for: activeEnergyType)?
+                .sumQuantity()?.doubleValue(for: unit),
+            totalEnergyKcal: workout.totalEnergyBurned?.doubleValue(for: unit))
     }
 
     func saveWorkout(_ workout: RecordedWorkout, points: Int) async throws -> UUID {

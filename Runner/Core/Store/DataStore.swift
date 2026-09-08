@@ -28,6 +28,28 @@ final class DataStore {
 
     func save() throws { try context.save() }
 
+    /// Drops every uncommitted change in the context.
+    ///
+    /// The batched import (`upsertWorkout(save: false)`) inserts many rows before
+    /// one commit. If anything in that loop throws, the inserted objects are still
+    /// sitting in the context and the next unrelated `save()` anywhere in the app
+    /// would commit them half-applied. The import rolls back instead.
+    func rollback() { context.rollback() }
+
+    /// True while the context holds writes that have not been committed. Exists
+    /// so the batched sync path can be tested for what it actually claims —
+    /// that it defers its commit — rather than only for its end state.
+    var hasPendingChanges: Bool { context.hasChanges }
+
+    /// Test seam. Views read workouts through `@Query` and the sync path fetches
+    /// by range or predicate, so nothing in the app calls this; it exists so a
+    /// test can assert what the store actually holds after a write.
+    func allWorkouts() throws -> [WorkoutRec] {
+        try context.fetch(FetchDescriptor<WorkoutRec>(sortBy: [SortDescriptor(\.start, order: .reverse)]))
+    }
+
+    /// Test seam, same reason as `allWorkouts()`: nothing in the app counts
+    /// profiles, but "exactly one row is ever created" is worth pinning.
     func profileCount() throws -> Int {
         try context.fetchCount(FetchDescriptor<UserProfile>())
     }
@@ -119,7 +141,7 @@ final class DataStore {
                        splitSeconds: [Double], source: String, hkSynced: Bool,
                        calories: Double = 0, caloriesFromHealth: Bool = false,
                        co2SavedGrams: Double = 0, co2FromHealth: Bool = false,
-                       autoStarted: Bool = false) throws -> WorkoutRec {
+                       autoStarted: Bool = false, save: Bool = true) throws -> WorkoutRec {
         #if DEBUG
         // Test-only seam. SwiftData's write cannot be made to fail on demand,
         // and the branch that matters most — a failed durable write must never
@@ -170,7 +192,15 @@ final class DataStore {
                              autoStarted: autoStarted)
             context.insert(rec)
         }
-        try context.save()
+        // `save: false` lets a caller writing many rows at once commit them in a
+        // single transaction. Every commit invalidates every `@Query` in the view
+        // tree, so a per-row commit made the sync redraw the visible tab once per
+        // workout — 718 times on a full backfill. The durable single-workout
+        // paths (`saveRecorded`, `retryPendingSaves`) keep committing immediately:
+        // their whole contract is that the row exists before the call returns.
+        if save {
+            try context.save()
+        }
         return rec
     }
 
@@ -210,8 +240,27 @@ final class DataStore {
         return try context.fetch(descriptor)
     }
 
-    func allWorkouts() throws -> [WorkoutRec] {
-        try context.fetch(FetchDescriptor<WorkoutRec>(sortBy: [SortDescriptor(\.start, order: .reverse)]))
+    /// Deletes every stored workout that covered no distance, and reports how
+    /// many went.
+    ///
+    /// A "0.00 km run" is not a workout: it earns no points, draws no route,
+    /// carries no pace, and tells the reader nothing — it is always the residue
+    /// of a session that failed rather than one that happened. Two reached the
+    /// field store before `WorkoutRecorder.finish()` learned to refuse a session
+    /// with no span and no distance, and they are still in History.
+    ///
+    /// Run on every sync rather than once behind a flag: it is a single indexed
+    /// predicate fetch, it is idempotent, and making it self-healing means a
+    /// future path that lets one through cannot leave permanent litter.
+    @discardableResult
+    func purgeZeroDistanceWorkouts() throws -> Int {
+        let stale = try context.fetch(
+            FetchDescriptor<WorkoutRec>(predicate: #Predicate { $0.distanceMeters <= 0 })
+        )
+        guard !stale.isEmpty else { return 0 }
+        for row in stale { context.delete(row) }
+        try context.save()
+        return stale.count
     }
 
     func pendingSync() throws -> [WorkoutRec] {

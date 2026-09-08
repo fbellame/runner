@@ -1,6 +1,6 @@
 # Runner — Unified Specification
 
-**Current as of v1.10 (build 21), 2026-08-15.** This is the single description
+**Current as of v1.11 (build 25), 2026-09-07.** This is the single description
 of what the app does today. It replaces reading fifteen epic designs to answer
 one question.
 
@@ -29,7 +29,7 @@ One user, one device, no accounts, no server, no analytics.
 
 | | |
 |---|---|
-| Target | iOS 26, iPhone only, portrait only |
+| Target | iOS 18+, iPhone only, portrait only (`project.yml` is the source of truth) |
 | UI | SwiftUI, `@Observable`, dark-only ("Electric Night") |
 | Persistence | SwiftData (`DayLedger`, `WorkoutRec`, `UserProfile`) |
 | Health | HealthKit — read steps/distance/workouts, write recorded workouts |
@@ -50,8 +50,9 @@ Three tabs (`RootTabView`), plus modals:
   per-activity hubs, records, split analytics, Wrapped archive.
 - **Routes** — the map surface.
 
-Modals: **Record** (full-screen cover), **Settings**, **Trophy Room**,
-**Workout Summary** (with celebrations), **Monthly Wrapped**.
+Modals: **Record** (full-screen cover), **Settings**, **Profile** (body
+metrics, pushed from Settings — it gates every calorie number), **Trophy
+Room**, **Workout Summary** (with celebrations), **Monthly Wrapped**.
 
 ## 4. Points engine
 
@@ -82,6 +83,15 @@ so SwiftData lightweight-migrates existing stores.
 ("runner" | "external"), `hkSynced`, calories (+`caloriesFromHealth`), CO₂
 (+`co2FromHealth`), `autoStarted`.
 
+**A workout with no distance is not stored.** `finish()` refuses to produce one
+on every manual path, the import loop skips them, and `purgeZeroDistanceWorkouts()`
+runs on every sync to clear anything a past build left behind. A "0.00 km run"
+earns no points, draws no route and carries no pace — it is always the residue of
+a session that failed, never one that happened. The auto-walk path is the single
+exception *during* finish (`requiringDistance: false`), because a detected walk
+legitimately has zero GPS metres until the Health backfill runs; it then applies
+its own, stricter 100 m floor.
+
 **`UserProfile`** — height, weight, birth date, sex, each with a manual-override
 flag so a Health value never silently overwrites a typed one.
 
@@ -100,6 +110,16 @@ Real Health values are preferred over estimates and marked as such
 (`caloriesFromHealth`, `co2FromHealth`, `distanceEstimated`). Rides imported
 without distance get an estimate; Bixi rides carry CO₂ in workout metadata,
 with `CO2Estimator` as the fallback. Settings has a HealthKit diagnostics screen.
+
+Workouts whose HealthKit source is Runner itself are imported **only when no
+local row already claims that `(type, start)`** — normally never, since the app
+wrote that row at record time, but after a delete-and-reinstall the HealthKit
+samples survive and the SwiftData rows do not. Skipping them outright used to
+make every run Runner ever recorded vanish from History, Routes, records and
+badges while still counting toward points and streaks.
+
+The import is one transaction (`upsertWorkout(save: false)` + a single commit),
+and rolls the context back if any row throws.
 
 ## 7. Recording pipeline
 
@@ -175,7 +195,9 @@ auto-walk one.
   the timer running; only pauses stop it.
 - **Checkpoints** every **30 s** to `CheckpointStore`, including whether the
   session was manually paused, so a relaunch rehydrates the real state.
-- **Finish** trims the tail to the last genuinely-moving sample.
+- **Finish** trims the tail to the last genuinely-moving sample, and refuses a
+  session that covered no distance — announcing `.runCancelled` rather than
+  going silent, since silence reads as a save.
 
 ### 7.6 Session trace (diagnostics)
 
@@ -242,6 +264,9 @@ All pure math, all unit-tested:
 walking at MET 3.0 / 4.5 km/h, stride estimated from height and sex, calories
 per step from weight. Health's `activeEnergyBurned` wins when available.
 `CO2Estimator` + `Co2Metadata` produce CO₂ avoided, preferring workout metadata.
+Both write paths apply it: a ride Runner recorded itself gets the same estimate
+as one imported from Bixi, and a HealthKit retry preserves it rather than
+resetting the column.
 
 ## 12. Design & i18n
 
@@ -253,7 +278,16 @@ so once produced five duplicate keys.
 
 ## 13. Testing
 
-386 tests, Swift Testing (`@Test` / `#expect`), no compiler warnings.
+436 tests, Swift Testing (`@Test` / `#expect`), 1 known warning (HealthKit's
+`totalEnergyBurned`, deprecated in iOS 18 and deliberately kept as the
+`activeEnergyBurned` fallback for sources that only set the aggregate). Shared
+test doubles live in `Fixtures.swift`, `FakeHealthStore.swift` and
+`FakeMotionActivityProvider.swift` — not inside whichever test file happened to
+need them first.
+
+Release contract tests assert **floors, not literals**: a test that pinned the
+exact marketing version failed on every bump and trained everyone to ignore a
+red suite.
 
 All engines are pure and tested directly. Seams (`LocationProviding`,
 `MotionActivityProviding`, `HealthStoring`, `Announcing`,
@@ -263,6 +297,41 @@ and provider configuration.
 
 Note: `#expect(d.update(…) == false)`, never `#expect(!d.update(…))` — the macro
 captures the receiver immutably and a `mutating` call will not compile.
+
+**Coverage, measured 2026-09-07** (the scheme gathers it on every run):
+37.6% of the app target. That single number hides the only distinction that
+matters:
+
+| Stratum | Coverage |
+|---|---|
+| `Features/*` non-view (`HubMath`, `InsightsMath`, `TrophyMath`, `WrappedMath`, `ActivityStats`, `SplitStats`, `GoalsMath`, `RouteSelection`, `WrappedBannerState`) | 97.7% |
+| `Core/` + `App/` (recorder 97.8%, sync 97.0%, store 97.9%, model 90.7%) | 74.2% |
+| SwiftUI views | **13.7%** |
+
+The view figure is not verification — **no test asserts anything about any
+view**. The unit bundle is hosted in the app, so launching it renders
+`RootTabView` and `TodayView` once; that incidental render is the whole 13%,
+which is why `HistoryView` and `RoutesView` read 0.00% (they need a tap nobody
+makes).
+
+This is where the defects are. The 2026-09-05 audit found 20, and its fix
+commit touched twelve view files — every one of them at 0.00%. The suite was
+green throughout. The answer is not "write UI tests": four of those defects
+were pure functions wearing a `View` costume, and they now live in
+`RouteSelection`, `WrappedBannerState`, `HubChartRange.series` and `AppModel`,
+all covered, pinned by `ViewDerivationTests`. Move that kind of derivation out
+of the body and the 97.7% stratum covers it; what stays in a view body should
+be layout.
+
+The lower-coverage seams, and why: `LiveActivityController` 1.8% and
+`SystemMotionActivityProvider` 6.2% are ActivityKit/CoreMotion and are covered
+instead through their extracted seams (`LiveActivityPresenting`,
+`LiveActivityRequestGate`, `LiveActivityOrphanSelector` — all 100%).
+`HealthStore` stays at 19.6% and that number will not move much: the branching
+that mattered (`resolvedDistanceMeters`, the cycling → walk-run → aggregate
+fallback that exists because Bixi rides read 0 km, and `resolvedEnergyKcal`) now
+lives in `HealthMappers` at 100%, and what is left behind is the HealthKit query
+plumbing — reachable only from a real phone, and correctly so.
 
 ```bash
 xcodebuild test -project Runner.xcodeproj -scheme Runner \
@@ -290,9 +359,16 @@ there (two places: app and widget), never with PlistBuddy.
 
 Each of these was paid for with a bug or an explicit decision.
 
-1. **No `distanceFilter` on the location manager.** The auto-pause detector only
-   advances on delivered samples and nothing runs on wall-clock time, so any
-   filter means "stop moving ⇒ no callbacks ⇒ never auto-pause".
+Where an invariant has a test that fails when it is undone, the test is named.
+The rest are still prose, and prose does not fail a build — treat an unenforced
+entry as the next one worth pinning, not as a weaker rule.
+
+1. **No `distanceFilter` on the location manager**, no automatic pausing, and
+   background updates on. The auto-pause detector only advances on delivered
+   samples and nothing runs on wall-clock time, so anything that stops delivery
+   means "stop moving ⇒ no callbacks ⇒ never auto-pause". All three, plus the
+   `UIBackgroundModes` entries they need, are pinned by
+   `LocationConfigurationInvariantTests`.
 2. **Never derive speed from two consecutive fixes.** Use `SpeedEstimator`.
    Noise over a short baseline is indistinguishable from running.
 3. **The motion gate may never block or delay a pause.** `CMMotionActivity`
@@ -305,9 +381,26 @@ Each of these was paid for with a bug or an explicit decision.
 6. **Starting from the Lock Screen must not force an unlock.** Sync on
    foreground instead.
 7. **Auto-detected walks stay completely silent.**
-8. **Never JSON-round-trip `Localizable.xcstrings`.**
+8. **Never JSON-round-trip `Localizable.xcstrings`.** Pinned by
+   `StringCatalogInvariantTests.theStringCatalogHasNoDuplicateKeys`, which counts
+   key lines textually — a JSON parse cannot see a duplicate, the last one wins.
 9. **Bump the build number in `project.yml`**, not in the generated plists.
 10. **Timer keeps running through GPS gaps** (tunnels); only pauses stop it.
+11. **A workout with no distance is never stored.** See section 5.
+12. **A split faster than `ActivityStats.minimumPlausibleSplitSeconds` did not
+    happen.** One re-acquired fix can close several kilometre boundaries at
+    once; the zero-second splits that produces used to become the all-time
+    "Fastest 1 km" and fire a bogus achievement.
+13. **Every `upsertWorkout` call passes every column it wants kept.** The method
+    assigns `co2SavedGrams` and `autoStarted` unconditionally, so an omitted
+    argument is a reset, not a no-op.
+14. **A save that did not become durable is never described as saved** — in the
+    return value (`isLocallyDurable`) *and* in the UI copy the user reads.
+15. **Localized format strings use `%lld` with `Int64`**, never `%d` with `Int`.
+    Pinned by `StringCatalogInvariantTests` on both sides — the catalog and the
+    `String(localized:)` call sites. Scoped to localized strings on purpose: a
+    hard-coded format that never reaches the catalog is out of scope, and
+    `Format.duration` builds "1:23:45" with `%d` correctly.
 
 ## 16. Open and unverified
 
@@ -315,6 +408,15 @@ Each of these was paid for with a bug or an explicit decision.
   ask before building anything on top of it.
 - **The motion gate and session traces have never run through a real workout.**
   They shipped in build 21 and were merged before field validation.
+- **The 2026-09-05 audit fixes are unverified in the field.** They ship in
+  build 24 and were proven only against the test suite. Four of them are now
+  also pinned by unit tests (`ViewDerivationTests`), which is not the same as
+  having been seen to work outside.
+- **No real session trace has ever been committed**, so §7.6's promise is
+  unfulfilled and every replay test feeds `TraceReplay` a synthetic trace.
+  [`FIELD-CHECKLIST.md`](FIELD-CHECKLIST.md) is one outdoor session that closes
+  this and the three items above it; the trace step is the one that makes the
+  result permanent.
 - No sharing for Monthly Wrapped (deferred, not dropped).
 - `autoStarted` on `WorkoutRec` is surfaced in no UI; it exists so "why is this
   walk here" has an answer.
@@ -334,6 +436,11 @@ Each of these was paid for with a bug or an explicit decision.
 | v1.8 | Monthly Wrapped | `2026-07-10-monthly-wrapped-design.md` |
 | v1.9 | Goals | `2026-07-10-runner-goals-design.md` |
 | v1.10 | Hands-free recording | `2026-07-24-hands-free-recording-design.md` |
+
+The labels the code comments cite (`CRITICAL 3`, `IMPORTANT 6`, `Task 8`,
+`fix wave 3`) are indexed in [`REVIEW-LOG.md`](REVIEW-LOG.md). The full-codebase
+audit of 2026-09-05 and the fixes that came out of it are in that commit's
+message; don't add new numbered labels.
 
 The auto-pause rebuild that followed the v1.10 field tests has no design
 document of its own — it was debugging, and its reasoning is in commits

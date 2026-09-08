@@ -69,6 +69,14 @@ final class WorkoutRecorder: LocationProvidingDelegate {
 
     /// Must match a key in Info.plist's NSLocationTemporaryUsageDescriptionDictionary.
     static let fullAccuracyPurposeKey = "PreciseWorkout"
+    /// How far back to replay CoreMotion when seeding `motionGate` at session
+    /// start. Matches `MotionGate.maxSampleAge`: a classification older than the
+    /// gate would accept anyway is not worth fetching.
+    static let motionSeedLookback: TimeInterval = MotionGate.maxSampleAge
+    /// How long the recorder tolerates GPS too inaccurate to judge speed before it
+    /// stops the clock — and only ever with the coprocessor's agreement. See the
+    /// blind-pause branch in `ingest`.
+    static let blindPauseAfter: TimeInterval = 60
     /// Hoisted out of `liveSnapshot()`: that method runs on every accepted GPS
     /// sample and again on every auto-pause detector tick — up to twice per
     /// sample — and `reducedAccuracy` being true is a persistent per-session
@@ -104,6 +112,10 @@ final class WorkoutRecorder: LocationProvidingDelegate {
     private var trace: SessionTrace?
     private var autoPause: AutoPauseDetector?
     private var lastCheckpointAt: Date?
+    /// The last sample whose accuracy was good enough to yield a speed estimate.
+    /// Nil until the first one arrives; the blind-pause branch falls back to the
+    /// session start so a session that never sees a usable fix still stops.
+    private var lastUsableSpeedAt: Date?
     private var lastSplitMovingSeconds: Double = 0
     private var timeAnchor: Date?
     private var pendingGap = false
@@ -214,6 +226,11 @@ final class WorkoutRecorder: LocationProvidingDelegate {
         armedTimeoutTask = nil
         sessionToken += 1
         let session = sessionToken
+        // A `.finished` snapshot belongs to the session that produced it.
+        // `finish()` sets it and then calls `reset()`, so it cannot be cleared
+        // there without breaking the finish -> `completeSave()`/`discard()`
+        // handoff; clearing it here is what stops it reaching the next session.
+        lastFinishedSnapshot = nil
 
         self.activity = activity
         self.autoStarted = autoStarted
@@ -241,12 +258,27 @@ final class WorkoutRecorder: LocationProvidingDelegate {
         }
         lastMovingAt = checkpoint?.route.last?.t
         lastKeptLocation = nil
+        lastUsableSpeedAt = nil
         speedEstimator.reset()
         // A classification from before this session says nothing about it.
         motionGate.clear()
         if let motion, motion.isAvailable, motion.isAuthorized {
             motion.startUpdates { [weak self] sample in
                 self?.motionGate.observe(sample)
+            }
+            // `startActivityUpdates` delivers only when the classification CHANGES.
+            // A session begun while the user is already standing still therefore
+            // receives nothing at all, and the gate abstains through exactly the
+            // window it was built for — the trailhead. Seven field sessions bear
+            // this out: 8760 samples, not one veto, including 27–31 s of armed
+            // standing per run. Replaying the recent past seeds it, the same trick
+            // `AutoWalkCoordinator.onForeground()` already uses. `observe` keeps the
+            // newest sample, so racing the live stream is safe, and the token check
+            // drops a reply that lands after a new session has begun.
+            Task { [weak self] in
+                let seed = await motion.history(from: now - Self.motionSeedLookback, to: now)
+                guard let self, self.sessionToken == session else { return }
+                for sample in seed { self.motionGate.observe(sample) }
             }
         }
         trace?.close()
@@ -318,6 +350,7 @@ final class WorkoutRecorder: LocationProvidingDelegate {
         let wasRecording = state == .recording
         if wasRecording { advanceTimer(to: clock()) }
         state = .manuallyPaused
+        trace?.mark(event: "manual-pause", state: String(describing: state), at: clock())
         saveCheckpoint(at: clock())
         if wasRecording, announcing, !autoStarted { announcer.announce(.paused) }
         if presentsLiveActivity {
@@ -325,20 +358,31 @@ final class WorkoutRecorder: LocationProvidingDelegate {
         }
     }
 
-    // No symmetric double-announce risk here: this is reachable ONLY from
-    // `.manuallyPaused` (the guard below), and the only path into `.manuallyPaused`
-    // is `pauseManually`, so there is exactly one `resumeManually` per pause. Unlike
-    // `pauseManually`, it always announces — even when the prior stop was originally
-    // an auto-pause — because the tap itself is the user's own explicit "resume"
-    // action and deserves its own confirmation, distinct from whatever announced
-    // (or didn't) the stop that preceded it.
+    // Resumes either kind of pause. It used to accept `.manuallyPaused` only, which
+    // made the Lock Screen lie: `liveActivityStatus` maps BOTH paused states to
+    // `.paused`, so the widget renders "Resume ▶" over an auto-paused run, and
+    // `togglePauseFromIntent` — seeing a state that wasn't `.manuallyPaused` — called
+    // `pauseManually()` instead. The first press did the opposite of its label and,
+    // worse, converted the auto-pause into a manual one, which switches OFF
+    // resume-on-movement: press once, pocket the phone, and the run stays frozen for
+    // the rest of the outing. Four field sessions show the resulting double-press.
+    //
+    // The `!isArmed` guard replaces the invariant that used to come for free from
+    // `pauseManually` refusing to run while armed. An armed session sits in
+    // `.autoPaused`, so without it this would re-enter `.recording` behind the
+    // one-shot `isArmed` rebase in `ingest` — the very thing that guard protects.
+    //
+    // Announcing is unconditional either way: the press is the user's own explicit
+    // action and deserves its own confirmation, distinct from whatever announced (or
+    // didn't) the stop before it.
     func resumeManually(announcing: Bool = true) {
-        guard state == .manuallyPaused else { return }
+        guard !isArmed, state == .manuallyPaused || state == .autoPaused else { return }
         autoPause = AutoPauseDetector(activity: activity)
         lastKeptLocation = nil
         pendingGap = !route.isEmpty // fresh segment; gap marker will show honestly
         timeAnchor = clock()
         state = .recording
+        trace?.mark(event: "manual-resume", state: String(describing: state), at: clock())
         // Symmetric with pauseManually(): persist the un-paused state immediately
         // rather than waiting for the next periodic checkpoint (up to 30 s away),
         // so a crash right after resuming doesn't rehydrate the run as paused.
@@ -352,7 +396,13 @@ final class WorkoutRecorder: LocationProvidingDelegate {
     /// `endingAt` supplies the true end when the caller knows it — an auto-stop
     /// fires five minutes after the walking actually stopped, and that stationary
     /// tail must not be baked into the workout.
-    func finish(endingAt end: Date? = nil) -> RecordedWorkout? {
+    /// - Parameter requiringDistance: when true (every manual path), a session
+    ///   that covered no distance yields nil instead of a 0.00 km workout.
+    ///   `AutoWalkCoordinator` passes false: a detected walk legitimately
+    ///   finishes with zero GPS metres — the stretch before GPS was running is
+    ///   backfilled from Health afterwards — and it applies its own, stricter
+    ///   100 m floor once that has happened.
+    func finish(endingAt end: Date? = nil, requiringDistance: Bool = true) -> RecordedWorkout? {
         // A session that has already been reset (e.g. the armed timeout fired
         // in the same MainActor turn a slide-to-finish landed) has no real
         // span to report; building a workout here would offer the user a
@@ -370,7 +420,34 @@ final class WorkoutRecorder: LocationProvidingDelegate {
         // every delegate callback through an unstructured Task, which is not
         // FIFO-guaranteed. Without this clamp, end < start would reach HealthKit's
         // HKQuantitySample(start:end:), which raises an uncatchable ObjC exception.
-        let finishedAt = max(start, end ?? clock())
+        // The route's own last point is a better end than a raced `end` that landed
+        // before `start`: it is the last moment the session demonstrably existed.
+        // Without it a real session collapses to start == end, which HealthKit
+        // rejects outright — one field row carried 868 m of route and 0 moving
+        // seconds and stayed an un-synced local orphan because of exactly this.
+        let finishedAt = max(start, end ?? clock(), route.last?.t ?? start)
+        // And with an honest end in hand: a session that covered no distance
+        // never happened, however long it ran. The previous rule only rejected a
+        // session with no span AND no distance, which still let through the run
+        // that has a duration but never got a usable fix — it lands in History as
+        // a "0.00 km run" that earns no points, draws no route and carries no
+        // pace. `discardArmedSession()` is the right cleanup: same "nothing to
+        // report" outcome, same Live Activity teardown.
+        //
+        // Say so out loud. A hands-free user who slid to finish is owed an
+        // answer, and `.runCancelled` is the existing cue for "there was
+        // nothing to keep" — silence would read as a save.
+        guard distanceMeters > 0 || !requiringDistance else {
+            if !autoStarted { announcer.announce(.runCancelled) }
+            discardArmedSession()
+            return nil
+        }
+        // The original rule, still needed for the backfilled path: no span and
+        // no distance means the session never happened at all.
+        guard finishedAt > start || distanceMeters > 0 else {
+            discardArmedSession()
+            return nil
+        }
         // A backdated start seeds moving time from the walk's beginning; if the
         // walk had already ended by the time we noticed, that seed overshoots the
         // workout's own span. Moving time can never exceed elapsed time.
@@ -549,6 +626,7 @@ final class WorkoutRecorder: LocationProvidingDelegate {
         trace?.close()
         trace = nil
         lastCheckpointAt = nil
+        lastUsableSpeedAt = nil
         autoPause = nil
         lastSplitMovingSeconds = 0
         timeAnchor = nil
@@ -613,9 +691,40 @@ final class WorkoutRecorder: LocationProvidingDelegate {
         // 2b. The coprocessor's veto. GPS cannot tell genuine travel from a
         //     signal bouncing off a building; steps can. See `MotionGate` for
         //     why this may only ever block a start, never force a pause.
-        let motionVetoesStart = motionGate.vetoesStart(at: location.timestamp)
+        let motionReason = motionGate.reason(at: location.timestamp)
+        let motionVetoesStart = motionReason == .stationary
         let vetoed = state == .autoPaused && motionVetoesStart
         var event = vetoed ? "motion-veto" : ""
+
+        // 2c. Blind GPS. When accuracy is too poor to estimate speed, step 3 below
+        //     is skipped entirely — the session can no longer auto-pause, while the
+        //     timer at step 1 keeps crediting every sample that arrives. Indoors
+        //     that combination bills a walk that isn't happening: one real auto-walk
+        //     ran 188 minutes for 501 m with moving time equal to elapsed time, and
+        //     the MET floor turned it into 476 kcal.
+        //
+        //     Stopping normally stays GPS's job, and `MotionGate` is one-directional
+        //     for a good reason — a lagging classification must never hold a stopped
+        //     run open. This is the one case that reasoning does not cover: GPS has
+        //     abdicated, so the coprocessor is not a second opinion, it is the only
+        //     one. Requiring a confident, current `stationary` keeps an outdoor run
+        //     under a canyon or an overpass safe — there CoreMotion says running,
+        //     never stationary, so the clock keeps running exactly as it does now.
+        if speed != nil {
+            lastUsableSpeedAt = location.timestamp
+        } else if state == .recording, motionVetoesStart,
+                  location.timestamp.timeIntervalSince(lastUsableSpeedAt ?? startedAt ?? location.timestamp)
+                    >= Self.blindPauseAfter {
+            // Pause the detector too, not just the state: leaving it un-paused would
+            // make the first usable fix — however slow — read as a resume.
+            autoPause = AutoPauseDetector(activity: activity, startPaused: true)
+            state = .autoPaused
+            event = "blind-pause"
+            if !autoStarted { announcer.announce(.paused) }
+            if presentsLiveActivity {
+                liveActivity.update(liveSnapshot())
+            }
+        }
 
         // 3. Feed the detector on EVERY sample it can judge, so standing still
         //    triggers a pause. A `nil` estimate means "no evidence yet", which
@@ -651,12 +760,15 @@ final class WorkoutRecorder: LocationProvidingDelegate {
 
         trace?.record(location: location, usedSpeed: speed,
                       state: String(describing: state), armed: isArmed,
-                      motion: motionVetoesStart ? "stationary" : "", event: event)
+                      motion: motionReason.rawValue, event: event)
 
         // 4. Accept or reject the sample.
+        // `clock()`, not `Date()`: every other timestamp in this type routes
+        // through the injected clock, and this was the one place a test's fake
+        // clock could not reach — the sample-age check silently used wall time.
         let decision = LocationFilter.evaluate(candidate: location,
                                                lastKept: lastKeptLocation,
-                                               now: Date())
+                                               now: clock())
         if decision.accepted, state == .recording {
             lastMovingAt = location.timestamp
 

@@ -29,6 +29,12 @@ final class AppModel {
     }
 
     let store: DataStore
+    /// Injected so a test gets its own suite instead of sharing the simulator's.
+    /// `SyncCoordinator` always had this seam; `AppModel` did not, so five test
+    /// files constructed models that read and wrote the same fifteen
+    /// `UserDefaults.standard` keys — in parallel, since Swift Testing does not
+    /// serialize suites. Green, and order-dependent by construction.
+    let defaults: UserDefaults
     let health: HealthStoring
     let sync: SyncCoordinator
     let recorder: WorkoutRecorder
@@ -50,46 +56,47 @@ final class AppModel {
 
     @ObservationIgnored nonisolated(unsafe) private var dayChangeObserver: (any NSObjectProtocol)?
 
+    /// The early `return` on the clamp path used to skip the persistence below
+    /// it. Swift does not re-enter an observer for an assignment made inside that
+    /// observer, so an out-of-range value was clamped in memory and never written
+    /// — it reverted on the next launch. Clamp, then always persist whatever the
+    /// property now holds.
     var dailyGoal: Int {
         didSet {
             let clamped = min(max(dailyGoal, Self.goalRange.lowerBound), Self.goalRange.upperBound)
-            if clamped != dailyGoal {
-                dailyGoal = clamped
-                return
-            }
-            UserDefaults.standard.set(dailyGoal, forKey: Self.goalKey)
+            if clamped != dailyGoal { dailyGoal = clamped }
+            defaults.set(dailyGoal, forKey: Self.goalKey)
             Task { await sync.syncNow() }
         }
     }
 
+    /// Same clamp-then-persist shape as `dailyGoal`, for the same reason.
     var weeklyGoldTarget: Int {
         didSet {
             let clamped = min(max(weeklyGoldTarget, Self.weeklyTargetRange.lowerBound), Self.weeklyTargetRange.upperBound)
-            if clamped != weeklyGoldTarget {
-                weeklyGoldTarget = clamped
-                return
-            }
-            UserDefaults.standard.set(weeklyGoldTarget, forKey: Self.weeklyTargetKey)
+            if clamped != weeklyGoldTarget { weeklyGoldTarget = clamped }
+            defaults.set(weeklyGoldTarget, forKey: Self.weeklyTargetKey)
             Task { await sync.syncNow() }
         }
     }
 
     private(set) var weeklyDistanceGoals: [ActivityType: Double]
 
-    static func storedGoal() -> Int {
-        let raw = UserDefaults.standard.object(forKey: goalKey) as? Int ?? 100
+    static func storedGoal(in defaults: UserDefaults = .standard) -> Int {
+        let raw = defaults.object(forKey: goalKey) as? Int ?? 100
         return min(max(raw, goalRange.lowerBound), goalRange.upperBound)
     }
 
-    static func storedWeeklyTarget() -> Int {
-        let raw = UserDefaults.standard.object(forKey: weeklyTargetKey) as? Int ?? 3
+    static func storedWeeklyTarget(in defaults: UserDefaults = .standard) -> Int {
+        let raw = defaults.object(forKey: weeklyTargetKey) as? Int ?? 3
         return min(max(raw, weeklyTargetRange.lowerBound), weeklyTargetRange.upperBound)
     }
 
-    static func storedWeeklyDistanceGoal(for type: ActivityType) -> Double? {
+    static func storedWeeklyDistanceGoal(for type: ActivityType,
+                                         in defaults: UserDefaults = .standard) -> Double? {
         let key = weeklyDistanceGoalKey(for: type)
-        guard UserDefaults.standard.object(forKey: key) != nil else { return nil }
-        let value = UserDefaults.standard.double(forKey: key)
+        guard defaults.object(forKey: key) != nil else { return nil }
+        let value = defaults.double(forKey: key)
         return value.isFinite && value > 0 ? value : nil
     }
 
@@ -101,35 +108,38 @@ final class AppModel {
         let key = Self.weeklyDistanceGoalKey(for: type)
         guard let kilometers, kilometers.isFinite, kilometers > 0 else {
             weeklyDistanceGoals.removeValue(forKey: type)
-            UserDefaults.standard.removeObject(forKey: key)
+            defaults.removeObject(forKey: key)
             return
         }
         weeklyDistanceGoals[type] = kilometers
-        UserDefaults.standard.set(kilometers, forKey: key)
+        defaults.set(kilometers, forKey: key)
     }
 
     init(store: DataStore,
          health: HealthStoring,
          recorder: WorkoutRecorder,
          checkpoints: CheckpointStore,
-         pendingCelebrations: PendingCelebrationStore = PendingCelebrationStore()) {
+         pendingCelebrations: PendingCelebrationStore = PendingCelebrationStore(),
+         defaults: UserDefaults = .standard) {
         self.store = store
+        self.defaults = defaults
         self.health = health
         self.recorder = recorder
         self.checkpoints = checkpoints
         self.pendingCelebrations = pendingCelebrations
-        self.dailyGoal = Self.storedGoal()
-        self.weeklyGoldTarget = Self.storedWeeklyTarget()
+        self.dailyGoal = Self.storedGoal(in: defaults)
+        self.weeklyGoldTarget = Self.storedWeeklyTarget(in: defaults)
         self.weeklyDistanceGoals = Dictionary(uniqueKeysWithValues:
             ActivityType.allCases.compactMap { type in
-                Self.storedWeeklyDistanceGoal(for: type).map { (type, $0) }
+                Self.storedWeeklyDistanceGoal(for: type, in: defaults).map { (type, $0) }
             })
         let profile = ProfileStore(store: store, health: health)
         self.profile = profile
         self.sync = SyncCoordinator(health: health, store: store,
-                                    currentGoal: { Self.storedGoal() },
-                                    currentWeeklyTarget: { Self.storedWeeklyTarget() },
-                                    metricsProvider: { profile.currentMetrics() })
+                                    currentGoal: { Self.storedGoal(in: defaults) },
+                                    currentWeeklyTarget: { Self.storedWeeklyTarget(in: defaults) },
+                                    metricsProvider: { profile.currentMetrics() },
+                                    defaults: defaults)
     }
 
     /// True when no other owner already has the recorder: no unanswered resume
@@ -257,7 +267,11 @@ final class AppModel {
         // guards already on every other announcement site.
         guard recorder.activity == .run, !recorder.autoStarted else { return }
         guard !recorder.isArmed else { return }
-        if recorder.state == .manuallyPaused {
+        // Both paused states must resume here. `liveActivityStatus` renders them
+        // identically ("Resume ▶"), so treating only `.manuallyPaused` as paused
+        // made the button do the opposite of its label on an auto-paused run — and
+        // left it in a state that no longer resumes on movement.
+        if recorder.state == .manuallyPaused || recorder.state == .autoPaused {
             recorder.resumeManually()
         } else {
             recorder.pauseManually()
@@ -280,10 +294,11 @@ final class AppModel {
         return recorder.state == .manuallyPaused ? .paused : .alreadyPaused
     }
 
-    /// Siri's explicit Resume command. It only resumes a manual pause; saying
-    /// "resume" while recording never calls the toggle and therefore can never
-    /// pause the run. An auto-paused run keeps the detector's established
-    /// movement-driven resume behavior.
+    /// Siri's explicit Resume command. Saying "resume" while recording never calls
+    /// the toggle and therefore can never pause the run. It resumes an auto-paused
+    /// run too: "resume" is unambiguous about what the user wants, and leaving the
+    /// detector to notice movement on its own is not what they asked for — the same
+    /// reasoning that fixed `togglePauseFromIntent()`.
     @discardableResult
     func resumeRunFromIntent(announcing: Bool = true) -> ResumeRunVoiceOutcome {
         guard resolveIntentSession() != .unavailable else { return .noRun }
@@ -292,13 +307,11 @@ final class AppModel {
         guard recorder.activity == .run else { return .noRun }
         guard !recorder.isArmed else { return .ready }
         switch recorder.state {
-        case .manuallyPaused:
+        case .manuallyPaused, .autoPaused:
             recorder.resumeManually(announcing: announcing)
             return .resumed
         case .recording:
             return .alreadyRunning
-        case .autoPaused:
-            return .waitingForMovement
         case .idle:
             return .noRun
         }
@@ -376,7 +389,7 @@ final class AppModel {
         var celebrationPersisted = true
         do {
             try pendingCelebrations.save(workout)
-            UserDefaults.standard.removeObject(forKey: Self.acknowledgedCelebrationKey)
+            defaults.removeObject(forKey: Self.acknowledgedCelebrationKey)
         } catch {
             celebrationPersisted = false
         }
@@ -417,11 +430,11 @@ final class AppModel {
         let start = pendingCelebration?.start
         do {
             try pendingCelebrations.clear()
-            UserDefaults.standard.removeObject(forKey: Self.acknowledgedCelebrationKey)
+            defaults.removeObject(forKey: Self.acknowledgedCelebrationKey)
         } catch {
             if let start {
-                UserDefaults.standard.set(start.timeIntervalSince1970,
-                                          forKey: Self.acknowledgedCelebrationKey)
+                defaults.set(start.timeIntervalSince1970,
+                             forKey: Self.acknowledgedCelebrationKey)
             }
         }
         pendingCelebration = nil
@@ -435,7 +448,7 @@ final class AppModel {
     /// dismissed but whose file could not be deleted (IMPORTANT 6).
     private func loadPendingCelebration() -> RecordedWorkout? {
         guard let workout = pendingCelebrations.load() else { return nil }
-        guard let acknowledged = UserDefaults.standard
+        guard let acknowledged = defaults
             .object(forKey: Self.acknowledgedCelebrationKey) as? Double,
               abs(workout.start.timeIntervalSince1970 - acknowledged) < 0.001 else {
             // IMPORTANT 5: the celebration is written BEFORE the local save
@@ -553,9 +566,9 @@ final class AppModel {
         }
         await autoWalk?.onForeground()
         await sync.syncNow()
-        if !UserDefaults.standard.bool(forKey: Self.profilePromptKey) {
+        if !defaults.bool(forKey: Self.profilePromptKey) {
             showProfilePrompt = true
-            UserDefaults.standard.set(true, forKey: Self.profilePromptKey)
+            defaults.set(true, forKey: Self.profilePromptKey)
         }
     }
 
@@ -595,6 +608,13 @@ final class AppModel {
     /// saved. End it explicitly.
     func saveCheckpointedWorkout() async {
         guard let checkpoint = pendingResume else { return }
+        // "Save as-is" on a checkpoint that never covered any distance would
+        // write exactly the 0.00 km row `WorkoutRecorder.finish()` now refuses
+        // to produce. There is nothing to credit, so treat it as Discard.
+        guard checkpoint.distanceMeters > 0 else {
+            discardPendingResume()
+            return
+        }
         let workout = RecordedWorkout(type: checkpoint.activity,
                                       start: checkpoint.startedAt,
                                       end: checkpoint.savedAt,
@@ -618,7 +638,7 @@ final class AppModel {
         // place. `try?`: a second failure to persist just means no file to
         // reload on a later relaunch — the in-memory celebration still shows
         // right now, same tolerance as IMPORTANT 6.
-        UserDefaults.standard.removeObject(forKey: Self.acknowledgedCelebrationKey)
+        defaults.removeObject(forKey: Self.acknowledgedCelebrationKey)
         try? pendingCelebrations.save(workout)
         pendingCelebration = workout
     }

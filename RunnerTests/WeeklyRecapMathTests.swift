@@ -46,7 +46,7 @@ struct WeeklyRecapMathTests {
         #expect(recap.distanceMeters == 0)
         #expect(recap.sessions == 0)
         #expect(recap.goldDays == 0)
-        #expect(recap.bestRun == nil)
+        #expect(recap.bestEffort == nil)
         #expect(recap.hasActivity == false)
     }
 
@@ -89,7 +89,7 @@ struct WeeklyRecapMathTests {
         #expect(recap.pointsPrevious == 70)
     }
 
-    @Test func bestRunIsMaxDistanceThisWeekTieToEarliest() {
+    @Test func bestEffortIsMaxDistanceThisWeekTieToEarliest() {
         let workouts = [
             workout(date(2026, 7, 8, hour: 9), type: .bike, distanceMeters: 8_000),   // later tie
             workout(date(2026, 7, 6, hour: 8), type: .run, distanceMeters: 8_000),    // earlier tie — wins
@@ -99,9 +99,9 @@ struct WeeklyRecapMathTests {
 
         let recap = WeeklyRecapMath.recap(ledgers: [], workouts: workouts, now: now, calendar: cal)
 
-        #expect(recap.bestRun == BestRun(type: .run,
-                                         distanceMeters: 8_000,
-                                         date: date(2026, 7, 6, hour: 8)))
+        #expect(recap.bestEffort == BestEffort(type: .run,
+                                            distanceMeters: 8_000,
+                                            date: date(2026, 7, 6, hour: 8)))
     }
 
     @Test func deltaUsesShiftedPreviousWindowAndIsNilWhenPreviousZero() {

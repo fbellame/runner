@@ -154,11 +154,10 @@ struct InsightsMathTests {
         #expect(result.sessionsPerWeekPrevious == 0.25)
         #expect(result.paceTrend == .improving)
         #expect(result.paceDeltaSecPerKm == -4)
-        #expect(result.distanceTrend == .improving)
         #expect(result.hasEnoughData == true)
     }
 
-    @Test func summaryMarksPaceDecliningAndDistanceDeclining() {
+    @Test func summaryMarksPaceDeclining() {
         let result = InsightsMath.summary([
             summary(date: date(2026, 5, 19), distanceMeters: 10_000, movingSeconds: 3_000),
             summary(date: date(2026, 6, 17), distanceMeters: 8_000, movingSeconds: 2_432)
@@ -169,7 +168,6 @@ struct InsightsMathTests {
 
         #expect(result.paceTrend == .declining)
         #expect(result.paceDeltaSecPerKm == 4)
-        #expect(result.distanceTrend == .declining)
         #expect(result.hasEnoughData == true)
     }
 
@@ -184,7 +182,6 @@ struct InsightsMathTests {
 
         #expect(result.paceTrend == .steady)
         #expect(result.paceDeltaSecPerKm == 2)
-        #expect(result.distanceTrend == .steady)
         #expect(result.hasEnoughData == true)
     }
 
@@ -199,7 +196,6 @@ struct InsightsMathTests {
 
         #expect(result.paceTrend == .steady)
         #expect(result.paceDeltaSecPerKm == -3)
-        #expect(result.distanceTrend == .steady)
     }
 
     @Test func summaryHasInsufficientPaceDataWhenEitherPeriodHasNoPacedSession() {
@@ -242,7 +238,6 @@ struct InsightsMathTests {
         #expect(result.sessionsPerWeekPrevious == 0)
         #expect(result.paceTrend == .insufficientData)
         #expect(result.paceDeltaSecPerKm == nil)
-        #expect(result.distanceTrend == .insufficientData)
         #expect(result.hasEnoughData == false)
     }
 

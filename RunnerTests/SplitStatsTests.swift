@@ -53,7 +53,10 @@ struct SplitStatsTests {
         let analysis = SplitStats.analyze([0, 300, -4, 280])
 
         #expect(analysis.splits.count == 2)
-        #expect(analysis.splits.map(\.km) == [1, 2])
+        // km 2 and km 4 — the kilometres these splits actually are. Labelling
+        // them 1 and 2 renumbered every split after a dropped one, in the list,
+        // on the chart's x-axis and in the "Fastest km · Km N" highlight.
+        #expect(analysis.splits.map(\.km) == [2, 4])
         #expect(analysis.splits.map(\.seconds) == [300, 280])
         #expect(analysis.averageSecPerKm == 290)
         #expect(analysis.fastestKmIndex == 1)

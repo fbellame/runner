@@ -25,13 +25,6 @@ struct AutoWalkCoordinatorTests {
 
     private final class Saved { var workouts: [RecordedWorkout] = [] }
 
-    private final class AnnouncementSpy: Announcing {
-        var events: [RunAnnouncement] = []
-        func announce(_ event: RunAnnouncement) {
-            events.append(event)
-        }
-    }
-
     private final class LiveActivitySpy: LiveActivityPresenting {
         var beginCount = 0
         func begin(_ snapshot: RunActivitySnapshot) { beginCount += 1 }

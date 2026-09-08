@@ -17,7 +17,8 @@ struct StartRunIntentModelTests {
                 provider: FakeLocationProvider(),
                 checkpoints: checkpoints
             ),
-            checkpoints: checkpoints
+            checkpoints: checkpoints,
+            defaults: isolatedDefaults("StartRunIntentModelTests")
         )
     }
 

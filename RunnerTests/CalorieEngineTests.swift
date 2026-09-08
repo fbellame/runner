@@ -11,6 +11,19 @@ struct CalorieEngineTests {
         #expect(mid > 8.3 && mid < 9.8)
     }
 
+    /// A walk session that stays open while the user stands still used to bill the
+    /// 2.0 MET stroll rate for its whole duration, because the table clamped there:
+    /// one real auto-walk covering 501 m in 188 minutes claimed 476 kcal. Standing
+    /// now costs roughly what standing costs.
+    @Test func standingStillDoesNotBillAStrollRate() {
+        #expect(abs(CalorieEngine.met(type: .walk, speedKmh: 0.0) - 1.3) < 0.001)
+        #expect(CalorieEngine.met(type: .walk, speedKmh: 0.16) < 1.5)
+        // 501 m over 188 minutes at 72 kg — the real row.
+        let kcal = CalorieEngine.workoutCalories(type: .walk, distanceMeters: 501,
+                                                 movingSeconds: 188 * 60, weightKg: 72)
+        #expect(kcal < 350)
+    }
+
     @Test func walkAndBikeMET() {
         #expect(abs(CalorieEngine.met(type: .walk, speedKmh: 2.0) - 2.0) < 0.001)  // stroll floor
         #expect(abs(CalorieEngine.met(type: .walk, speedKmh: 5.6) - 4.3) < 0.001)

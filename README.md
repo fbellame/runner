@@ -18,9 +18,18 @@ Streak +5%/gold day (max x1.5). Default goal 100 pts in Settings.
 ```bash
 brew install xcodegen
 xcodegen generate
-xcodebuild -project Runner.xcodeproj -scheme Runner \
-  -destination 'platform=iOS Simulator,name=RunnerSim' test
+xcodebuild test -project Runner.xcodeproj -scheme Runner \
+  -destination 'platform=iOS Simulator,name=RunnerSim' \
+  DEVELOPMENT_TEAM=QPX8CS262Z CODE_SIGNING_ALLOWED=NO
 ```
+
+## CI
+
+Every pull request into `main` runs the whole suite on a simulator
+([`.github/workflows/ci.yml`](.github/workflows/ci.yml)): XcodeGen regenerates
+the project, `xcodebuild test` runs it unsigned on the newest iPhone simulator
+of the runner, and per-target line coverage is printed in the run summary. A
+failing run uploads `TestResults.xcresult` as an artifact.
 
 ## Deploy to iPhone
 
@@ -39,4 +48,5 @@ cache rebuilds itself.
 (HealthKit, CoreLocation, SwiftData). `Runner/Features` contains SwiftUI
 screens (Today, Record, History, Routes, Settings).
 
-Spec: `docs/superpowers/specs/2026-07-05-runner-fitness-app-design.md`.
+Spec: [`docs/SPEC.md`](docs/SPEC.md). The per-epic designs under
+`docs/superpowers/` are a historical log, not maintained.

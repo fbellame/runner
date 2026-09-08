@@ -17,7 +17,6 @@ enum PauseRunVoiceOutcome: Equatable {
 enum ResumeRunVoiceOutcome: Equatable {
     case resumed
     case alreadyRunning
-    case waitingForMovement
     case ready
     case noRun
     case silent

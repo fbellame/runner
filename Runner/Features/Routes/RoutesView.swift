@@ -8,27 +8,50 @@ struct RoutesView: View {
     @State private var selected: WorkoutRec?
     // Decoded once when the workout set or filter changes, not on every body pass.
     @State private var routed: [(rec: WorkoutRec, points: [RoutePoint])] = []
+    /// Decoded routes, kept across rebuilds and keyed by workout id.
+    ///
+    /// `rebuild()` runs on appear, on every change to the workout set, and on
+    /// every filter tap — and it used to JSON-decode every matching route blob
+    /// from scratch each time, synchronously on the main actor. Route blobs are
+    /// the largest thing in the store; tapping "All" after "Run" re-decoded the
+    /// runs it had just decoded. A route is written once with its workout and
+    /// never edited, so a decode is good forever.
+    @State private var decoded: [UUID: [RoutePoint]] = [:]
+    /// The camera, held in state.
+    ///
+    /// This screen passed `Map(initialPosition: .region(region))`, with `region`
+    /// derived from `routed` — which is empty at first render, because it is
+    /// filled in `.onAppear`. `initialPosition` is honoured once and ignored on
+    /// every update, so the camera was always set from the empty case and fell
+    /// through to `fittingRegion`'s literal fallback. The map never framed the
+    /// routes at all; it was invisible only because that fallback is Montreal.
+    @State private var camera: MapCameraPosition = .region(RouteMapView.fittingRegion(for: []))
 
+    /// Thin wrapper over `RouteSelection.visible`: the filtering, decoding,
+    /// caching and two-point rule are pure and tested there, and only the
+    /// mapping back onto `WorkoutRec` (for `navigationDestination`) and the
+    /// camera assignment need to happen here.
     private func rebuild() {
-        routed = workouts.compactMap { rec in
-            guard filter == nil || rec.type == filter,
-                  let data = rec.routeData else { return nil }
-            let points = [RoutePoint].decode(data)
-            return points.count >= 2 ? (rec, points) : nil
-        }
-    }
+        let byID = Dictionary(uniqueKeysWithValues: workouts.map { ($0.id, $0) })
+        let result = RouteSelection.visible(
+            workouts.map { (id: $0.id, type: $0.type, routeData: $0.routeData) },
+            filter: filter,
+            cache: decoded)
 
-    private var region: MKCoordinateRegion {
-        RouteMapView.fittingRegion(for: routed.flatMap(\.points),
-                                   paddingFactor: 1.3,
-                                   minSpan: 0.01)
+        routed = result.items.compactMap { item in
+            byID[item.id].map { (rec: $0, points: item.points) }
+        }
+        decoded = result.cache
+        camera = .region(RouteMapView.fittingRegion(for: result.allPoints,
+                                                    paddingFactor: 1.3,
+                                                    minSpan: 0.01))
     }
 
     var body: some View {
         NavigationStack {
             ZStack(alignment: .top) {
                 MapReader { proxy in
-                    Map(initialPosition: .region(region)) {
+                    Map(position: $camera) {
                         ForEach(routed, id: \.rec.id) { item in
                             MapPolyline(coordinates: item.points.map {
                                 CLLocationCoordinate2D(latitude: $0.lat, longitude: $0.lon)

@@ -36,10 +36,8 @@ struct TypeStats {
     let totalDistanceMeters: Double
     let totalMovingSeconds: Double
     let totalCalories: Double
-    let totalPoints: Int
     let bestPaceSecPerKm: Double?
     let avgPaceSecPerKm: Double?
-    let longestDistanceMeters: Double
     let weeklyDistance: [(weekStart: Date, meters: Double)]
 }
 
@@ -48,7 +46,6 @@ struct LifetimeTotals {
     let movingSeconds: Double
     let calories: Double
     let workouts: Int
-    let routesPainted: Int
     let co2SavedGrams: Double
     let perType: [ActivityType: (distanceMeters: Double, workouts: Int)]
 }
@@ -77,32 +74,29 @@ enum RecordKind: CaseIterable, Equatable, Sendable {
     case bestAveragePace
 }
 
-struct Milestone {
-    let kind: MilestoneKind
-    let threshold: Double
-    let earned: Bool
-    let progress: Double
-}
-
-enum MilestoneKind {
-    case totalDistance
-    case workoutCount
-}
-
 enum ActivityStats {
+    /// A kilometre split faster than this did not happen. `LocationFilter`
+    /// enforces a minimum displacement but no maximum, so one re-acquired fix
+    /// can jump far enough to close several kilometre boundaries at once — the
+    /// recorder appends a zero-second split for each, and already suppresses
+    /// the spoken cue for exactly that reason (see `WorkoutRecorder.ingest`).
+    /// Those splits reached the records: a single glitch pinned "Fastest 1 km"
+    /// at 0 s forever (`Format.pace` renders it as "—", so the row read blank)
+    /// and fired a bogus achievement banner. 120 s/km is 30 km/h — faster than
+    /// any human has run a kilometre, so nothing real is ever rejected.
+    static let minimumPlausibleSplitSeconds: Double = 120
+
     static func typeStats(_ summaries: [ActivityWorkoutSummary], type: ActivityType,
                           calendar: Calendar) -> TypeStats {
         let scoped = summaries.filter { $0.type == type }
         let totalDistance = scoped.reduce(0) { $0 + $1.distanceMeters }
         let totalMovingSeconds = scoped.reduce(0) { $0 + $1.movingSeconds }
         let totalCalories = scoped.reduce(0) { $0 + $1.calories }
-        let totalPoints = scoped.reduce(0) { $0 + $1.points }
         let paced = scoped.filter { $0.distanceMeters > 0 && $0.movingSeconds > 0 }
         let bestPace = paced.map { paceSecondsPerKm($0) }.min()
         let pacedDistance = paced.reduce(0) { $0 + $1.distanceMeters }
         let pacedSeconds = paced.reduce(0) { $0 + $1.movingSeconds }
         let avgPace = pacedDistance > 0 ? pacedSeconds / (pacedDistance / 1000.0) : nil
-        let longest = scoped.map(\.distanceMeters).max() ?? 0
 
         var weeklyMeters: [Date: Double] = [:]
         for summary in scoped {
@@ -114,10 +108,8 @@ enum ActivityStats {
                          totalDistanceMeters: totalDistance,
                          totalMovingSeconds: totalMovingSeconds,
                          totalCalories: totalCalories,
-                         totalPoints: totalPoints,
                          bestPaceSecPerKm: bestPace,
                          avgPaceSecPerKm: avgPace,
-                         longestDistanceMeters: longest,
                          weeklyDistance: weeklyMeters
                             .map { (weekStart: $0.key, meters: $0.value) }
                             .sorted { $0.weekStart < $1.weekStart })
@@ -138,7 +130,6 @@ enum ActivityStats {
                               movingSeconds: summaries.reduce(0) { $0 + $1.movingSeconds },
                               calories: summaries.reduce(0) { $0 + $1.calories },
                               workouts: summaries.count,
-                              routesPainted: summaries.filter(\.hasRoute).count,
                               co2SavedGrams: summaries.reduce(0) { $0 + $1.co2SavedGrams },
                               perType: perType)
     }
@@ -183,15 +174,6 @@ enum ActivityStats {
         return records
     }
 
-    static func milestones(_ totals: LifetimeTotals) -> [Milestone] {
-        milestoneTrack(kind: .totalDistance,
-                       thresholds: [10, 25, 50, 100, 250, 500, 1000],
-                       current: totals.distanceMeters / 1000.0)
-        + milestoneTrack(kind: .workoutCount,
-                         thresholds: [10, 25, 50, 100],
-                         current: Double(totals.workouts))
-    }
-
     private static func paceSecondsPerKm(_ summary: ActivityWorkoutSummary) -> Double {
         summary.movingSeconds / (summary.distanceMeters / 1000.0)
     }
@@ -200,7 +182,7 @@ enum ActivityStats {
     -> (summary: ActivityWorkoutSummary, seconds: Double)? {
         var best: (summary: ActivityWorkoutSummary, seconds: Double)?
         for summary in summaries {
-            for split in summary.splitSeconds {
+            for split in summary.splitSeconds where split >= minimumPlausibleSplitSeconds {
                 if best == nil || split < best!.seconds {
                     best = (summary, split)
                 }
@@ -215,7 +197,11 @@ enum ActivityStats {
 
         for summary in summaries where summary.splitSeconds.count >= 5 {
             for start in 0...(summary.splitSeconds.count - 5) {
-                let seconds = summary.splitSeconds[start..<(start + 5)].reduce(0, +)
+                let window = summary.splitSeconds[start..<(start + 5)]
+                // One implausible split invalidates every window containing it,
+                // not just the split itself.
+                guard window.allSatisfy({ $0 >= minimumPlausibleSplitSeconds }) else { continue }
+                let seconds = window.reduce(0, +)
                 if best == nil || seconds < best!.seconds {
                     best = (summary, seconds)
                 }
@@ -225,24 +211,4 @@ enum ActivityStats {
         return best
     }
 
-    private static func milestoneTrack(kind: MilestoneKind, thresholds: [Double],
-                                       current: Double) -> [Milestone] {
-        let nextUnearned = thresholds.first { current < $0 }
-        return thresholds.map { threshold in
-            let earned = current >= threshold
-            let progress: Double
-            if earned {
-                progress = 1
-            } else if threshold == nextUnearned {
-                progress = threshold > 0 ? min(max(current / threshold, 0), 1) : 0
-            } else {
-                progress = 0
-            }
-
-            return Milestone(kind: kind,
-                             threshold: threshold,
-                             earned: earned,
-                             progress: progress)
-        }
-    }
 }

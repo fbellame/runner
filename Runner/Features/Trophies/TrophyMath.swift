@@ -158,8 +158,19 @@ enum TrophyMath {
     }
 
     static func nextMilestone(_ summaries: [ActivityWorkoutSummary]) -> Badge? {
-        guard !summaries.isEmpty else { return nil }
-        return allBadges(summaries)
+        nextMilestone(from: allBadges(summaries), hasHistory: !summaries.isEmpty)
+    }
+
+    /// The same answer for a caller that has already paid for `allBadges`.
+    ///
+    /// `allBadges` sorts every summary and then walks 8 ladders × 7 thresholds
+    /// per workout — ~43k iterations over a 766-workout history — and it is not
+    /// memoised. `HistoryView` used to call it once directly and once more
+    /// through `nextMilestone`, and `TrophyRoomView` read it as a computed
+    /// property five times per render. A computed property is not a cache.
+    static func nextMilestone(from badges: [Badge], hasHistory: Bool) -> Badge? {
+        guard hasHistory else { return nil }
+        return badges
             .filter { !$0.earned }
             .max { lhs, rhs in
                 if lhs.progress == rhs.progress {

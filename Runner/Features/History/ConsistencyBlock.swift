@@ -55,7 +55,7 @@ struct ConsistencyBlock: View {
 
     private func gapCallout(days: Int) -> some View {
         SurfaceCard {
-            Text(String(format: gapFormat, days))
+            Text(String(format: gapFormat, Int64(days)))
                 .font(.system(size: 14, weight: .semibold, design: .rounded))
                 .foregroundStyle(Color.rOrange)
         }
@@ -64,15 +64,15 @@ struct ConsistencyBlock: View {
     private var gapFormat: String {
         switch type {
         case .run:
-            String(localized: "Last run: %d days ago")
+            String(localized: "Last run: %lld days ago")
         case .walk:
-            String(localized: "Last walk: %d days ago")
+            String(localized: "Last walk: %lld days ago")
         case .bike:
-            String(localized: "Last ride: %d days ago")
+            String(localized: "Last ride: %lld days ago")
         }
     }
 
     private func weeksValue(_ weeks: Int) -> String {
-        String(format: String(localized: "%d wk"), weeks)
+        String(format: String(localized: "%lld wk"), Int64(weeks))
     }
 }

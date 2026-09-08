@@ -27,6 +27,18 @@ final class SystemLocationProvider: NSObject, LocationProviding, CLLocationManag
     /// run failed to auto-pause in the field.
     var configuredDistanceFilter: CLLocationDistance { manager.distanceFilter }
 
+    /// Test seam, same family as the one above and equally load-bearing.
+    /// CoreLocation's automatic pausing stops delivery on *its* judgement of
+    /// when a workout ended, which is the same starvation by another route: the
+    /// recorder would never see the samples its own auto-pause runs on, and a
+    /// paused-by-iOS session never resumes on its own either.
+    var configuredPausesAutomatically: Bool { manager.pausesLocationUpdatesAutomatically }
+
+    /// Test seam. Without this the screen going off ends the run's data — the
+    /// whole point of the hands-free epic. Set in `startUpdates()` rather than
+    /// `init` because iOS requires an in-foreground start.
+    var configuredAllowsBackgroundUpdates: Bool { manager.allowsBackgroundLocationUpdates }
+
     func requestWhenInUseAuthorization() {
         manager.requestWhenInUseAuthorization()
     }

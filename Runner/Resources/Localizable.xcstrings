@@ -321,7 +321,7 @@
         }
       }
     },
-    "%d of %d earned": {
+    "%lld of %lld earned": {
       "localizations": {
         "fr": {
           "stringUnit": {
@@ -331,42 +331,42 @@
         }
       }
     },
-    "%d of %d this week": {
+    "%lld of %lld this week": {
       "localizations": {
         "fr": {
           "stringUnit": {
             "state": "translated",
-            "value": "%d sur %d cette semaine"
+            "value": "%lld sur %lld cette semaine"
           }
         }
       }
     },
-    "%d sessions (vs %d) · %@ (vs %@)": {
+    "%lld sessions (vs %lld) · %@ (vs %@)": {
       "localizations": {
         "fr": {
           "stringUnit": {
             "state": "translated",
-            "value": "%d séances (vs %d) · %@ (vs %@)"
+            "value": "%lld séances (vs %lld) · %@ (vs %@)"
           }
         }
       }
     },
-    "%d vs all-time": {
+    "%lld vs all-time": {
       "localizations": {
         "fr": {
           "stringUnit": {
             "state": "translated",
-            "value": "%d vs records absolus"
+            "value": "%lld vs records absolus"
           }
         }
       }
     },
-    "%d wk": {
+    "%lld wk": {
       "localizations": {
         "fr": {
           "stringUnit": {
             "state": "translated",
-            "value": "%d sem"
+            "value": "%lld sem"
           }
         }
       }
@@ -751,12 +751,12 @@
         }
       }
     },
-    "CO₂ avoided in %d": {
+    "CO₂ avoided in %lld": {
       "localizations": {
         "fr": {
           "stringUnit": {
             "state": "translated",
-            "value": "CO₂ évité en %d"
+            "value": "CO₂ évité en %lld"
           }
         }
       }
@@ -961,12 +961,12 @@
         }
       }
     },
-    "Distance in %d": {
+    "Distance in %lld": {
       "localizations": {
         "fr": {
           "stringUnit": {
             "state": "translated",
-            "value": "Distance en %d"
+            "value": "Distance en %lld"
           }
         }
       }
@@ -1241,12 +1241,12 @@
         }
       }
     },
-    "Hours in %d": {
+    "Hours in %lld": {
       "localizations": {
         "fr": {
           "stringUnit": {
             "state": "translated",
-            "value": "Heures en %d"
+            "value": "Heures en %lld"
           }
         }
       }
@@ -1371,32 +1371,32 @@
         }
       }
     },
-    "Last ride: %d days ago": {
+    "Last ride: %lld days ago": {
       "localizations": {
         "fr": {
           "stringUnit": {
             "state": "translated",
-            "value": "Dernier trajet : il y a %d jours"
+            "value": "Dernier trajet : il y a %lld jours"
           }
         }
       }
     },
-    "Last run: %d days ago": {
+    "Last run: %lld days ago": {
       "localizations": {
         "fr": {
           "stringUnit": {
             "state": "translated",
-            "value": "Dernière course : il y a %d jours"
+            "value": "Dernière course : il y a %lld jours"
           }
         }
       }
     },
-    "Last walk: %d days ago": {
+    "Last walk: %lld days ago": {
       "localizations": {
         "fr": {
           "stringUnit": {
             "state": "translated",
-            "value": "Dernière marche : il y a %d jours"
+            "value": "Dernière marche : il y a %lld jours"
           }
         }
       }
@@ -1951,12 +1951,12 @@
         }
       }
     },
-    "Rides in %d": {
+    "Rides in %lld": {
       "localizations": {
         "fr": {
           "stringUnit": {
             "state": "translated",
-            "value": "Trajets en %d"
+            "value": "Trajets en %lld"
           }
         }
       }
@@ -2561,12 +2561,12 @@
         }
       }
     },
-    "in %d": {
+    "in %lld": {
       "localizations": {
         "fr": {
           "stringUnit": {
             "state": "translated",
-            "value": "en %d"
+            "value": "en %lld"
           }
         }
       }
@@ -2661,12 +2661,12 @@
         }
       }
     },
-    "vs %@ by this time in %d": {
+    "vs %@ by this time in %lld": {
       "localizations": {
         "fr": {
           "stringUnit": {
             "state": "translated",
-            "value": "vs %@ à pareille date en %d"
+            "value": "vs %@ à pareille date en %lld"
           }
         }
       }
