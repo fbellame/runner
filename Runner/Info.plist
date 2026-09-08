@@ -38,8 +38,6 @@
 	</array>
 	<key>ITSAppUsesNonExemptEncryption</key>
 	<false/>
-	<key>LSSupportsOpeningDocumentsInPlace</key>
-	<true/>
 	<key>NSHealthShareUsageDescription</key>
 	<string>Runner reads your daily steps and workouts to compute your daily points.</string>
 	<key>NSHealthUpdateUsageDescription</key>
@@ -60,8 +58,6 @@
 		<string>location</string>
 		<string>audio</string>
 	</array>
-	<key>UIFileSharingEnabled</key>
-	<true/>
 	<key>UILaunchScreen</key>
 	<dict>
 		<key>UIColorName</key>
