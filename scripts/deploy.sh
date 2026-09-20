@@ -1,5 +1,7 @@
 #!/usr/bin/env bash
-# Deploy Runner to a cable-connected iPhone (free Apple ID: re-run weekly).
+# Deploy Runner to a connected iPhone (free Apple ID: re-run weekly).
+#   ./scripts/deploy.sh          # find the iPhone itself
+#   ./scripts/deploy.sh <udid>   # use that device (what refresh-signing.sh passes in)
 # First time only, in Xcode: Settings -> Accounts -> add your Apple ID.
 # On the iPhone: enable Developer Mode (Settings -> Privacy & Security), trust this Mac,
 # and after the first install trust the developer cert (Settings -> General -> VPN & Device Management).
@@ -8,6 +10,9 @@ cd "$(dirname "$0")/.."
 
 command -v xcodegen >/dev/null && xcodegen generate
 
+if [ -n "${1:-}" ]; then
+  UDID="$1"
+else
 JSON=$(mktemp)
 trap 'rm -f "$JSON"' EXIT
 xcrun devicectl list devices --json-output "$JSON" >/dev/null
@@ -28,6 +33,7 @@ for device in data.get("result", {}).get("devices", []):
         break
 PY
 )
+fi
 if [ -z "${UDID}" ]; then
   echo "No iPhone found. Connect it with a cable, unlock it, and tap 'Trust'." >&2
   exit 1

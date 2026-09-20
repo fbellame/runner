@@ -1,0 +1,37 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Checks every day at 14:00 whether Runner is nearing the free Apple ID's 7-day expiry, and
+     reinstalls it over Wi-Fi if so. The script exits immediately when there is nothing to do.
+     Install with scripts/install-refresh-agent.sh, which rewrites HOME_DIR for this machine. -->
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+  <key>Label</key>
+  <string>com.runner.refresh-signing</string>
+
+  <key>ProgramArguments</key>
+  <array>
+    <string>__REPO__/scripts/refresh-signing.sh</string>
+  </array>
+
+  <!-- 14:00: the Mac is awake and the iPhone is on the home Wi-Fi. An hour after the StuSup
+       agent, so two Xcode builds never land on the same minute.
+       If the Mac is asleep then, launchd runs the job on wake. -->
+  <key>StartCalendarInterval</key>
+  <dict>
+    <key>Hour</key><integer>14</integer>
+    <key>Minute</key><integer>0</integer>
+  </dict>
+
+  <key>StandardOutPath</key>
+  <string>__HOME__/Library/Logs/runner-refresh-signing.out.log</string>
+  <key>StandardErrorPath</key>
+  <string>__HOME__/Library/Logs/runner-refresh-signing.err.log</string>
+
+  <!-- An Xcode build must not hang forever. -->
+  <key>ExitTimeOut</key>
+  <integer>1800</integer>
+
+  <key>ProcessType</key>
+  <string>Background</string>
+</dict>
+</plist>
