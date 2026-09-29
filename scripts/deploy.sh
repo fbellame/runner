@@ -45,7 +45,10 @@ if [ -z "${TEAM_ID:-}" ]; then
     | awk -F'= ' '/teamID/{gsub(/[; ]/, "", $2); print $2; exit}')
 fi
 
-BUILD_ARGS=(-project Runner.xcodeproj -scheme Runner -destination "id=${UDID}" -allowProvisioningUpdates)
+# Build for a generic iPhone, not for this one: a device destination makes xcodebuild wait on the
+# Wi-Fi connection ("Connecting to iPhone…") and it hung for 30 min on 2026-09-26 and 09-28.
+# Compiling and signing never needed the phone; only the install below does.
+BUILD_ARGS=(-project Runner.xcodeproj -scheme Runner -destination "generic/platform=iOS" -allowProvisioningUpdates)
 if [ -n "${TEAM_ID:-}" ]; then
   echo "Using development team ${TEAM_ID}"
   BUILD_ARGS+=("DEVELOPMENT_TEAM=${TEAM_ID}")
@@ -54,7 +57,16 @@ xcodebuild "${BUILD_ARGS[@]}" build
 
 PRODUCTS_DIR=$(xcodebuild "${BUILD_ARGS[@]}" -showBuildSettings 2>/dev/null \
   | awk -F' = ' '/ BUILT_PRODUCTS_DIR/{print $2; exit}')
-xcrun devicectl device install app --device "${UDID}" "${PRODUCTS_DIR}/Runner.app"
+# Over Wi-Fi the phone can take a while to answer, or be locked for a minute: retry.
+for attempt in 1 2 3 4 5 6 7 8 9 10; do
+  xcrun devicectl device install app --device "${UDID}" "${PRODUCTS_DIR}/Runner.app" && break
+  if [ "$attempt" -eq 10 ]; then
+    echo "Install failed: is the iPhone unlocked and on the same Wi-Fi?" >&2
+    exit 1
+  fi
+  echo "Install attempt ${attempt} failed, retrying in 30 s…" >&2
+  sleep 30
+done
 if ! xcrun devicectl device process launch --device "${UDID}" com.farid.runner; then
   echo "Runner installed, but iOS refused to launch it." >&2
   echo "On the iPhone, trust the developer profile in Settings -> General -> VPN & Device Management, then rerun this script." >&2

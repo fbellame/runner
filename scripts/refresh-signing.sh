@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Reinstall Runner on the iPhone before the free Apple ID's 7-day signature expires.
 #
-# Run daily by launchd (com.runner.refresh-signing), it does nothing while the last successful
+# Run several times a day by launchd (com.runner.refresh-signing), it does nothing while the last successful
 # install is younger than DELAY_DAYS. The install goes over Wi-Fi: the iPhone only has to be on
 # the same network and unlocked, never plugged in.
 #
@@ -90,7 +90,7 @@ if [ "$STATUS" -eq 0 ] || [ "$STATUS" -eq 2 ]; then
   LAUNCHED="done"
   [ "$STATUS" -eq 0 ] || LAUNCHED="done (installed, iOS refused to launch it)"
 
-  APP="$(xcodebuild -project Runner.xcodeproj -scheme Runner -destination "id=$UDID" \
+  APP="$(xcodebuild -project Runner.xcodeproj -scheme Runner -destination "generic/platform=iOS" \
     -showBuildSettings 2>/dev/null | awk -F' = ' '/ BUILT_PRODUCTS_DIR/{print $2; exit}')/Runner.app"
   UNTIL=$(expiry "$APP")
   UNTIL_AT=$(date -j -f "%Y-%m-%dT%H:%M:%SZ" "${UNTIL:-}" +%s 2>/dev/null || echo 0)
@@ -107,5 +107,11 @@ if [ "$STATUS" -eq 0 ] || [ "$STATUS" -eq 2 ]; then
 fi
 
 note "FAILED: $(echo "$OUTPUT" | tail -3 | tr '\n' ' ')"
-warn "Reinstall failed after $DAYS days. See $LOG."
+# Xcode dropping the Apple ID (seen 2026-09-29) cannot be fixed from here, and since the purge above
+# already deleted the profiles, nothing will build until it is back. Say exactly what to do.
+if echo "$OUTPUT" | grep -q "No Accounts"; then
+  warn "Xcode lost your Apple ID. Xcode → Settings → Accounts → add it back."
+else
+  warn "Reinstall failed after $DAYS days. See $LOG."
+fi
 exit 1

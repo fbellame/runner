@@ -25,6 +25,6 @@ sed -e "s|__REPO__|$REPO|g" -e "s|__HOME__|$HOME|g" \
   launchd/$LABEL.plist > "$TARGET"
 launchctl bootstrap "gui/$UID" "$TARGET"
 
-echo "$LABEL loaded. It checks daily at 14:00 and reinstalls when the signature is 5 days old."
+echo "$LABEL loaded. It checks at 10:00, 14:00, 18:00 and 21:00 and reinstalls when the signature is 5 days old."
 echo "Log:       ~/Library/Logs/runner-refresh-signing.log"
 echo "Run now:   ./scripts/refresh-signing.sh --force"
