@@ -13,14 +13,17 @@
     <string>__REPO__/scripts/refresh-signing.sh</string>
   </array>
 
-  <!-- 14:00: the Mac is awake and the iPhone is on the home Wi-Fi. An hour after the StuSup
-       agent, so two Xcode builds never land on the same minute.
-       If the Mac is asleep then, launchd runs the job on wake. -->
+  <!-- Several tries a day: one attempt at 14:00 lost the whole day whenever the iPhone was locked
+       or away then. The script exits at once while the install is fresh, so the extra runs cost
+       nothing. Minute 0 stays an hour clear of the StuSup agent. If the Mac is asleep, launchd
+       runs the job on wake. -->
   <key>StartCalendarInterval</key>
-  <dict>
-    <key>Hour</key><integer>14</integer>
-    <key>Minute</key><integer>0</integer>
-  </dict>
+  <array>
+    <dict><key>Hour</key><integer>10</integer><key>Minute</key><integer>0</integer></dict>
+    <dict><key>Hour</key><integer>14</integer><key>Minute</key><integer>0</integer></dict>
+    <dict><key>Hour</key><integer>18</integer><key>Minute</key><integer>0</integer></dict>
+    <dict><key>Hour</key><integer>21</integer><key>Minute</key><integer>0</integer></dict>
+  </array>
 
   <key>StandardOutPath</key>
   <string>__HOME__/Library/Logs/runner-refresh-signing.out.log</string>
