@@ -1,6 +1,16 @@
 {
   "sourceLanguage": "en",
   "strings": {
+    "${applicationName} status": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "${applicationName} statut"
+          }
+        }
+      }
+    },
     "Check my run in ${applicationName}": {
       "localizations": {
         "fr": {
@@ -137,6 +147,16 @@
           "stringUnit": {
             "state": "translated",
             "value": "Arrête ma course ${applicationName}"
+          }
+        }
+      }
+    },
+    "Status ${applicationName}": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Statut ${applicationName}"
           }
         }
       }
