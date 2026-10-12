@@ -46,6 +46,8 @@ struct RunnerAppShortcuts: AppShortcutsProvider {
         AppShortcut(
             intent: RunStatusIntent(),
             phrases: [
+                "Status \(.applicationName)",
+                "\(.applicationName) status",
                 "How is my run going in \(.applicationName)",
                 "What is my run status in \(.applicationName)",
                 "Check my run in \(.applicationName)"
